@@ -54,23 +54,29 @@ export async function deleteClientAction(id: number) {
 
 // Concepte Despesa Directa --------------------------------------------------
 
-export async function createConcepteDirectaAction(nom: string) {
+export async function createConcepteDirectaAction(nom: string, preu: number) {
   await requireUser();
   const trimmed = nom.trim();
   if (!trimmed) return;
+  const preuOk = Number.isFinite(preu) ? preu : 28.27;
   await sql`
-    insert into public.concepte_despesa_directa (nom, ordre)
-    values (${trimmed}, coalesce((select max(ordre) + 10 from public.concepte_despesa_directa), 10))
+    insert into public.concepte_despesa_directa (nom, preu_hora_default, ordre)
+    values (${trimmed}, ${preuOk}, coalesce((select max(ordre) + 10 from public.concepte_despesa_directa), 10))
     on conflict (nom) do nothing
   `;
   revalidatePath("/parameters");
 }
 
-export async function updateConcepteDirectaAction(id: number, nom: string, actiu: boolean) {
+export async function updateConcepteDirectaAction(id: number, nom: string, preu: number, actiu: boolean) {
   await requireUser();
   const trimmed = nom.trim();
   if (!trimmed) return;
-  await sql`update public.concepte_despesa_directa set nom = ${trimmed}, actiu = ${actiu} where id = ${id}`;
+  const preuOk = Number.isFinite(preu) ? preu : 28.27;
+  await sql`
+    update public.concepte_despesa_directa
+    set nom = ${trimmed}, preu_hora_default = ${preuOk}, actiu = ${actiu}
+    where id = ${id}
+  `;
   revalidatePath("/parameters");
 }
 

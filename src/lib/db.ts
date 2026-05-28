@@ -1,4 +1,10 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { neon, types, type NeonQueryFunction } from "@neondatabase/serverless";
+
+// Neon (and pg generally) returns BIGINT (int8) as a JS string by default to
+// avoid precision loss. We never have ids ≥ 2^53, so parse them as numbers —
+// otherwise client-side comparisons like `concept.id === pickedId` silently
+// fail because they compare "1" to 1.
+types.setTypeParser(types.builtins.INT8 as unknown as number, (val: string) => parseInt(val, 10));
 
 let _sql: NeonQueryFunction<false, false> | null = null;
 

@@ -38,7 +38,7 @@ export async function updatePropostaAction(id: number, patch: PropostaUpdate) {
 export async function addDespesaDirectaLineAction(propostaId: number, concepteId: number) {
   await requireUser();
   const rows = await sql`
-    select preu_hora_default from public.propostes where id = ${propostaId}
+    select preu_hora_default from public.concepte_despesa_directa where id = ${concepteId}
   ` as { preu_hora_default: string }[];
   const preu_hora = rows[0]?.preu_hora_default ?? "28.27";
 

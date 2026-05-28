@@ -257,6 +257,7 @@ function ClientRow({ row }: { row: Client }) {
 
 function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
   const [nom, setNom] = useState("");
+  const [preu, setPreu] = useState("28.27");
   const [, startTransition] = useTransition();
 
   return (
@@ -265,13 +266,17 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!nom.trim()) return;
-          startTransition(() => createConcepteDirectaAction(nom));
+          const preuNum = parseFloat(preu);
+          if (!Number.isFinite(preuNum)) return;
+          startTransition(() => createConcepteDirectaAction(nom, preuNum));
           setNom("");
+          setPreu("28.27");
         }}
-        className="flex gap-2 max-w-xl"
+        className="grid gap-2 sm:grid-cols-3 max-w-2xl"
       >
-        <input className="input" placeholder="Nou concepte (ex: Visita d'obra)" value={nom} onChange={(e) => setNom(e.target.value)} />
-        <button className="btn-primary" type="submit">+ Afegir</button>
+        <input className="input sm:col-span-2" placeholder="Nou concepte (ex: Visita d'obra)" value={nom} onChange={(e) => setNom(e.target.value)} />
+        <input className="input" type="number" step="0.01" placeholder="€/h" value={preu} onChange={(e) => setPreu(e.target.value)} />
+        <button className="btn-primary sm:col-span-3 sm:w-auto sm:justify-self-start" type="submit">+ Afegir</button>
       </form>
 
       <div className="table-wrap max-w-3xl">
@@ -279,6 +284,7 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
           <thead>
             <tr>
               <th className="th">Concepte</th>
+              <th className="th w-32">€ / hora per defecte</th>
               <th className="th w-20">Actiu</th>
               <th className="th w-32"></th>
             </tr>
@@ -291,6 +297,7 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
         </table>
       </div>
       <p className="text-xs text-[var(--color-muted)]">
+        Canviar el preu aquí no modifica propostes ja creades — només els valors per defecte de les noves línies.
         Desactivar amaga el concepte als nous formularis sense esborrar línies existents.
       </p>
     </div>
@@ -299,13 +306,16 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
 
 function ConcepteDirectaRow({ row }: { row: ConcepteDespesaDirecta }) {
   const [nom, setNom] = useState(row.nom);
+  const [preu, setPreu] = useState(row.preu_hora_default);
   const [actiu, setActiu] = useState(row.actiu);
   const [, startTransition] = useTransition();
 
   function persist() {
     if (!nom.trim()) return;
-    if (nom !== row.nom || actiu !== row.actiu) {
-      startTransition(() => updateConcepteDirectaAction(row.id, nom, actiu));
+    const preuNum = parseFloat(preu);
+    if (!Number.isFinite(preuNum)) return;
+    if (nom !== row.nom || preu !== row.preu_hora_default || actiu !== row.actiu) {
+      startTransition(() => updateConcepteDirectaAction(row.id, nom, preuNum, actiu));
     }
   }
 
@@ -314,11 +324,24 @@ function ConcepteDirectaRow({ row }: { row: ConcepteDespesaDirecta }) {
       <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
       <td className="td">
         <input
+          type="number"
+          step="0.01"
+          className="input text-right"
+          value={preu}
+          onChange={(e) => setPreu(e.target.value)}
+          onBlur={persist}
+        />
+      </td>
+      <td className="td">
+        <input
           type="checkbox"
           checked={actiu}
           onChange={(e) => {
             setActiu(e.target.checked);
-            startTransition(() => updateConcepteDirectaAction(row.id, nom, e.target.checked));
+            const preuNum = parseFloat(preu);
+            if (Number.isFinite(preuNum)) {
+              startTransition(() => updateConcepteDirectaAction(row.id, nom, preuNum, e.target.checked));
+            }
           }}
         />
       </td>

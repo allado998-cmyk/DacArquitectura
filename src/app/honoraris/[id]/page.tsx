@@ -42,7 +42,7 @@ export default async function HonorarisDetailPage({
   const [projectes, clients, conceptesDirectes, conceptesAltres, linesDirectes, linesAltres] = await Promise.all([
     sql`select id, nom, created_at from public.projectes order by nom` as unknown as Promise<Projecte[]>,
     sql`select id, nom, contacte, created_at from public.clients order by nom` as unknown as Promise<Client[]>,
-    sql`select id, nom, actiu, ordre from public.concepte_despesa_directa where actiu = true order by ordre, nom` as unknown as Promise<ConcepteDespesaDirecta[]>,
+    sql`select id, nom, preu_hora_default::text as preu_hora_default, actiu, ordre from public.concepte_despesa_directa where actiu = true order by ordre, nom` as unknown as Promise<ConcepteDespesaDirecta[]>,
     sql`select id, nom, preu_unitat_default::text as preu_unitat_default, actiu, ordre from public.concepte_altra_despesa where actiu = true order by ordre, nom` as unknown as Promise<ConcepteAltraDespesa[]>,
     sql`
       select l.id, l.proposta_id, l.concepte_id, c.nom as concepte_nom,

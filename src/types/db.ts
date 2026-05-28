@@ -14,6 +14,7 @@ export interface Client {
 export interface ConcepteDespesaDirecta {
   id: number;
   nom: string;
+  preu_hora_default: string; // numeric arrives as string from neon
   actiu: boolean;
   ordre: number;
 }

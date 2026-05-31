@@ -47,7 +47,7 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
   if (rows.length === 0) {
     return (
       <div className="card text-sm text-[var(--color-muted)]">
-        Encara no hi ha cap proposta. Crea&apos;n una de nova per començar.
+        Encara no hi ha cap càlcul. Crea&apos;n un de nou per començar.
       </div>
     );
   }

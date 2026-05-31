@@ -206,8 +206,8 @@ export function HonorarisView({
     <div className="space-y-8">
       <div className="flex items-end justify-between">
         <div>
-          <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Totes les propostes</Link>
-          <h1 className="text-2xl font-semibold tracking-tight mt-1">Proposta {proposta.num_proposta}</h1>
+          <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Tots els càlculs</Link>
+          <h1 className="text-2xl font-semibold tracking-tight mt-1">Càlcul {proposta.num_proposta}</h1>
         </div>
         <Link href="/parameters" className="text-sm text-[var(--color-accent)] hover:underline">
           Base de Dades →
@@ -582,8 +582,7 @@ function SummaryRowPercent({
   return (
     <div className="flex items-center justify-between gap-4">
       <span>{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[var(--color-muted)] w-28 text-right">{formatEur(amount)}</span>
+      <div className="flex items-center gap-4">
         <div className="relative">
           <input
             type="number"
@@ -596,6 +595,7 @@ function SummaryRowPercent({
           />
           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-muted)]">%</span>
         </div>
+        <span className="font-mono w-28 text-right">{formatEur(amount)}</span>
       </div>
     </div>
   );

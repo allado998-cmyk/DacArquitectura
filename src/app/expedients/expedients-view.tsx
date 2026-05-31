@@ -180,7 +180,7 @@ function ExpedientsList({
               <th className="th w-44">Categoria</th>
               <th className="th w-44">Tipologia</th>
               <th className="th w-28">Tipus</th>
-              <th className="th w-36">Pressupost</th>
+              <th className="th w-36 text-right">Pressupost</th>
               <th className="th w-32">Tancat el</th>
               <th className="th w-28">Estat</th>
               <th className="th w-20"></th>

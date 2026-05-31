@@ -45,6 +45,7 @@ export interface ExpedientPatch {
   ciutat: string;
   estat: string;
   categoria: string; // "" means none
+  tipologia_id: number | null;
   tipus: string;
   pressupost: number;
   data_tancament: string; // "" means none
@@ -61,6 +62,7 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
   const tipus = TIPUS.includes(data.tipus) ? data.tipus : "privat";
   const pressupost = Number.isFinite(data.pressupost) ? data.pressupost : 0;
   const clientId = data.client_id && Number.isFinite(data.client_id) ? data.client_id : null;
+  const tipologiaId = data.tipologia_id && Number.isFinite(data.tipologia_id) ? data.tipologia_id : null;
   const dataTancament = /^\d{4}-\d{2}-\d{2}$/.test(data.data_tancament) ? data.data_tancament : null;
 
   await sql`
@@ -71,6 +73,7 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       ciutat = ${data.ciutat.trim() || null},
       estat = ${estat},
       categoria = ${categoria},
+      tipologia_id = ${tipologiaId},
       tipus = ${tipus},
       pressupost = ${pressupost},
       data_tancament = ${dataTancament}::date

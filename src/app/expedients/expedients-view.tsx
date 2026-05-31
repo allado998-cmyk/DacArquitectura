@@ -7,7 +7,7 @@ import {
   updateExpedientAction,
   type ExpedientPatch,
 } from "./actions";
-import type { Client, Dedicacio, Expedient } from "@/types/db";
+import type { Client, Dedicacio, Expedient, Tipologia } from "@/types/db";
 import { formatEur } from "@/lib/format";
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS } from "@/lib/expedients";
 import { Combobox, type ComboOption } from "@/components/combobox";
@@ -33,10 +33,12 @@ export function ExpedientsView({
   expedients,
   clients,
   dedicacions,
+  tipologies,
 }: {
   expedients: Expedient[];
   clients: Client[];
   dedicacions: Dedicacio[];
+  tipologies: Tipologia[];
 }) {
   const [tab, setTab] = useState<Tab>("llista");
   const [, startTransition] = useTransition();
@@ -79,8 +81,8 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} />}
-      {tab === "estadistiques" && <StatsPanel rows={expedients} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} tipologies={tipologies} />}
+      {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} />}
     </div>
   );
 }
@@ -143,10 +145,12 @@ function ExpedientsList({
   rows,
   clientOpts,
   dedicByExp,
+  tipologies,
 }: {
   rows: Expedient[];
   clientOpts: ComboOption[];
   dedicByExp: Map<number, Dedicacio[]>;
+  tipologies: Tipologia[];
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
 
@@ -169,6 +173,7 @@ function ExpedientsList({
               <th className="th" style={{ minWidth: "16rem" }}>Client</th>
               <th className="th w-40">Ciutat</th>
               <th className="th w-44">Categoria</th>
+              <th className="th w-44">Tipologia</th>
               <th className="th w-28">Tipus</th>
               <th className="th w-36">Pressupost</th>
               <th className="th w-32">Tancat el</th>
@@ -178,7 +183,7 @@ function ExpedientsList({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} onOpen={() => setDetail(r)} />
+              <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} tipologies={tipologies} onOpen={() => setDetail(r)} />
             ))}
           </tbody>
         </table>
@@ -196,10 +201,12 @@ function ExpedientsList({
 function ExpedientRow({
   row,
   clientOpts,
+  tipologies,
   onOpen,
 }: {
   row: Expedient;
   clientOpts: ComboOption[];
+  tipologies: Tipologia[];
   onOpen: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -210,6 +217,7 @@ function ExpedientRow({
   const [clientId, setClientId] = useState<number | null>(row.client_id);
   const [ciutat, setCiutat] = useState(row.ciutat ?? "");
   const [categoria, setCategoria] = useState<string>(row.categoria ?? "");
+  const [tipologiaId, setTipologiaId] = useState<string>(row.tipologia_id != null ? String(row.tipologia_id) : "");
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
@@ -221,6 +229,7 @@ function ExpedientRow({
     setClientId(row.client_id);
     setCiutat(row.ciutat ?? "");
     setCategoria(row.categoria ?? "");
+    setTipologiaId(row.tipologia_id != null ? String(row.tipologia_id) : "");
     setEstat(row.estat);
     setTipus(row.tipus);
     setPressupost(row.pressupost);
@@ -235,6 +244,7 @@ function ExpedientRow({
       client_id: clientId,
       ciutat,
       categoria,
+      tipologia_id: tipologiaId ? Number(tipologiaId) : null,
       estat,
       tipus,
       pressupost: parseFloat(pressupost) || 0,
@@ -254,6 +264,7 @@ function ExpedientRow({
         <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td"><CategoriaBadge code={row.categoria} /></td>
+        <td className="td">{row.tipologia_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
         <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
         <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
@@ -297,6 +308,14 @@ function ExpedientRow({
           <option value="">—</option>
           {CATEGORIES.map((c) => (
             <option key={c.code} value={c.code}>{c.label}</option>
+          ))}
+        </select>
+      </td>
+      <td className="td align-top">
+        <select className="input" value={tipologiaId} onChange={(e) => setTipologiaId(e.target.value)}>
+          <option value="">—</option>
+          {tipologies.map((t) => (
+            <option key={t.id} value={t.id}>{t.nom}</option>
           ))}
         </select>
       </td>
@@ -425,10 +444,11 @@ function anyOf(num: string): string {
   return m ? `20${m[1]}` : "—";
 }
 
-function StatsPanel({ rows }: { rows: Expedient[] }) {
+function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipologia[] }) {
   const [fAny, setFAny] = useState("");
   const [fEstat, setFEstat] = useState("");
   const [fCategoria, setFCategoria] = useState("");
+  const [fTipologia, setFTipologia] = useState("");
   const [fTipus, setFTipus] = useState("");
   const [fCiutat, setFCiutat] = useState("");
 
@@ -450,11 +470,12 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
         if (fAny && anyOf(r.num_expedient) !== fAny) return false;
         if (fEstat && r.estat !== fEstat) return false;
         if (fCategoria && r.categoria !== fCategoria) return false;
+        if (fTipologia && String(r.tipologia_id ?? "") !== fTipologia) return false;
         if (fTipus && r.tipus !== fTipus) return false;
         if (fCiutat && (r.ciutat ?? "").trim() !== fCiutat) return false;
         return true;
       }),
-    [rows, fAny, fEstat, fCategoria, fTipus, fCiutat],
+    [rows, fAny, fEstat, fCategoria, fTipologia, fTipus, fCiutat],
   );
 
   const total = filtered.length;
@@ -476,15 +497,17 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
     color: c.color,
     count: filtered.filter((r) => r.categoria === c.code).length,
   })).filter((g) => g.count > 0);
+  const byTipologia = groupBy(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
 
   return (
     <div className="space-y-6">
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
           <FilterSelect label="Estat" value={fEstat} onChange={setFEstat} options={[["obert", "Oberts"], ["tancat", "Tancats"]]} />
           <FilterSelect label="Categoria" value={fCategoria} onChange={setFCategoria} options={CATEGORIES.map((c) => [c.code, c.label])} />
+          <FilterSelect label="Tipologia" value={fTipologia} onChange={setFTipologia} options={tipologies.map((t) => [String(t.id), t.nom])} />
           <FilterSelect label="Tipus" value={fTipus} onChange={setFTipus} options={[["privat", "Privat"], ["public", "Públic"]]} />
           <FilterSelect label="Ciutat" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
         </div>
@@ -541,6 +564,11 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
       {/* Categoria */}
       <ChartCard title="Expedients per categoria" meta="nombre">
         <VBarChart bars={catGroups.map((g) => ({ label: g.label, value: g.count, color: g.color, display: String(g.count) }))} />
+      </ChartCard>
+
+      {/* Tipologia */}
+      <ChartCard title="Expedients per tipologia" meta="nombre">
+        <HBarChart bars={byTipologia.map((g) => ({ label: g.key, value: g.count, color: "#ec4899", display: String(g.count) }))} />
       </ChartCard>
 
       {/* Ciutat + Any */}

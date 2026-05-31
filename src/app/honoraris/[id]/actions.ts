@@ -6,11 +6,11 @@ import { sql } from "@/lib/db";
 
 export interface PropostaUpdate {
   data?: string;
-  projecte_id?: number | null;
+  projecte?: string | null;
   client_id?: number | null;
   contacte_prescriptor?: string | null;
-  despeses_indirectes?: number;
-  benefici?: number;
+  despeses_indirectes_pct?: number;
+  benefici_pct?: number;
   total_honoraris_override?: number | null;
 }
 
@@ -21,11 +21,11 @@ export async function updatePropostaAction(id: number, patch: PropostaUpdate) {
   await sql`
     update public.propostes set
       data = coalesce(${patch.data ?? null}::date, data),
-      projecte_id = ${patch.projecte_id === undefined ? null : patch.projecte_id},
+      projecte = ${patch.projecte === undefined ? null : patch.projecte},
       client_id = ${patch.client_id === undefined ? null : patch.client_id},
       contacte_prescriptor = ${patch.contacte_prescriptor ?? null},
-      despeses_indirectes = coalesce(${patch.despeses_indirectes ?? null}::numeric, despeses_indirectes),
-      benefici = coalesce(${patch.benefici ?? null}::numeric, benefici),
+      despeses_indirectes_pct = coalesce(${patch.despeses_indirectes_pct ?? null}::numeric, despeses_indirectes_pct),
+      benefici_pct = coalesce(${patch.benefici_pct ?? null}::numeric, benefici_pct),
       total_honoraris_override = ${patch.total_honoraris_override ?? null}
     where id = ${id}
   `;

@@ -1,6 +1,7 @@
-export interface Projecte {
+export interface Tipologia {
   id: number;
   nom: string;
+  ordre: number;
   created_at: string;
 }
 
@@ -43,13 +44,14 @@ export interface ConcepteAltraDespesa {
 
 export interface Proposta {
   id: number;
+  num_proposta: string; // YY-NNNN
   data: string; // ISO date
-  projecte_id: number | null;
+  projecte: string | null; // free text
   client_id: number | null;
   contacte_prescriptor: string | null;
   preu_hora_default: string;
-  despeses_indirectes: string;
-  benefici: string;
+  despeses_indirectes_pct: string; // percentage
+  benefici_pct: string; // percentage
   total_honoraris_override: string | null;
   created_at: string;
   updated_at: string;
@@ -88,6 +90,8 @@ export interface Expedient {
   ciutat: string | null;
   estat: ExpedientEstat;
   categoria: ExpedientCategoria | null;
+  tipologia_id: number | null;
+  tipologia_nom: string | null; // joined
   tipus: ExpedientTipus;
   pressupost: string; // numeric arrives as string from neon
   data_tancament: string | null; // ISO date, set when closed

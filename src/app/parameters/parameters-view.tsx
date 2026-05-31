@@ -6,10 +6,12 @@ import {
   createClientAction,
   createConcepteAltraAction,
   createConcepteDirectaAction,
+  createTipologiaAction,
   deleteClientAction,
   deleteClientContacteAction,
   deleteConcepteAltraAction,
   deleteConcepteDirectaAction,
+  deleteTipologiaAction,
   updateClientAction,
   updateClientContacteAction,
   updateConcepteAltraAction,
@@ -22,12 +24,13 @@ import type {
   ClientStats,
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
+  Tipologia,
 } from "@/types/db";
 import { formatEur, formatEurPrecise } from "@/lib/format";
 import { Modal } from "@/components/modal";
 import { KpiCard } from "@/components/charts";
 
-type Tab = "clients" | "directes" | "altres";
+type Tab = "clients" | "directes" | "altres" | "tipologies";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
 
@@ -36,11 +39,13 @@ export function ParametersView({
   clientStats,
   conceptesDirectes,
   conceptesAltres,
+  tipologies,
 }: {
   clients: Client[];
   clientStats: ClientStats[];
   conceptesDirectes: ConcepteDespesaDirecta[];
   conceptesAltres: ConcepteAltraDespesa[];
+  tipologies: Tipologia[];
 }) {
   const [tab, setTab] = useState<Tab>("clients");
 
@@ -54,13 +59,76 @@ export function ParametersView({
     <div>
       <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
         <TabBtn current={tab} value="clients" onClick={setTab}>Clients ({clients.length})</TabBtn>
+        <TabBtn current={tab} value="tipologies" onClick={setTab}>Tipologies ({tipologies.length})</TabBtn>
         <TabBtn current={tab} value="directes" onClick={setTab}>Despeses Directes ({conceptesDirectes.length})</TabBtn>
         <TabBtn current={tab} value="altres" onClick={setTab}>Altres Despeses ({conceptesAltres.length})</TabBtn>
       </div>
 
       {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} />}
+      {tab === "tipologies" && <TipologiesPanel rows={tipologies} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} />}
+    </div>
+  );
+}
+
+// ============================================================================
+// Tipologies
+// ============================================================================
+
+function TipologiesPanel({ rows }: { rows: Tipologia[] }) {
+  const [nom, setNom] = useState("");
+  const [query, setQuery] = useState("");
+  const [, startTransition] = useTransition();
+
+  const q = query.trim().toLowerCase();
+  const filtered = (q ? rows.filter((t) => t.nom.toLowerCase().includes(q)) : rows)
+    .slice()
+    .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <input className="input max-w-xs" placeholder="Cercar tipologia…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!nom.trim()) return;
+            startTransition(() => createTipologiaAction(nom));
+            setNom("");
+          }}
+          className="flex gap-2 ml-auto"
+        >
+          <input className="input" placeholder="Nova tipologia" value={nom} onChange={(e) => setNom(e.target.value)} />
+          <button className="btn-primary" type="submit">+ Afegir</button>
+        </form>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap tipologia encara." : "Cap resultat."}</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((t) => (
+            <div key={t.id} className="flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-white px-3 py-2">
+              <span className="text-sm">{t.nom}</span>
+              <button
+                type="button"
+                className="text-red-700 hover:underline text-sm"
+                onClick={() => {
+                  if (confirm(`Eliminar la tipologia "${t.nom}"?`)) {
+                    startTransition(() => deleteTipologiaAction(t.id));
+                  }
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-[var(--color-muted)]">
+        Eliminar una tipologia no esborra els expedients: només es desvincula.
+      </p>
     </div>
   );
 }
@@ -326,7 +394,13 @@ function ContacteRow({ row }: { row: ClientContacte }) {
 function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
   const [nom, setNom] = useState("");
   const [preu, setPreu] = useState("28.27");
+  const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
+
+  const q = query.trim().toLowerCase();
+  const filtered = (q ? rows.filter((c) => c.nom.toLowerCase().includes(q)) : rows)
+    .slice()
+    .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
 
   return (
     <div className="space-y-4">
@@ -347,18 +421,20 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
         <button className="btn-primary sm:col-span-3 sm:w-auto sm:justify-self-start" type="submit">+ Afegir</button>
       </form>
 
+      <input className="input max-w-xs" placeholder="Cercar concepte…" value={query} onChange={(e) => setQuery(e.target.value)} />
+
       <div className="table-wrap max-w-3xl">
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th">Concepte</th>
+              <th className="th">Concepte (A–Z)</th>
               <th className="th w-32">€ / hora per defecte</th>
               <th className="th w-20">Actiu</th>
               <th className="th w-32"></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => (
+            {filtered.map((c) => (
               <ConcepteDirectaRow key={c.id} row={c} />
             ))}
           </tbody>
@@ -429,7 +505,13 @@ function ConcepteDirectaRow({ row }: { row: ConcepteDespesaDirecta }) {
 function ConceptesAltresPanel({ rows }: { rows: ConcepteAltraDespesa[] }) {
   const [nom, setNom] = useState("");
   const [preu, setPreu] = useState("0");
+  const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
+
+  const q = query.trim().toLowerCase();
+  const filtered = (q ? rows.filter((c) => c.nom.toLowerCase().includes(q)) : rows)
+    .slice()
+    .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
 
   return (
     <div className="space-y-4">
@@ -450,18 +532,20 @@ function ConceptesAltresPanel({ rows }: { rows: ConcepteAltraDespesa[] }) {
         <button className="btn-primary sm:col-span-3 sm:w-auto sm:justify-self-start" type="submit">+ Afegir</button>
       </form>
 
+      <input className="input max-w-xs" placeholder="Cercar concepte…" value={query} onChange={(e) => setQuery(e.target.value)} />
+
       <div className="table-wrap max-w-4xl">
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th">Concepte</th>
+              <th className="th">Concepte (A–Z)</th>
               <th className="th w-40">€ / unitat per defecte</th>
               <th className="th w-20">Actiu</th>
               <th className="th w-32"></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => (
+            {filtered.map((c) => (
               <ConcepteAltraRow key={c.id} row={c} />
             ))}
           </tbody>

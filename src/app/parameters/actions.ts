@@ -77,6 +77,26 @@ export async function deleteClientContacteAction(id: number) {
   revalidatePath("/parameters");
 }
 
+// Tipologies ----------------------------------------------------------------
+
+export async function createTipologiaAction(nom: string) {
+  await requireUser();
+  const trimmed = nom.trim();
+  if (!trimmed) return;
+  await sql`
+    insert into public.tipologies (nom, ordre)
+    values (${trimmed}, coalesce((select max(ordre) + 10 from public.tipologies), 10))
+    on conflict (nom) do nothing
+  `;
+  revalidatePath("/parameters");
+}
+
+export async function deleteTipologiaAction(id: number) {
+  await requireUser();
+  await sql`delete from public.tipologies where id = ${id}`;
+  revalidatePath("/parameters");
+}
+
 // Concepte Despesa Directa --------------------------------------------------
 
 export async function createConcepteDirectaAction(nom: string, preu: number) {

@@ -290,6 +290,7 @@ function EntryForm({
 
 function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
+  const [pending, startTransition] = useTransition();
 
   const byDate = useMemo(() => {
     const map = new Map<string, Dedicacio[]>();
@@ -323,11 +324,24 @@ function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: st
                 ) : (
                   <ul className="space-y-1">
                     {items.map((d) => (
-                      <li key={d.id} className="flex items-baseline gap-2 text-sm">
+                      <li key={d.id} className="group flex items-baseline gap-2 text-sm">
                         <span className="font-mono text-xs text-[var(--color-muted)] w-28 shrink-0 truncate" title={targetLabel(d)}>{targetLabel(d)}</span>
                         <span className="font-medium tabular-nums w-14 shrink-0">{fmtHores(parseFloat(d.hores) || 0)}</span>
                         <span>{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</span>
                         {d.comentari && <span className="text-[var(--color-muted)]">· {d.comentari}</span>}
+                        <button
+                          type="button"
+                          className="ml-auto text-red-700 hover:underline text-xs opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                          disabled={pending}
+                          onClick={() => {
+                            if (confirm("Eliminar aquesta dedicació?")) {
+                              startTransition(() => deleteDedicacioAction(d.id));
+                            }
+                          }}
+                          aria-label="Eliminar"
+                        >
+                          ✕
+                        </button>
                       </li>
                     ))}
                   </ul>

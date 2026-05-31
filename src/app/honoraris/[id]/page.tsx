@@ -4,7 +4,6 @@ import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { HonorarisView } from "./honoraris-view";
 import type {
-  Projecte,
   Client,
   ConcepteDespesaDirecta,
   ConcepteAltraDespesa,
@@ -26,12 +25,12 @@ export default async function HonorarisDetailPage({
   if (!Number.isFinite(id)) notFound();
 
   const propostaRows = (await sql`
-    select id,
+    select id, num_proposta,
            to_char(data, 'YYYY-MM-DD') as data,
-           projecte_id, client_id, contacte_prescriptor,
+           projecte, client_id, contacte_prescriptor,
            preu_hora_default::text as preu_hora_default,
-           despeses_indirectes::text as despeses_indirectes,
-           benefici::text as benefici,
+           despeses_indirectes_pct::text as despeses_indirectes_pct,
+           benefici_pct::text as benefici_pct,
            total_honoraris_override::text as total_honoraris_override,
            created_at, updated_at
     from public.propostes where id = ${id}
@@ -39,8 +38,7 @@ export default async function HonorarisDetailPage({
   if (propostaRows.length === 0) notFound();
   const proposta = propostaRows[0];
 
-  const [projectes, clients, conceptesDirectes, conceptesAltres, linesDirectes, linesAltres] = await Promise.all([
-    sql`select id, nom, created_at from public.projectes order by nom` as unknown as Promise<Projecte[]>,
+  const [clients, conceptesDirectes, conceptesAltres, linesDirectes, linesAltres] = await Promise.all([
     sql`select id, nom, contacte, created_at from public.clients order by nom` as unknown as Promise<Client[]>,
     sql`select id, nom, preu_hora_default::text as preu_hora_default, actiu, ordre from public.concepte_despesa_directa where actiu = true order by ordre, nom` as unknown as Promise<ConcepteDespesaDirecta[]>,
     sql`select id, nom, preu_unitat_default::text as preu_unitat_default, actiu, ordre from public.concepte_altra_despesa where actiu = true order by ordre, nom` as unknown as Promise<ConcepteAltraDespesa[]>,
@@ -68,7 +66,6 @@ export default async function HonorarisDetailPage({
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <HonorarisView
           proposta={proposta}
-          projectes={projectes}
           clients={clients}
           conceptesDirectes={conceptesDirectes}
           conceptesAltres={conceptesAltres}

@@ -16,7 +16,6 @@ import type {
   Client,
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
-  Projecte,
   Proposta,
   PropostaAltraDespesaLine,
   PropostaDespesaDirectaLine,
@@ -32,7 +31,6 @@ function n(v: string | number | null | undefined): number {
 
 export function HonorarisView({
   proposta,
-  projectes,
   clients,
   conceptesDirectes,
   conceptesAltres,
@@ -40,7 +38,6 @@ export function HonorarisView({
   initialLinesAltres,
 }: {
   proposta: Proposta;
-  projectes: Projecte[];
   clients: Client[];
   conceptesDirectes: ConcepteDespesaDirecta[];
   conceptesAltres: ConcepteAltraDespesa[];
@@ -49,13 +46,13 @@ export function HonorarisView({
 }) {
   // Header (with optimistic local state, persisted onBlur).
   const [data, setData] = useState(proposta.data);
-  const [projecteId, setProjecteId] = useState<number | "">(proposta.projecte_id ?? "");
+  const [projecte, setProjecte] = useState(proposta.projecte ?? "");
   const [clientId, setClientId] = useState<number | "">(proposta.client_id ?? "");
   const [contacte, setContacte] = useState(proposta.contacte_prescriptor ?? "");
 
-  // Resum free inputs.
-  const [despesesIndirectes, setDespesesIndirectes] = useState<string>(proposta.despeses_indirectes);
-  const [benefici, setBenefici] = useState<string>(proposta.benefici);
+  // Resum percentages (of the final total).
+  const [pInd, setPInd] = useState<string>(proposta.despeses_indirectes_pct);
+  const [pBen, setPBen] = useState<string>(proposta.benefici_pct);
 
   // Resum Final override (nullable).
   const [totalOverride, setTotalOverride] = useState<string>(proposta.total_honoraris_override ?? "");
@@ -75,16 +72,38 @@ export function HonorarisView({
     [linesAltres]
   );
 
-  const totalHonorarisComputed = totalDirectes + totalAltres + n(despesesIndirectes) + n(benefici);
+  // Direct + other costs are "the project itself"; indirectes & benefici are
+  // percentages OF THE FINAL total. If they are 30% and 20%, the project is the
+  // remaining 50% → total = base / (1 - 0.30 - 0.20).
+  const base = totalDirectes + totalAltres;
+  const pIndN = Math.max(0, n(pInd));
+  const pBenN = Math.max(0, n(pBen));
+  const denom = 1 - (pIndN + pBenN) / 100;
+  const overflow = denom <= 0; // percentages add up to ≥ 100%
+  const totalHonorarisComputed = overflow ? base : base / denom;
+  const indirectesAmount = totalHonorarisComputed * (pIndN / 100);
+  const beneficiAmount = totalHonorarisComputed * (pBenN / 100);
+  const projecteShare = Math.max(0, 100 - pIndN - pBenN);
+
   const totalHonorarisFinal = totalOverride === "" ? totalHonorarisComputed : n(totalOverride);
   const iva = totalHonorarisFinal * IVA_RATE;
   const totalAIngresar = totalHonorarisFinal + iva;
 
   // Helpers ----------------------------------------------------------------
 
+  // Always persist the full header so a single-field change never nulls the rest.
   function persistHeader(patch: Parameters<typeof updatePropostaAction>[1]) {
     startTransition(() => {
-      updatePropostaAction(proposta.id, patch);
+      updatePropostaAction(proposta.id, {
+        data,
+        projecte: projecte.trim() || null,
+        client_id: clientId === "" ? null : clientId,
+        contacte_prescriptor: contacte.trim() || null,
+        despeses_indirectes_pct: pIndN,
+        benefici_pct: pBenN,
+        total_honoraris_override: totalOverride === "" ? null : n(totalOverride),
+        ...patch,
+      });
     });
   }
 
@@ -177,10 +196,10 @@ export function HonorarisView({
       <div className="flex items-end justify-between">
         <div>
           <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Totes les propostes</Link>
-          <h1 className="text-2xl font-semibold tracking-tight mt-1">Proposta núm. {proposta.id}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight mt-1">Proposta {proposta.num_proposta}</h1>
         </div>
         <Link href="/parameters" className="text-sm text-[var(--color-accent)] hover:underline">
-          Gestionar paràmetres →
+          Base de Dades →
         </Link>
       </div>
 
@@ -200,25 +219,19 @@ export function HonorarisView({
           </div>
           <div>
             <label className="label">Proposta núm.</label>
-            <div className="input bg-[var(--color-paper)] font-mono">{proposta.id}</div>
+            <div className="input bg-[var(--color-paper)] font-mono">{proposta.num_proposta}</div>
           </div>
           <div>
             <label className="label" htmlFor="projecte">Projecte</label>
-            <select
+            <input
               id="projecte"
+              type="text"
               className="input"
-              value={projecteId === "" ? "" : projecteId}
-              onChange={(e) => {
-                const v = e.target.value === "" ? "" : Number(e.target.value);
-                setProjecteId(v);
-                persistHeader({ projecte_id: v === "" ? null : v });
-              }}
-            >
-              <option value="">— Selecciona —</option>
-              {projectes.map((p) => (
-                <option key={p.id} value={p.id}>{p.nom}</option>
-              ))}
-            </select>
+              placeholder="Nom del projecte"
+              value={projecte}
+              onChange={(e) => setProjecte(e.target.value)}
+              onBlur={() => persistHeader({ projecte: projecte.trim() || null })}
+            />
           </div>
           <div>
             <label className="label" htmlFor="client">Client</label>
@@ -250,10 +263,10 @@ export function HonorarisView({
             />
           </div>
         </div>
-        {(projectes.length === 0 || clients.length === 0) && (
+        {clients.length === 0 && (
           <p className="mt-4 text-xs text-[var(--color-muted)]">
-            Si no veus opcions a Projecte o Client, afegeix-les a{" "}
-            <Link href="/parameters" className="underline">Paràmetres</Link>.
+            Si no veus opcions a Client, afegeix-les a{" "}
+            <Link href="/parameters" className="underline">Base de Dades</Link>.
           </p>
         )}
       </section>
@@ -440,20 +453,30 @@ export function HonorarisView({
       <section className="card">
         <h2 className="text-lg font-semibold mb-4">Resum</h2>
         <div className="space-y-2 text-sm">
-          <SummaryRow label="Despeses Directes" value={formatEur(totalDirectes)} />
-          <SummaryRow label="Altres Despeses" value={formatEur(totalAltres)} />
-          <SummaryRowEditable
+          <SummaryRow label={`Projecte — despeses directes + altres (${projecteShare.toFixed(0)}%)`} value={formatEur(base)} />
+          <div className="pl-4 text-xs text-[var(--color-muted)] space-y-1">
+            <div className="flex items-center justify-between"><span>· Despeses Directes</span><span className="font-mono">{formatEur(totalDirectes)}</span></div>
+            <div className="flex items-center justify-between"><span>· Altres Despeses</span><span className="font-mono">{formatEur(totalAltres)}</span></div>
+          </div>
+          <SummaryRowPercent
             label="Despeses Indirectes"
-            value={despesesIndirectes}
-            onChange={(v) => setDespesesIndirectes(v)}
-            onCommit={() => persistHeader({ despeses_indirectes: n(despesesIndirectes) })}
+            value={pInd}
+            amount={indirectesAmount}
+            onChange={(v) => setPInd(v)}
+            onCommit={() => persistHeader({ despeses_indirectes_pct: Math.max(0, n(pInd)) })}
           />
-          <SummaryRowEditable
+          <SummaryRowPercent
             label="Benefici"
-            value={benefici}
-            onChange={(v) => setBenefici(v)}
-            onCommit={() => persistHeader({ benefici: n(benefici) })}
+            value={pBen}
+            amount={beneficiAmount}
+            onChange={(v) => setPBen(v)}
+            onCommit={() => persistHeader({ benefici_pct: Math.max(0, n(pBen)) })}
           />
+          {overflow && (
+            <p className="text-xs text-red-700">
+              Els percentatges sumen 100% o més. Redueix-los perquè el projecte tingui un pes positiu.
+            </p>
+          )}
           <div className="flex items-center justify-between border-t border-[var(--color-line)] pt-3 mt-3">
             <span className="font-semibold">Total Honoraris</span>
             <span className="font-semibold font-mono">{formatEur(totalHonorarisComputed)}</span>
@@ -515,28 +538,37 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryRowEditable({
+function SummaryRowPercent({
   label,
   value,
+  amount,
   onChange,
   onCommit,
 }: {
   label: string;
   value: string;
+  amount: number;
   onChange: (v: string) => void;
   onCommit: () => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span>{label}</span>
-      <input
-        type="number"
-        step="0.01"
-        className="input text-right w-40"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onCommit}
-      />
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[var(--color-muted)] w-28 text-right">{formatEur(amount)}</span>
+        <div className="relative">
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            className="input text-right w-24 pr-7"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onCommit}
+          />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-muted)]">%</span>
+        </div>
+      </div>
     </div>
   );
 }

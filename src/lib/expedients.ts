@@ -36,3 +36,24 @@ export const ESTAT: Record<ExpedientEstat, Swatch & { label: string }> = {
   obert: { label: "Obert", color: "#dc2626", bg: "#fee2e2", text: "#b91c1c" }, // red
   tancat: { label: "Tancat", color: "#16a34a", bg: "#dcfce7", text: "#15803d" }, // green
 };
+
+// Tipologies are a user-managed catalog, so colours are assigned deterministically
+// from a palette (stable per name) to look like the categoria badges.
+export const TIPOLOGIA_PALETTE: Swatch[] = [
+  { color: "#ef4444", bg: "#fef2f2", text: "#b91c1c" },
+  { color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
+  { color: "#10b981", bg: "#ecfdf5", text: "#047857" },
+  { color: "#14b8a6", bg: "#f0fdfa", text: "#0f766e" },
+  { color: "#0ea5e9", bg: "#f0f9ff", text: "#0369a1" },
+  { color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
+  { color: "#6366f1", bg: "#eef2ff", text: "#4338ca" },
+  { color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
+  { color: "#a855f7", bg: "#faf5ff", text: "#7e22ce" },
+  { color: "#ec4899", bg: "#fdf2f8", text: "#be185d" },
+];
+
+export function tipologiaSwatch(key: string): Swatch {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return TIPOLOGIA_PALETTE[h % TIPOLOGIA_PALETTE.length];
+}

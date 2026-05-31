@@ -9,7 +9,7 @@ import {
 } from "./actions";
 import type { Client, Dedicacio, Expedient, Tipologia } from "@/types/db";
 import { formatEur } from "@/lib/format";
-import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS } from "@/lib/expedients";
+import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, VBarChart } from "@/components/charts";
@@ -137,6 +137,11 @@ function CategoriaBadge({ code }: { code: string | null }) {
   return <Badge swatch={m} label={m.label} />;
 }
 
+function TipologiaBadge({ nom }: { nom: string | null }) {
+  if (!nom) return <span className="text-[var(--color-muted)]">—</span>;
+  return <Badge swatch={tipologiaSwatch(nom)} label={nom} />;
+}
+
 // ============================================================================
 // Llista
 // ============================================================================
@@ -178,7 +183,7 @@ function ExpedientsList({
               <th className="th w-36">Pressupost</th>
               <th className="th w-32">Tancat el</th>
               <th className="th w-28">Estat</th>
-              <th className="th w-32"></th>
+              <th className="th w-20"></th>
             </tr>
           </thead>
           <tbody>
@@ -264,26 +269,26 @@ function ExpedientRow({
         <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td"><CategoriaBadge code={row.categoria} /></td>
-        <td className="td">{row.tipologia_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+        <td className="td"><TipologiaBadge nom={row.tipologia_nom} /></td>
         <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
         <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
         <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
-        <td className="td text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => setEditing(true)}>
-            Editar
-          </button>
-          <button
-            type="button"
-            className="text-red-700 hover:underline text-sm"
-            onClick={() => {
-              if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
-                startTransition(() => deleteExpedientAction(row.id));
-              }
-            }}
-          >
-            Eliminar
-          </button>
+        <td className="td whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-1">
+            <IconBtn title="Editar" onClick={() => setEditing(true)} className="text-[var(--color-accent)]">✎</IconBtn>
+            <IconBtn
+              title="Eliminar"
+              className="text-red-700"
+              onClick={() => {
+                if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
+                  startTransition(() => deleteExpedientAction(row.id));
+                }
+              }}
+            >
+              ✕
+            </IconBtn>
+          </div>
         </td>
       </tr>
     );
@@ -345,22 +350,49 @@ function ExpedientRow({
           <option value="tancat">Tancat</option>
         </select>
       </td>
-      <td className="td align-top text-right whitespace-nowrap">
-        <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3 disabled:opacity-50" onClick={save} disabled={pending}>
-          Desar
-        </button>
-        <button
-          type="button"
-          className="text-[var(--color-muted)] hover:underline text-sm"
-          onClick={() => {
-            reset();
-            setEditing(false);
-          }}
-        >
-          Cancel·lar
-        </button>
+      <td className="td align-top whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1">
+          <IconBtn title="Desar" onClick={save} disabled={pending} className="text-[var(--color-accent)]">✓</IconBtn>
+          <IconBtn
+            title="Cancel·lar"
+            className="text-[var(--color-muted)]"
+            onClick={() => {
+              reset();
+              setEditing(false);
+            }}
+          >
+            ✕
+          </IconBtn>
+        </div>
       </td>
     </tr>
+  );
+}
+
+function IconBtn({
+  children,
+  title,
+  onClick,
+  className = "",
+  disabled,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  className?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--color-paper)] disabled:opacity-50 ${className}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -568,7 +600,7 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
 
       {/* Tipologia */}
       <ChartCard title="Expedients per tipologia" meta="nombre">
-        <HBarChart bars={byTipologia.map((g) => ({ label: g.key, value: g.count, color: "#ec4899", display: String(g.count) }))} />
+        <HBarChart bars={byTipologia.map((g) => ({ label: g.key, value: g.count, color: tipologiaSwatch(g.key).color, display: String(g.count) }))} />
       </ChartCard>
 
       {/* Ciutat + Any */}

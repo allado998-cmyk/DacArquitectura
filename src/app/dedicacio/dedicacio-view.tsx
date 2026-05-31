@@ -58,10 +58,6 @@ function weekStart(iso: string) {
   dt.setDate(dt.getDate() - day);
   return dateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
-function targetLabel(d: Dedicacio) {
-  return d.num_expedient ?? d.activitat ?? "—";
-}
-
 export function DedicacioView({
   expedients,
   dedicacions,
@@ -323,27 +319,33 @@ function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: st
                   <p className="text-sm text-[var(--color-muted)]">Sense dedicació.</p>
                 ) : (
                   <ul className="space-y-1">
-                    {items.map((d) => (
-                      <li key={d.id} className="group flex items-baseline gap-2 text-sm">
-                        <span className="font-mono text-xs text-[var(--color-muted)] w-28 shrink-0 truncate" title={targetLabel(d)}>{targetLabel(d)}</span>
-                        <span className="font-medium tabular-nums w-14 shrink-0">{fmtHores(parseFloat(d.hores) || 0)}</span>
-                        <span>{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</span>
-                        {d.comentari && <span className="text-[var(--color-muted)]">· {d.comentari}</span>}
-                        <button
-                          type="button"
-                          className="ml-auto text-red-700 hover:underline text-xs opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                          disabled={pending}
-                          onClick={() => {
-                            if (confirm("Eliminar aquesta dedicació?")) {
-                              startTransition(() => deleteDedicacioAction(d.id));
-                            }
-                          }}
-                          aria-label="Eliminar"
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
+                    {items.map((d) => {
+                      const exp = d.num_expedient
+                        ? `${d.num_expedient}${d.projecte ? ` · ${d.projecte}` : ""}`
+                        : d.activitat ?? "—";
+                      return (
+                        <li key={d.id} className="flex items-baseline gap-2 text-sm">
+                          <span className="w-14 shrink-0 text-right font-semibold tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</span>
+                          <span className="font-medium truncate max-w-[22rem]" title={exp}>{exp}</span>
+                          {d.tasca && <span className="text-[var(--color-muted)]">· {d.tasca}</span>}
+                          {d.comentari && <span className="text-[var(--color-muted)]">· {d.comentari}</span>}
+                          <button
+                            type="button"
+                            className="ml-2 shrink-0 text-red-700 hover:text-red-900 text-sm disabled:opacity-50"
+                            disabled={pending}
+                            onClick={() => {
+                              if (confirm("Eliminar aquesta dedicació?")) {
+                                startTransition(() => deleteDedicacioAction(d.id));
+                              }
+                            }}
+                            aria-label="Eliminar"
+                            title="Eliminar"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
@@ -368,77 +370,49 @@ function cellStyle(hours: number, max: number): React.CSSProperties {
 
 function Calendar({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
   const [ty, tm] = today.split("-").map(Number);
+  const [offset, setOffset] = useState(0); // 0 = current month
 
-  const months = useMemo(() => {
-    const out: { year: number; month: number }[] = [];
-    for (let i = 2; i >= 0; i--) {
-      const dt = new Date(ty, tm - 1 - i, 1);
-      out.push({ year: dt.getFullYear(), month: dt.getMonth() });
-    }
-    return out;
-  }, [ty, tm]);
-
-  const monthKeys = new Set(months.map((m) => `${m.year}-${pad(m.month + 1)}`));
+  const base = new Date(ty, tm - 1 + offset, 1);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const monthKey = `${year}-${pad(month + 1)}`;
 
   const hoursByDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of dedicacions) {
-      if (!monthKeys.has(d.data.slice(0, 7))) continue;
+      if (d.data.slice(0, 7) !== monthKey) continue;
       map.set(d.data, (map.get(d.data) ?? 0) + (parseFloat(d.hores) || 0));
     }
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dedicacions, ty, tm]);
+  }, [dedicacions, monthKey]);
 
   const max = Math.max(0, ...hoursByDate.values());
   const total = Array.from(hoursByDate.values()).reduce((s, h) => s + h, 0);
   const dies = hoursByDate.size;
 
-  return (
-    <div className="card">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold tracking-tight">Calendari · últims 3 mesos</h2>
-        <div className="flex items-center gap-6 text-sm">
-          <Stat label="Hores" value={fmtHores(total)} />
-          <Stat label="Dies treballats" value={String(dies)} />
-          <Stat label="Mitjana / dia" value={fmtHores(dies ? total / dies : 0)} />
-        </div>
-      </div>
-
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {months.map(({ year, month }) => (
-          <MonthGrid key={`${year}-${month}`} year={year} month={month} hoursByDate={hoursByDate} max={max} today={today} />
-        ))}
-      </div>
-
-      <Legend max={max} />
-    </div>
-  );
-}
-
-function MonthGrid({
-  year,
-  month,
-  hoursByDate,
-  max,
-  today,
-}: {
-  year: number;
-  month: number;
-  hoursByDate: Map<string, number>;
-  max: number;
-  today: string;
-}) {
   const lead = firstWeekdayMonday(year, month);
   const days = daysInMonth(year, month);
   const cells: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
 
   return (
-    <div className="rounded-lg border border-[var(--color-line)] p-3">
-      <div className="text-sm font-medium mb-2">{MONTHS_CA[month]} {year}</div>
-      <div className="grid grid-cols-7 gap-1">
+    <div className="card">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight">Calendari</h2>
+          <button type="button" className="btn-ghost px-2 py-1" onClick={() => setOffset((o) => o - 1)}>‹</button>
+          <span className="min-w-36 text-center text-sm font-medium">{MONTHS_CA[month]} {year}</span>
+          <button type="button" className="btn-ghost px-2 py-1" onClick={() => setOffset((o) => o + 1)}>›</button>
+        </div>
+        <div className="flex items-center gap-6 text-sm">
+          <Stat label="Hores del mes" value={fmtHores(total)} />
+          <Stat label="Dies treballats" value={String(dies)} />
+          <Stat label="Mitjana / dia" value={fmtHores(dies ? total / dies : 0)} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
         {WEEKDAYS_CA.map((w) => (
-          <div key={w} className="text-center text-[10px] uppercase text-[var(--color-muted)]">{w}</div>
+          <div key={w} className="pb-1 text-center text-[11px] uppercase tracking-wide text-[var(--color-muted)]">{w}</div>
         ))}
         {cells.map((d, i) => {
           if (d === null) return <div key={`e${i}`} />;
@@ -449,16 +423,21 @@ function MonthGrid({
             <div
               key={iso}
               title={hours ? `${formatDataShort(iso)} · ${fmtHores(hours)}` : formatDataShort(iso)}
-              className={`flex aspect-square items-center justify-center rounded text-[11px] tabular-nums ${
-                isToday ? "ring-2 ring-[var(--color-accent)] ring-offset-1" : ""
-              }`}
+              className={`relative min-h-16 rounded-lg p-1.5 ${isToday ? "ring-2 ring-[var(--color-accent)] ring-offset-1" : ""}`}
               style={cellStyle(hours, max)}
             >
-              {hours ? Math.round(hours) : d}
+              <span className="absolute left-1.5 top-1 text-[11px] font-medium opacity-70">{d}</span>
+              {hours > 0 && (
+                <span className="flex h-full items-center justify-center text-sm font-semibold tabular-nums">
+                  {fmtHores(hours)}
+                </span>
+              )}
             </div>
           );
         })}
       </div>
+
+      <Legend max={max} />
     </div>
   );
 }

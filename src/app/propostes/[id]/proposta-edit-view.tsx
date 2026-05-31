@@ -90,9 +90,12 @@ export function PropostaEditView({
     sub: c.client_nom ?? undefined,
   }));
 
+  function logoUrl() {
+    return typeof window !== "undefined" ? `${window.location.origin}/logo.jpg` : "/logo.jpg";
+  }
+
   function downloadWord() {
-    const logo = typeof window !== "undefined" ? `${window.location.origin}/logo.jpg` : "/logo.jpg";
-    const html = buildWordDoc(data, lang, logo);
+    const html = buildWordDoc(data, lang, logoUrl());
     const blob = new Blob(["﻿", html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -100,6 +103,19 @@ export function PropostaEditView({
     a.download = `Proposta_${doc.num}_${lang}.doc`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function printDoc() {
+    const body = buildPropostaHtml(data, lang, logoUrl());
+    const w = window.open("", "_blank", "width=900,height=1000");
+    if (!w) return;
+    w.document.write(
+      `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${doc.num}</title>` +
+        `<style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`,
+    );
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
   }
 
   return (
@@ -122,7 +138,7 @@ export function PropostaEditView({
             <button type="button" className={`rounded px-3 py-1 ${lang === "es" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`} onClick={() => setLang("es")}>Castellà</button>
           </div>
           <button type="button" className="btn-ghost" onClick={downloadWord}>Word</button>
-          <button type="button" className="btn-primary" onClick={() => window.print()}>PDF / Imprimir</button>
+          <button type="button" className="btn-primary" onClick={printDoc}>PDF / Imprimir</button>
         </div>
       </div>
 
@@ -413,9 +429,10 @@ function PagamentRow({ docId, row }: { docId: number; row: PropostaDocPagament }
   }
   return (
     <div className="flex items-center gap-2">
-      <input className="input flex-1" value={descripcio} onChange={(e) => setDescripcio(e.target.value)} onBlur={persist} placeholder="Ex: En finalitzar el servei" />
-      <input type="number" step="0.01" className="input w-40 text-right" value={importe} onChange={(e) => setImporte(e.target.value)} onBlur={persist} placeholder="€" />
-      <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => startTransition(() => deletePagamentAction(docId, row.id))}>✕</button>
+      <input className="input flex-1 min-w-0" value={descripcio} onChange={(e) => setDescripcio(e.target.value)} onBlur={persist} placeholder="Ex: En finalitzar el servei" />
+      <input type="number" step="0.01" className="input w-28 shrink-0 text-right" value={importe} onChange={(e) => setImporte(e.target.value)} onBlur={persist} placeholder="€" />
+      <span className="shrink-0 text-sm text-[var(--color-muted)]">€ + IVA</span>
+      <button type="button" className="shrink-0 text-red-700 hover:underline text-sm" onClick={() => startTransition(() => deletePagamentAction(docId, row.id))}>✕</button>
     </div>
   );
 }

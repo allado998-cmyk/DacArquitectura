@@ -74,7 +74,6 @@ html, body {
 }
 
 .input {
-  width: 100%;
   border: 1px solid var(--color-line);
   border-radius: 0.375rem;
   background: white;
@@ -128,6 +127,8 @@ html, body {
    `text-center` / `text-right` utilities can override it. */
 @layer components {
   .th { text-align: left; }
+  /* Default full width, but allow w-* / max-w-* utilities to override. */
+  .input { width: 100%; }
 }
 
 .td {

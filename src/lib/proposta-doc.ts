@@ -261,14 +261,12 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     .join("");
 
   const signature = `
-    <div style="margin-top:24px;line-height:1.5;font-size:11px;">
+    <div style="margin-top:24px;line-height:1.5;font-size:11px;page-break-inside:avoid;">
       <div style="margin-left:18px;">${t.barcelonaData(doc.data)}</div>
       <div style="height:34px;"></div>
       <div style="margin-left:18px;"><strong>${PROFESSIONAL.signatari}</strong>, <span style="font-style:italic;">${t.rolSignatari}</span></div>
       <div style="margin-left:18px;font-style:italic;">${t.adminSignatari}</div>
     </div>`;
-
-  const footer = `<div style="font-size:8px;color:${grey};border-top:1px solid #ddd;margin-top:18px;padding-top:5px;">${esc(t.footer)}</div>`;
 
   const clientSection = doc.client
     ? bar("DADES CLIENT") +
@@ -281,7 +279,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;max-width:820px;margin:0 auto;">
     <div style="text-align:right;margin-bottom:4px;">
-      <img src="${logoUrl}" alt="DAC arquitectura" style="height:46px;width:auto;display:inline-block;" />
+      <img src="${logoUrl}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" />
     </div>
 
     ${bar("DADES PROPOSTA")}
@@ -300,7 +298,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     ${clientSection}
 
     ${bar(t.serveiTitle, "euros")}
-    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid;">
       <tbody>${serveiRows}</tbody>
       <tfoot>
         <tr style="font-weight:bold;"><td colspan="2" style="padding:4px 8px;border:1px solid #ccc;">${t.subtotal}</td><td style="padding:4px 8px;border:1px solid #ccc;text-align:right;">${num2(subtotal, lang)}</td></tr>
@@ -310,8 +308,8 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     </table>
 
     ${signature}
-    ${footer}
 
+    <div style="page-break-before:always;"></div>
     ${bar(t.contingutTitle)}
     <div style="${sub}">${esc(t.especificacionsTitle)}</div>
     <p style="${p}">${esc(t.inclouIntro)}</p>
@@ -335,7 +333,6 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     ${t.tancament.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
 
     ${signature}
-    ${footer}
   </div>`;
 }
 

@@ -25,7 +25,7 @@ export default async function ParametersPage() {
     <>
       <AppNav current="parameters" />
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight mb-1">Paràmetres</h1>
+        <h1 className="text-2xl font-semibold tracking-tight mb-1">Base de Dades</h1>
         <p className="text-sm text-[var(--color-muted)] mb-6">
           Gestiona projectes, clients i catàlegs de despeses.
         </p>

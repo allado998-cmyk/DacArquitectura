@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 
 const ESTATS = ["obert", "tancat"];
 const CATEGORIES = ["re", "co", "ed", "rec", "do"];
-const VISIBILITATS = ["public", "privat"];
+const TIPUS = ["public", "privat"];
 
 // Generate the next "YY-NNNN" number for the current year.
 async function nextNumExpedient(): Promise<string> {
@@ -40,12 +40,12 @@ export async function createExpedientAction() {
 
 export interface ExpedientPatch {
   num_expedient: string;
-  projecte: string;
-  client: string;
+  projecte_id: number | null;
+  client_id: number | null;
   ciutat: string;
   estat: string;
   categoria: string; // "" means none
-  visibilitat: string;
+  tipus: string;
   pressupost: number;
 }
 
@@ -57,18 +57,20 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
 
   const estat = ESTATS.includes(data.estat) ? data.estat : "obert";
   const categoria = CATEGORIES.includes(data.categoria) ? data.categoria : null;
-  const visibilitat = VISIBILITATS.includes(data.visibilitat) ? data.visibilitat : "privat";
+  const tipus = TIPUS.includes(data.tipus) ? data.tipus : "privat";
   const pressupost = Number.isFinite(data.pressupost) ? data.pressupost : 0;
+  const projecteId = data.projecte_id && Number.isFinite(data.projecte_id) ? data.projecte_id : null;
+  const clientId = data.client_id && Number.isFinite(data.client_id) ? data.client_id : null;
 
   await sql`
     update public.expedients set
       num_expedient = ${num},
-      projecte = ${data.projecte.trim() || null},
-      client = ${data.client.trim() || null},
+      projecte_id = ${projecteId},
+      client_id = ${clientId},
       ciutat = ${data.ciutat.trim() || null},
       estat = ${estat},
       categoria = ${categoria},
-      visibilitat = ${visibilitat},
+      tipus = ${tipus},
       pressupost = ${pressupost}
     where id = ${id}
   `;

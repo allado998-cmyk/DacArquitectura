@@ -7,26 +7,31 @@ import {
   updateExpedientAction,
   type ExpedientPatch,
 } from "./actions";
-import type { Expedient, ExpedientCategoria } from "@/types/db";
-import { formatEur, formatNumber } from "@/lib/format";
+import type { Client, Expedient, Projecte } from "@/types/db";
+import { formatEur } from "@/lib/format";
+import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS } from "@/lib/expedients";
+import { Combobox, type ComboOption } from "@/components/combobox";
 
 type Tab = "llista" | "estadistiques";
 
-const CATEGORIES: { code: ExpedientCategoria; label: string; short: string }[] = [
-  { code: "re", label: "Rehabilitació", short: "RE" },
-  { code: "co", label: "Consultoria", short: "CO" },
-  { code: "ed", label: "Edificació", short: "ED" },
-  { code: "rec", label: "Reconstrucció", short: "REC" },
-  { code: "do", label: "Docència", short: "DO" },
-];
-
-const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
-  CATEGORIES.map((c) => [c.code, c.label]),
-);
-
-export function ExpedientsView({ expedients }: { expedients: Expedient[] }) {
+export function ExpedientsView({
+  expedients,
+  projectes,
+  clients,
+}: {
+  expedients: Expedient[];
+  projectes: Projecte[];
+  clients: Client[];
+}) {
   const [tab, setTab] = useState<Tab>("llista");
   const [, startTransition] = useTransition();
+
+  const projecteOpts: ComboOption[] = projectes.map((p) => ({ id: p.id, label: p.nom }));
+  const clientOpts: ComboOption[] = clients.map((c) => ({
+    id: c.id,
+    label: c.nom,
+    sub: c.contacte ?? undefined,
+  }));
 
   return (
     <div>
@@ -49,7 +54,9 @@ export function ExpedientsView({ expedients }: { expedients: Expedient[] }) {
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} />}
+      {tab === "llista" && (
+        <ExpedientsList rows={expedients} projecteOpts={projecteOpts} clientOpts={clientOpts} />
+      )}
       {tab === "estadistiques" && <StatsPanel rows={expedients} />}
     </div>
   );
@@ -83,10 +90,41 @@ function TabBtn({
 }
 
 // ============================================================================
+// Badges
+// ============================================================================
+
+function Badge({ swatch, label, dot }: { swatch: { bg: string; text: string; color: string }; label: string; dot?: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+      style={{ backgroundColor: swatch.bg, color: swatch.text }}
+    >
+      {dot && <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: swatch.color }} />}
+      {label}
+    </span>
+  );
+}
+
+function CategoriaBadge({ code }: { code: string | null }) {
+  if (!code) return <span className="text-[var(--color-muted)]">—</span>;
+  const m = CATEGORY_BY_CODE[code];
+  if (!m) return <span className="text-[var(--color-muted)]">—</span>;
+  return <Badge swatch={m} label={m.label} />;
+}
+
+// ============================================================================
 // Llista
 // ============================================================================
 
-function ExpedientsList({ rows }: { rows: Expedient[] }) {
+function ExpedientsList({
+  rows,
+  projecteOpts,
+  clientOpts,
+}: {
+  rows: Expedient[];
+  projecteOpts: ComboOption[];
+  clientOpts: ComboOption[];
+}) {
   if (rows.length === 0) {
     return (
       <div className="card text-sm text-[var(--color-muted)]">
@@ -104,16 +142,16 @@ function ExpedientsList({ rows }: { rows: Expedient[] }) {
             <th className="th">Projecte</th>
             <th className="th">Client</th>
             <th className="th">Ciutat</th>
-            <th className="th w-40">Categoria</th>
-            <th className="th w-24">Estat</th>
-            <th className="th w-28">Visibilitat</th>
+            <th className="th w-44">Categoria</th>
+            <th className="th w-28">Tipus</th>
             <th className="th w-36">Pressupost</th>
-            <th className="th w-20"></th>
+            <th className="th w-28">Estat</th>
+            <th className="th w-32"></th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <ExpedientRow key={r.id} row={r} />
+            <ExpedientRow key={r.id} row={r} projecteOpts={projecteOpts} clientOpts={clientOpts} />
           ))}
         </tbody>
       </table>
@@ -121,134 +159,138 @@ function ExpedientsList({ rows }: { rows: Expedient[] }) {
   );
 }
 
-function ExpedientRow({ row }: { row: Expedient }) {
+function ExpedientRow({
+  row,
+  projecteOpts,
+  clientOpts,
+}: {
+  row: Expedient;
+  projecteOpts: ComboOption[];
+  clientOpts: ComboOption[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  // Edit-mode draft state.
   const [num, setNum] = useState(row.num_expedient);
-  const [projecte, setProjecte] = useState(row.projecte ?? "");
-  const [client, setClient] = useState(row.client ?? "");
+  const [projecteId, setProjecteId] = useState<number | null>(row.projecte_id);
+  const [clientId, setClientId] = useState<number | null>(row.client_id);
   const [ciutat, setCiutat] = useState(row.ciutat ?? "");
   const [categoria, setCategoria] = useState<string>(row.categoria ?? "");
   const [estat, setEstat] = useState(row.estat);
-  const [visibilitat, setVisibilitat] = useState(row.visibilitat);
+  const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
-  const [, startTransition] = useTransition();
 
-  function patch(overrides?: Partial<ExpedientPatch>): ExpedientPatch {
-    return {
+  function reset() {
+    setNum(row.num_expedient);
+    setProjecteId(row.projecte_id);
+    setClientId(row.client_id);
+    setCiutat(row.ciutat ?? "");
+    setCategoria(row.categoria ?? "");
+    setEstat(row.estat);
+    setTipus(row.tipus);
+    setPressupost(row.pressupost);
+  }
+
+  function save() {
+    if (!num.trim()) return;
+    const patch: ExpedientPatch = {
       num_expedient: num,
-      projecte,
-      client,
+      projecte_id: projecteId,
+      client_id: clientId,
       ciutat,
       categoria,
       estat,
-      visibilitat,
+      tipus,
       pressupost: parseFloat(pressupost) || 0,
-      ...overrides,
     };
+    startTransition(async () => {
+      await updateExpedientAction(row.id, patch);
+      setEditing(false);
+    });
   }
 
-  function persist(overrides?: Partial<ExpedientPatch>) {
-    if (!num.trim()) return;
-    startTransition(() => updateExpedientAction(row.id, patch(overrides)));
+  if (!editing) {
+    return (
+      <tr>
+        <td className="td font-mono">{row.num_expedient}</td>
+        <td className="td">{row.projecte_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+        <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+        <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+        <td className="td"><CategoriaBadge code={row.categoria} /></td>
+        <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
+        <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
+        <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
+        <td className="td text-right whitespace-nowrap">
+          <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => setEditing(true)}>
+            Editar
+          </button>
+          <button
+            type="button"
+            className="text-red-700 hover:underline text-sm"
+            onClick={() => {
+              if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
+                startTransition(() => deleteExpedientAction(row.id));
+              }
+            }}
+          >
+            Eliminar
+          </button>
+        </td>
+      </tr>
+    );
   }
-
-  const obert = estat === "obert";
 
   return (
-    <tr>
-      <td className="td">
-        <input
-          className="input font-mono"
-          value={num}
-          onChange={(e) => setNum(e.target.value)}
-          onBlur={() => persist()}
-        />
+    <tr style={{ backgroundColor: "var(--color-paper)" }}>
+      <td className="td align-top">
+        <input className="input font-mono" value={num} onChange={(e) => setNum(e.target.value)} />
       </td>
-      <td className="td">
-        <input className="input" value={projecte} onChange={(e) => setProjecte(e.target.value)} onBlur={() => persist()} />
+      <td className="td align-top min-w-44">
+        <Combobox options={projecteOpts} value={projecteId} onChange={setProjecteId} placeholder="Cerca projecte…" />
       </td>
-      <td className="td">
-        <input className="input" value={client} onChange={(e) => setClient(e.target.value)} onBlur={() => persist()} />
+      <td className="td align-top min-w-44">
+        <Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" />
       </td>
-      <td className="td">
-        <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} onBlur={() => persist()} />
+      <td className="td align-top">
+        <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} placeholder="Ciutat" />
       </td>
-      <td className="td">
-        <select
-          className="input"
-          value={categoria}
-          onChange={(e) => {
-            setCategoria(e.target.value);
-            persist({ categoria: e.target.value });
-          }}
-        >
+      <td className="td align-top">
+        <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
           <option value="">—</option>
           {CATEGORIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.label}
-            </option>
+            <option key={c.code} value={c.code}>{c.label}</option>
           ))}
         </select>
       </td>
-      <td className="td">
-        <button
-          type="button"
-          onClick={() => {
-            const next = obert ? "tancat" : "obert";
-            setEstat(next);
-            persist({ estat: next });
-          }}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-          style={{
-            backgroundColor: obert ? "#fee2e2" : "#dcfce7",
-            color: obert ? "#b91c1c" : "#15803d",
-          }}
-        >
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ backgroundColor: obert ? "#dc2626" : "#16a34a" }}
-          />
-          {obert ? "Obert" : "Tancat"}
+      <td className="td align-top">
+        <select className="input" value={tipus} onChange={(e) => setTipus(e.target.value as typeof tipus)}>
+          <option value="privat">Privat</option>
+          <option value="public">Públic</option>
+        </select>
+      </td>
+      <td className="td align-top">
+        <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
+      </td>
+      <td className="td align-top">
+        <select className="input" value={estat} onChange={(e) => setEstat(e.target.value as typeof estat)}>
+          <option value="obert">Obert</option>
+          <option value="tancat">Tancat</option>
+        </select>
+      </td>
+      <td className="td align-top text-right whitespace-nowrap">
+        <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3 disabled:opacity-50" onClick={save} disabled={pending}>
+          Desar
         </button>
-      </td>
-      <td className="td">
         <button
           type="button"
+          className="text-[var(--color-muted)] hover:underline text-sm"
           onClick={() => {
-            const next = visibilitat === "public" ? "privat" : "public";
-            setVisibilitat(next);
-            persist({ visibilitat: next });
-          }}
-          className="rounded-md border px-2.5 py-1 text-xs font-medium"
-          style={
-            visibilitat === "public"
-              ? { borderColor: "var(--color-accent)", color: "var(--color-accent)", backgroundColor: "var(--color-accent-soft)" }
-              : { borderColor: "var(--color-line)", color: "var(--color-muted)", backgroundColor: "white" }
-          }
-        >
-          {visibilitat === "public" ? "Públic" : "Privat"}
-        </button>
-      </td>
-      <td className="td">
-        <input
-          type="number"
-          step="0.01"
-          className="input text-right"
-          value={pressupost}
-          onChange={(e) => setPressupost(e.target.value)}
-          onBlur={() => persist()}
-        />
-      </td>
-      <td className="td text-right">
-        <button
-          type="button"
-          className="text-red-700 hover:underline text-sm"
-          onClick={() => {
-            if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
-              startTransition(() => deleteExpedientAction(row.id));
-            }
+            reset();
+            setEditing(false);
           }}
         >
-          Eliminar
+          Cancel·lar
         </button>
       </td>
     </tr>
@@ -268,7 +310,7 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
   const [fAny, setFAny] = useState("");
   const [fEstat, setFEstat] = useState("");
   const [fCategoria, setFCategoria] = useState("");
-  const [fVisibilitat, setFVisibilitat] = useState("");
+  const [fTipus, setFTipus] = useState("");
   const [fCiutat, setFCiutat] = useState("");
 
   const anys = useMemo(
@@ -277,8 +319,8 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
   );
   const ciutats = useMemo(
     () =>
-      Array.from(new Set(rows.map((r) => (r.ciutat ?? "").trim()).filter(Boolean))).sort(
-        (a, b) => a.localeCompare(b, "ca"),
+      Array.from(new Set(rows.map((r) => (r.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, "ca"),
       ),
     [rows],
   );
@@ -289,77 +331,115 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
         if (fAny && anyOf(r.num_expedient) !== fAny) return false;
         if (fEstat && r.estat !== fEstat) return false;
         if (fCategoria && r.categoria !== fCategoria) return false;
-        if (fVisibilitat && r.visibilitat !== fVisibilitat) return false;
+        if (fTipus && r.tipus !== fTipus) return false;
         if (fCiutat && (r.ciutat ?? "").trim() !== fCiutat) return false;
         return true;
       }),
-    [rows, fAny, fEstat, fCategoria, fVisibilitat, fCiutat],
+    [rows, fAny, fEstat, fCategoria, fTipus, fCiutat],
   );
 
   const total = filtered.length;
   const oberts = filtered.filter((r) => r.estat === "obert").length;
   const tancats = total - oberts;
-  const publics = filtered.filter((r) => r.visibilitat === "public").length;
+  const publics = filtered.filter((r) => r.tipus === "public").length;
+  const privats = total - publics;
   const pressupostTotal = filtered.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
+  const pressupostObert = filtered
+    .filter((r) => r.estat === "obert")
+    .reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   const pressupostMitja = total ? pressupostTotal / total : 0;
 
+  const estatSegments = [
+    { label: "Oberts", value: oberts, color: ESTAT.obert.color },
+    { label: "Tancats", value: tancats, color: ESTAT.tancat.color },
+  ];
+  const tipusSegments = [
+    { label: "Privat", value: privats, color: TIPUS.privat.color },
+    { label: "Públic", value: publics, color: TIPUS.public.color },
+  ];
+
   const byCiutat = groupBy(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
-  const byCategoria = groupBy(filtered, (r) =>
-    r.categoria ? CATEGORY_LABEL[r.categoria] : "(Sense categoria)",
-  );
-  const byEstat = groupBy(filtered, (r) => (r.estat === "obert" ? "Oberts" : "Tancats"));
-  const byVisibilitat = groupBy(filtered, (r) => (r.visibilitat === "public" ? "Públic" : "Privat"));
-  const byAny = groupBy(filtered, (r) => anyOf(r.num_expedient));
+  const byAny = groupBy(filtered, (r) => anyOf(r.num_expedient)).sort((a, b) => a.key.localeCompare(b.key));
+  const catGroups = CATEGORIES.map((c) => {
+    const items = filtered.filter((r) => r.categoria === c.code);
+    return {
+      key: c.label,
+      color: c.color,
+      count: items.length,
+      pressupost: items.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0),
+    };
+  }).filter((g) => g.count > 0);
+  const senseCat = filtered.filter((r) => !r.categoria).length;
 
   return (
     <div className="space-y-8">
       {/* Filtres */}
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
-        <FilterSelect
-          label="Estat"
-          value={fEstat}
-          onChange={setFEstat}
-          options={[
-            ["obert", "Oberts"],
-            ["tancat", "Tancats"],
-          ]}
-        />
-        <FilterSelect
-          label="Categoria"
-          value={fCategoria}
-          onChange={setFCategoria}
-          options={CATEGORIES.map((c) => [c.code, c.label])}
-        />
-        <FilterSelect
-          label="Visibilitat"
-          value={fVisibilitat}
-          onChange={setFVisibilitat}
-          options={[
-            ["public", "Públic"],
-            ["privat", "Privat"],
-          ]}
-        />
-        <FilterSelect label="Ciutat" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+      <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
+          <FilterSelect
+            label="Estat"
+            value={fEstat}
+            onChange={setFEstat}
+            options={[["obert", "Oberts"], ["tancat", "Tancats"]]}
+          />
+          <FilterSelect
+            label="Categoria"
+            value={fCategoria}
+            onChange={setFCategoria}
+            options={CATEGORIES.map((c) => [c.code, c.label])}
+          />
+          <FilterSelect
+            label="Tipus"
+            value={fTipus}
+            onChange={setFTipus}
+            options={[["privat", "Privat"], ["public", "Públic"]]}
+          />
+          <FilterSelect label="Ciutat" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+        </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-        <Kpi label="Expedients" value={formatNumber(total).replace(",00", "")} />
-        <Kpi label="Oberts" value={String(oberts)} accent="#dc2626" />
-        <Kpi label="Tancats" value={String(tancats)} accent="#16a34a" />
-        <Kpi label="Pressupost total" value={formatEur(pressupostTotal)} />
-        <Kpi label="Pressupost mitjà" value={formatEur(pressupostMitja)} />
-        <Kpi label="Públics / Privats" value={`${publics} / ${total - publics}`} />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Expedients" value={String(total)} accent="var(--color-accent)" hint={`${oberts} oberts · ${tancats} tancats`} />
+        <Kpi label="Pressupost total" value={formatEur(pressupostTotal)} accent="#0ea5e9" hint="Suma de tots els filtrats" />
+        <Kpi label="Pressupost en obert" value={formatEur(pressupostObert)} accent={ESTAT.obert.color} hint={`${oberts} expedients oberts`} />
+        <Kpi label="Pressupost mitjà" value={formatEur(pressupostMitja)} accent="#7c3aed" hint="Per expedient" />
       </div>
 
-      {/* Desglossos */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Breakdown title="Per ciutat" groups={byCiutat} />
-        <Breakdown title="Per categoria" groups={byCategoria} />
-        <Breakdown title="Per estat" groups={byEstat} />
-        <Breakdown title="Públic / Privat" groups={byVisibilitat} />
-        <Breakdown title="Per any" groups={byAny} />
+      {/* Donuts */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <DonutCard title="Estat" segments={estatSegments} centerLabel={`${total}`} centerSub="expedients" />
+        <DonutCard title="Tipus" segments={tipusSegments} centerLabel={`${total}`} centerSub="expedients" />
+      </div>
+
+      {/* Categoria */}
+      <div className="card">
+        <SectionTitle>Per categoria</SectionTitle>
+        {catGroups.length === 0 ? (
+          <Empty />
+        ) : (
+          <div className="space-y-3">
+            {catGroups.map((g) => (
+              <ColorBar key={g.key} label={g.key} color={g.color} count={g.count} pressupost={g.pressupost} max={Math.max(...catGroups.map((x) => x.count))} />
+            ))}
+            {senseCat > 0 && (
+              <p className="text-xs text-[var(--color-muted)] pt-1">{senseCat} sense categoria assignada.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Ciutat + Any */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="card">
+          <SectionTitle>Per ciutat</SectionTitle>
+          <BarList groups={byCiutat} />
+        </div>
+        <div className="card">
+          <SectionTitle>Per any</SectionTitle>
+          <BarList groups={byAny} />
+        </div>
       </div>
     </div>
   );
@@ -383,6 +463,14 @@ function groupBy(rows: Expedient[], keyFn: (r: Expedient) => string): Group[] {
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] mb-4">{children}</h3>;
+}
+
+function Empty() {
+  return <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>;
+}
+
 function FilterSelect({
   label,
   value,
@@ -400,53 +488,154 @@ function FilterSelect({
       <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Tots</option>
         {options.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
+          <option key={v} value={v}>{l}</option>
         ))}
       </select>
     </div>
   );
 }
 
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: string }) {
+function Kpi({ label, value, accent, hint }: { label: string; value: string; accent: string; hint?: string }) {
   return (
-    <div className="card py-4">
+    <div className="relative overflow-hidden rounded-lg border border-[var(--color-line)] bg-white p-4">
+      <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
       <div className="label mb-1">{label}</div>
-      <div className="text-2xl font-semibold tracking-tight" style={accent ? { color: accent } : undefined}>
+      <div className="text-2xl font-semibold tracking-tight tabular-nums" style={{ color: accent }}>
         {value}
+      </div>
+      {hint && <div className="mt-1 text-xs text-[var(--color-muted)]">{hint}</div>}
+    </div>
+  );
+}
+
+function DonutCard({
+  title,
+  segments,
+  centerLabel,
+  centerSub,
+}: {
+  title: string;
+  segments: { label: string; value: number; color: string }[];
+  centerLabel: string;
+  centerSub: string;
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  return (
+    <div className="card">
+      <SectionTitle>{title}</SectionTitle>
+      {total === 0 ? (
+        <Empty />
+      ) : (
+        <div className="flex items-center gap-6">
+          <Donut segments={segments} centerLabel={centerLabel} centerSub={centerSub} />
+          <ul className="space-y-2 text-sm">
+            {segments.map((s) => (
+              <li key={s.label} className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: s.color }} />
+                <span className="font-medium">{s.label}</span>
+                <span className="text-[var(--color-muted)]">
+                  {s.value} · {total ? Math.round((s.value / total) * 100) : 0}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Donut({
+  segments,
+  size = 132,
+  thickness = 20,
+  centerLabel,
+  centerSub,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  size?: number;
+  thickness?: number;
+  centerLabel: string;
+  centerSub: string;
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const r = (size - thickness) / 2;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0ee" strokeWidth={thickness} />
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          {segments.map((s) => {
+            const len = (s.value / total) * c;
+            const el = (
+              <circle
+                key={s.label}
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={thickness}
+                strokeDasharray={`${len} ${c - len}`}
+                strokeDashoffset={-offset}
+                strokeLinecap="butt"
+              />
+            );
+            offset += len;
+            return el;
+          })}
+        </g>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-semibold tracking-tight tabular-nums">{centerLabel}</span>
+        <span className="text-xs text-[var(--color-muted)]">{centerSub}</span>
       </div>
     </div>
   );
 }
 
-function Breakdown({ title, groups }: { title: string; groups: Group[] }) {
-  const max = Math.max(1, ...groups.map((g) => g.count));
+function ColorBar({
+  label,
+  color,
+  count,
+  pressupost,
+  max,
+}: {
+  label: string;
+  color: string;
+  count: number;
+  pressupost: number;
+  max: number;
+}) {
   return (
-    <div className="card">
-      <h3 className="text-sm font-semibold mb-3">{title}</h3>
-      {groups.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
-      ) : (
-        <div className="space-y-2.5">
-          {groups.map((g) => (
-            <div key={g.key}>
-              <div className="flex items-baseline justify-between text-sm mb-1">
-                <span className="truncate pr-2">{g.key}</span>
-                <span className="whitespace-nowrap text-[var(--color-muted)]">
-                  {g.count} · {formatEur(g.pressupost)}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--color-line)]">
-                <div
-                  className="h-2 rounded-full bg-[var(--color-accent)]"
-                  style={{ width: `${(g.count / max) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div>
+      <div className="flex items-baseline justify-between text-sm mb-1">
+        <span className="flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
+          {label}
+        </span>
+        <span className="whitespace-nowrap text-[var(--color-muted)] tabular-nums">
+          {count} · {formatEur(pressupost)}
+        </span>
+      </div>
+      <div className="h-2.5 rounded-full bg-[var(--color-line)]">
+        <div className="h-2.5 rounded-full" style={{ width: `${(count / Math.max(1, max)) * 100}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+}
+
+function BarList({ groups }: { groups: Group[] }) {
+  const max = Math.max(1, ...groups.map((g) => g.count));
+  if (groups.length === 0) return <Empty />;
+  return (
+    <div className="space-y-3">
+      {groups.map((g) => (
+        <ColorBar key={g.key} label={g.key} color="var(--color-accent)" count={g.count} pressupost={g.pressupost} max={max} />
+      ))}
     </div>
   );
 }

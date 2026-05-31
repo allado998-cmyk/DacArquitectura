@@ -161,15 +161,14 @@ function ExpedientsList({
   const [query, setQuery] = useState("");
   const [fAny, setFAny] = useState("");
   const [fClient, setFClient] = useState("");
-  const [fCiutat, setFCiutat] = useState("");
+  const [fCategoria, setFCategoria] = useState("");
+  const [fTipus, setFTipus] = useState("");
+  const [fTipologia, setFTipologia] = useState("");
+  const [fEstat, setFEstat] = useState("");
 
   const anys = useMemo(() => Array.from(new Set(rows.map((r) => anyOf(r.num_expedient)))).sort().reverse(), [rows]);
   const clientsList = useMemo(
     () => Array.from(new Set(rows.map((r) => r.client_nom ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
-    [rows],
-  );
-  const ciutats = useMemo(
-    () => Array.from(new Set(rows.map((r) => (r.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
     [rows],
   );
 
@@ -177,7 +176,10 @@ function ExpedientsList({
   const filtered = rows.filter((r) => {
     if (fAny && anyOf(r.num_expedient) !== fAny) return false;
     if (fClient && (r.client_nom ?? "") !== fClient) return false;
-    if (fCiutat && (r.ciutat ?? "").trim() !== fCiutat) return false;
+    if (fCategoria && (r.categoria ?? "") !== fCategoria) return false;
+    if (fTipus && r.tipus !== fTipus) return false;
+    if (fTipologia && String(r.tipologia_id ?? "") !== fTipologia) return false;
+    if (fEstat && r.estat !== fEstat) return false;
     if (q) {
       const hay = `${r.num_expedient} ${r.projecte ?? ""} ${r.client_nom ?? ""} ${r.ciutat ?? ""} ${r.tipologia_nom ?? ""} ${r.categoria ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -196,16 +198,16 @@ function ExpedientsList({
   return (
     <>
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-56">
-          <label className="label">Cercar</label>
-          <input className="input" placeholder="Projecte, client, ciutat, núm.…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
         <div>
           <label className="label">Any</label>
-          <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
+          <select className="input w-28" value={fAny} onChange={(e) => setFAny(e.target.value)}>
             <option value="">Tots</option>
             {anys.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
+        </div>
+        <div className="flex-1 min-w-48">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Projecte, client, núm.…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div>
           <label className="label">Client</label>
@@ -215,10 +217,33 @@ function ExpedientsList({
           </select>
         </div>
         <div>
-          <label className="label">Ciutat</label>
-          <select className="input" value={fCiutat} onChange={(e) => setFCiutat(e.target.value)}>
+          <label className="label">Categoria</label>
+          <select className="input" value={fCategoria} onChange={(e) => setFCategoria(e.target.value)}>
             <option value="">Totes</option>
-            {ciutats.map((c) => <option key={c} value={c}>{c}</option>)}
+            {CATEGORIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Tipus</label>
+          <select className="input" value={fTipus} onChange={(e) => setFTipus(e.target.value)}>
+            <option value="">Tots</option>
+            <option value="privat">Privat</option>
+            <option value="public">Públic</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Tipologia</label>
+          <select className="input" value={fTipologia} onChange={(e) => setFTipologia(e.target.value)}>
+            <option value="">Totes</option>
+            {tipologies.map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Estat</label>
+          <select className="input" value={fEstat} onChange={(e) => setFEstat(e.target.value)}>
+            <option value="">Tots</option>
+            <option value="obert">Obert</option>
+            <option value="tancat">Tancat</option>
           </select>
         </div>
       </div>

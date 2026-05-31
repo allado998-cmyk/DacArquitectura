@@ -7,8 +7,22 @@ export interface Projecte {
 export interface Client {
   id: number;
   nom: string;
-  contacte: string | null;
+  nif: string | null;
+  carrer: string | null;
+  ciutat: string | null;
+  codi_postal: string | null;
+  contacte: string | null; // legacy, used by Honoraris
   created_at: string;
+  contactes?: ClientContacte[]; // joined
+}
+
+export interface ClientContacte {
+  id: number;
+  client_id: number;
+  nom: string | null;
+  telefon: string | null;
+  mail: string | null;
+  ordre: number;
 }
 
 export interface ConcepteDespesaDirecta {
@@ -68,15 +82,15 @@ export type ExpedientTipus = "public" | "privat";
 export interface Expedient {
   id: number;
   num_expedient: string; // YY-NNNN
-  projecte_id: number | null;
+  projecte: string | null; // free text
   client_id: number | null;
-  projecte_nom: string | null; // joined from projectes
   client_nom: string | null; // joined from clients
   ciutat: string | null;
   estat: ExpedientEstat;
   categoria: ExpedientCategoria | null;
   tipus: ExpedientTipus;
   pressupost: string; // numeric arrives as string from neon
+  data_tancament: string | null; // ISO date, set when closed
   created_at: string;
   updated_at: string;
 }
@@ -85,7 +99,10 @@ export interface Dedicacio {
   id: number;
   expedient_id: number;
   num_expedient?: string; // joined
-  projecte_nom?: string | null; // joined
+  projecte?: string | null; // joined (expedient free text)
+  categoria?: ExpedientCategoria | null; // joined
+  client_id?: number | null; // joined
+  client_nom?: string | null; // joined
   data: string; // ISO date
   hores: string; // numeric arrives as string from neon
   tasca: string | null;

@@ -2,52 +2,49 @@
 
 import { useState, useTransition } from "react";
 import {
+  addClientContacteAction,
   createClientAction,
   createConcepteAltraAction,
   createConcepteDirectaAction,
-  createProjecteAction,
   deleteClientAction,
+  deleteClientContacteAction,
   deleteConcepteAltraAction,
   deleteConcepteDirectaAction,
-  deleteProjecteAction,
   updateClientAction,
+  updateClientContacteAction,
   updateConcepteAltraAction,
   updateConcepteDirectaAction,
-  updateProjecteAction,
+  type ClientPatch,
 } from "./actions";
 import type {
   Client,
+  ClientContacte,
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
-  Projecte,
 } from "@/types/db";
 import { formatEurPrecise } from "@/lib/format";
 
-type Tab = "projectes" | "clients" | "directes" | "altres";
+type Tab = "clients" | "directes" | "altres";
 
 export function ParametersView({
-  projectes,
   clients,
   conceptesDirectes,
   conceptesAltres,
 }: {
-  projectes: Projecte[];
   clients: Client[];
   conceptesDirectes: ConcepteDespesaDirecta[];
   conceptesAltres: ConcepteAltraDespesa[];
 }) {
-  const [tab, setTab] = useState<Tab>("projectes");
+  const [tab, setTab] = useState<Tab>("clients");
 
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
-        <TabBtn current={tab} value="projectes" onClick={setTab}>Projectes ({projectes.length})</TabBtn>
         <TabBtn current={tab} value="clients" onClick={setTab}>Clients ({clients.length})</TabBtn>
         <TabBtn current={tab} value="directes" onClick={setTab}>Despeses Directes ({conceptesDirectes.length})</TabBtn>
         <TabBtn current={tab} value="altres" onClick={setTab}>Altres Despeses ({conceptesAltres.length})</TabBtn>
       </div>
 
-      {tab === "projectes" && <ProjectesPanel rows={projectes} />}
       {tab === "clients" && <ClientsPanel rows={clients} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} />}
@@ -83,98 +80,11 @@ function TabBtn({
 }
 
 // ============================================================================
-// Projectes
-// ============================================================================
-
-function ProjectesPanel({ rows }: { rows: Projecte[] }) {
-  const [nom, setNom] = useState("");
-  const [, startTransition] = useTransition();
-
-  return (
-    <div className="space-y-4">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const value = nom;
-          if (!value.trim()) return;
-          startTransition(() => createProjecteAction(value));
-          setNom("");
-        }}
-        className="flex gap-2 max-w-xl"
-      >
-        <input
-          className="input"
-          placeholder="Nom del projecte"
-          value={nom}
-          onChange={(e) => setNom(e.target.value)}
-        />
-        <button className="btn-primary" type="submit">+ Afegir</button>
-      </form>
-
-      {rows.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted)]">Cap projecte encara.</p>
-      ) : (
-        <div className="table-wrap max-w-3xl">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="th">Nom</th>
-                <th className="th w-32"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <ProjecteRow key={p.id} row={p} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ProjecteRow({ row }: { row: Projecte }) {
-  const [nom, setNom] = useState(row.nom);
-  const [, startTransition] = useTransition();
-  return (
-    <tr>
-      <td className="td">
-        <input
-          className="input"
-          value={nom}
-          onChange={(e) => setNom(e.target.value)}
-          onBlur={() => {
-            if (nom !== row.nom && nom.trim()) {
-              startTransition(() => updateProjecteAction(row.id, nom));
-            }
-          }}
-        />
-      </td>
-      <td className="td text-right">
-        <button
-          type="button"
-          className="text-red-700 hover:underline text-sm"
-          onClick={() => {
-            if (confirm(`Eliminar "${row.nom}"?`)) {
-              startTransition(() => deleteProjecteAction(row.id));
-            }
-          }}
-        >
-          Eliminar
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-// ============================================================================
 // Clients
 // ============================================================================
 
 function ClientsPanel({ rows }: { rows: Client[] }) {
   const [nom, setNom] = useState("");
-  const [contacte, setContacte] = useState("");
   const [, startTransition] = useTransition();
 
   return (
@@ -183,58 +93,69 @@ function ClientsPanel({ rows }: { rows: Client[] }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!nom.trim()) return;
-          startTransition(() => createClientAction(nom, contacte));
+          startTransition(() => createClientAction(nom));
           setNom("");
-          setContacte("");
         }}
-        className="grid gap-2 sm:grid-cols-3 max-w-2xl"
+        className="flex gap-2 max-w-xl"
       >
-        <input className="input" placeholder="Nom del client" value={nom} onChange={(e) => setNom(e.target.value)} />
-        <input className="input" placeholder="Contacte (opcional)" value={contacte} onChange={(e) => setContacte(e.target.value)} />
+        <input className="input" placeholder="Nom del nou client" value={nom} onChange={(e) => setNom(e.target.value)} />
         <button className="btn-primary" type="submit">+ Afegir</button>
       </form>
 
       {rows.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">Cap client encara.</p>
       ) : (
-        <div className="table-wrap max-w-4xl">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="th">Nom</th>
-                <th className="th">Contacte</th>
-                <th className="th w-32"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => (
-                <ClientRow key={c.id} row={c} />
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          {rows.map((c) => (
+            <ClientCard key={c.id} row={c} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function ClientRow({ row }: { row: Client }) {
+function ClientCard({ row }: { row: Client }) {
+  const [open, setOpen] = useState(false);
   const [nom, setNom] = useState(row.nom);
-  const [contacte, setContacte] = useState(row.contacte ?? "");
+  const [nif, setNif] = useState(row.nif ?? "");
+  const [carrer, setCarrer] = useState(row.carrer ?? "");
+  const [ciutat, setCiutat] = useState(row.ciutat ?? "");
+  const [codiPostal, setCodiPostal] = useState(row.codi_postal ?? "");
   const [, startTransition] = useTransition();
 
   function persist() {
     if (!nom.trim()) return;
-    if (nom !== row.nom || contacte !== (row.contacte ?? "")) {
-      startTransition(() => updateClientAction(row.id, nom, contacte));
+    const patch: ClientPatch = { nom, nif, carrer, ciutat, codi_postal: codiPostal };
+    if (
+      nom !== row.nom ||
+      nif !== (row.nif ?? "") ||
+      carrer !== (row.carrer ?? "") ||
+      ciutat !== (row.ciutat ?? "") ||
+      codiPostal !== (row.codi_postal ?? "")
+    ) {
+      startTransition(() => updateClientAction(row.id, patch));
     }
   }
 
+  const contactes = row.contactes ?? [];
+
   return (
-    <tr>
-      <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
-      <td className="td"><input className="input" value={contacte} onChange={(e) => setContacte(e.target.value)} onBlur={persist} /></td>
-      <td className="td text-right">
+    <div className="rounded-lg border border-[var(--color-line)] bg-white">
+      <div className="flex items-center gap-3 p-3">
+        <button type="button" className="text-[var(--color-muted)] text-xs w-4" onClick={() => setOpen((o) => !o)}>
+          {open ? "▾" : "▸"}
+        </button>
+        <input
+          className="input max-w-sm font-medium"
+          value={nom}
+          onChange={(e) => setNom(e.target.value)}
+          onBlur={persist}
+        />
+        <span className="text-sm text-[var(--color-muted)]">{nif || "Sense NIF/CIF"}</span>
+        <span className="ml-auto text-xs text-[var(--color-muted)]">
+          {contactes.length} contacte{contactes.length === 1 ? "" : "s"}
+        </span>
         <button
           type="button"
           className="text-red-700 hover:underline text-sm"
@@ -246,8 +167,88 @@ function ClientRow({ row }: { row: Client }) {
         >
           Eliminar
         </button>
-      </td>
-    </tr>
+      </div>
+
+      {open && (
+        <div className="border-t border-[var(--color-line)] p-4 space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="NIF / CIF">
+              <input className="input" value={nif} onChange={(e) => setNif(e.target.value)} onBlur={persist} />
+            </Field>
+            <Field label="Carrer">
+              <input className="input" value={carrer} onChange={(e) => setCarrer(e.target.value)} onBlur={persist} />
+            </Field>
+            <Field label="Ciutat">
+              <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} onBlur={persist} />
+            </Field>
+            <Field label="Codi postal">
+              <input className="input" value={codiPostal} onChange={(e) => setCodiPostal(e.target.value)} onBlur={persist} />
+            </Field>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
+              <button
+                type="button"
+                className="btn-ghost px-2.5 py-1 text-sm"
+                onClick={() => startTransition(() => addClientContacteAction(row.id))}
+              >
+                + Afegir contacte
+              </button>
+            </div>
+            {contactes.length === 0 ? (
+              <p className="text-sm text-[var(--color-muted)]">Cap contacte encara.</p>
+            ) : (
+              <div className="space-y-2">
+                {contactes.map((ct) => (
+                  <ContacteRow key={ct.id} row={ct} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function ContacteRow({ row }: { row: ClientContacte }) {
+  const [nom, setNom] = useState(row.nom ?? "");
+  const [telefon, setTelefon] = useState(row.telefon ?? "");
+  const [mail, setMail] = useState(row.mail ?? "");
+  const [, startTransition] = useTransition();
+
+  function persist() {
+    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "")) {
+      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail }));
+    }
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-12 items-center">
+      <input className="input sm:col-span-4" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-3" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-4" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
+      <div className="sm:col-span-1 text-right">
+        <button
+          type="button"
+          className="text-red-700 hover:underline text-sm"
+          onClick={() => startTransition(() => deleteClientContacteAction(row.id))}
+        >
+          ✕
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -323,14 +324,7 @@ function ConcepteDirectaRow({ row }: { row: ConcepteDespesaDirecta }) {
     <tr>
       <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
       <td className="td">
-        <input
-          type="number"
-          step="0.01"
-          className="input text-right"
-          value={preu}
-          onChange={(e) => setPreu(e.target.value)}
-          onBlur={persist}
-        />
+        <input type="number" step="0.01" className="input text-right" value={preu} onChange={(e) => setPreu(e.target.value)} onBlur={persist} />
       </td>
       <td className="td">
         <input
@@ -433,14 +427,7 @@ function ConcepteAltraRow({ row }: { row: ConcepteAltraDespesa }) {
     <tr>
       <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
       <td className="td">
-        <input
-          type="number"
-          step="0.0001"
-          className="input text-right"
-          value={preu}
-          onChange={(e) => setPreu(e.target.value)}
-          onBlur={persist}
-        />
+        <input type="number" step="0.0001" className="input text-right" value={preu} onChange={(e) => setPreu(e.target.value)} onBlur={persist} />
         <div className="text-xs text-[var(--color-muted)] text-right mt-1">{formatEurPrecise(preu)}</div>
       </td>
       <td className="td">

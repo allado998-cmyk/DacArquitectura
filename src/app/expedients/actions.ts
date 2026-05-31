@@ -40,13 +40,14 @@ export async function createExpedientAction() {
 
 export interface ExpedientPatch {
   num_expedient: string;
-  projecte_id: number | null;
+  projecte: string;
   client_id: number | null;
   ciutat: string;
   estat: string;
   categoria: string; // "" means none
   tipus: string;
   pressupost: number;
+  data_tancament: string; // "" means none
 }
 
 export async function updateExpedientAction(id: number, data: ExpedientPatch) {
@@ -59,19 +60,20 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
   const categoria = CATEGORIES.includes(data.categoria) ? data.categoria : null;
   const tipus = TIPUS.includes(data.tipus) ? data.tipus : "privat";
   const pressupost = Number.isFinite(data.pressupost) ? data.pressupost : 0;
-  const projecteId = data.projecte_id && Number.isFinite(data.projecte_id) ? data.projecte_id : null;
   const clientId = data.client_id && Number.isFinite(data.client_id) ? data.client_id : null;
+  const dataTancament = /^\d{4}-\d{2}-\d{2}$/.test(data.data_tancament) ? data.data_tancament : null;
 
   await sql`
     update public.expedients set
       num_expedient = ${num},
-      projecte_id = ${projecteId},
+      projecte = ${data.projecte.trim() || null},
       client_id = ${clientId},
       ciutat = ${data.ciutat.trim() || null},
       estat = ${estat},
       categoria = ${categoria},
       tipus = ${tipus},
-      pressupost = ${pressupost}
+      pressupost = ${pressupost},
+      data_tancament = ${dataTancament}::date
     where id = ${id}
   `;
   revalidatePath("/expedients");

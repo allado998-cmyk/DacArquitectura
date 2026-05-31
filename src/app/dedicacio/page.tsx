@@ -12,22 +12,24 @@ export default async function DedicacioPage() {
 
   const [expedients, dedicacions, tasques] = await Promise.all([
     sql`
-      select e.id, e.num_expedient, e.projecte_id, e.client_id,
-             pr.nom as projecte_nom, c.nom as client_nom,
+      select e.id, e.num_expedient, e.projecte, e.client_id,
+             c.nom as client_nom,
              e.ciutat, e.estat, e.categoria, e.tipus,
-             e.pressupost::text as pressupost, e.created_at, e.updated_at
+             e.pressupost::text as pressupost,
+             to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,
+             e.created_at, e.updated_at
       from public.expedients e
-      left join public.projectes pr on pr.id = e.projecte_id
       left join public.clients c on c.id = e.client_id
       order by e.num_expedient desc
     ` as unknown as Promise<Expedient[]>,
     sql`
-      select d.id, d.expedient_id, e.num_expedient, pr.nom as projecte_nom,
+      select d.id, d.expedient_id, e.num_expedient, e.projecte,
+             e.categoria, e.client_id, c.nom as client_nom,
              to_char(d.data, 'YYYY-MM-DD') as data,
              d.hores::text as hores, d.tasca, d.comentari, d.created_at
       from public.dedicacions d
       join public.expedients e on e.id = d.expedient_id
-      left join public.projectes pr on pr.id = e.projecte_id
+      left join public.clients c on c.id = e.client_id
       order by d.data desc, d.id desc
     ` as unknown as Promise<Dedicacio[]>,
     sql`select nom from public.concepte_despesa_directa where actiu = true order by ordre, nom` as unknown as Promise<{ nom: string }[]>,

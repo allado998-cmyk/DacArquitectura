@@ -4,51 +4,78 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
-// Projectes -----------------------------------------------------------------
-
-export async function createProjecteAction(nom: string) {
-  await requireUser();
-  const trimmed = nom.trim();
-  if (!trimmed) return;
-  await sql`insert into public.projectes (nom) values (${trimmed})`;
-  revalidatePath("/parameters");
-}
-
-export async function updateProjecteAction(id: number, nom: string) {
-  await requireUser();
-  const trimmed = nom.trim();
-  if (!trimmed) return;
-  await sql`update public.projectes set nom = ${trimmed} where id = ${id}`;
-  revalidatePath("/parameters");
-}
-
-export async function deleteProjecteAction(id: number) {
-  await requireUser();
-  await sql`delete from public.projectes where id = ${id}`;
-  revalidatePath("/parameters");
-}
-
 // Clients -------------------------------------------------------------------
 
-export async function createClientAction(nom: string, contacte: string) {
+export async function createClientAction(nom: string) {
   await requireUser();
   const trimmed = nom.trim();
   if (!trimmed) return;
-  await sql`insert into public.clients (nom, contacte) values (${trimmed}, ${contacte.trim() || null})`;
+  await sql`insert into public.clients (nom) values (${trimmed})`;
   revalidatePath("/parameters");
 }
 
-export async function updateClientAction(id: number, nom: string, contacte: string) {
+export interface ClientPatch {
+  nom: string;
+  nif: string;
+  carrer: string;
+  ciutat: string;
+  codi_postal: string;
+}
+
+export async function updateClientAction(id: number, data: ClientPatch) {
   await requireUser();
-  const trimmed = nom.trim();
-  if (!trimmed) return;
-  await sql`update public.clients set nom = ${trimmed}, contacte = ${contacte.trim() || null} where id = ${id}`;
+  const nom = data.nom.trim();
+  if (!nom) return;
+  await sql`
+    update public.clients set
+      nom = ${nom},
+      nif = ${data.nif.trim() || null},
+      carrer = ${data.carrer.trim() || null},
+      ciutat = ${data.ciutat.trim() || null},
+      codi_postal = ${data.codi_postal.trim() || null}
+    where id = ${id}
+  `;
   revalidatePath("/parameters");
 }
 
 export async function deleteClientAction(id: number) {
   await requireUser();
   await sql`delete from public.clients where id = ${id}`;
+  revalidatePath("/parameters");
+}
+
+// Client contactes ----------------------------------------------------------
+
+export async function addClientContacteAction(clientId: number) {
+  await requireUser();
+  await sql`
+    insert into public.client_contactes (client_id, ordre)
+    values (
+      ${clientId},
+      coalesce((select max(ordre) + 10 from public.client_contactes where client_id = ${clientId}), 10)
+    )
+  `;
+  revalidatePath("/parameters");
+}
+
+export async function updateClientContacteAction(
+  id: number,
+  data: { nom: string; telefon: string; mail: string },
+) {
+  await requireUser();
+  await sql`
+    update public.client_contactes set
+      nom = ${data.nom.trim() || null},
+      telefon = ${data.telefon.trim() || null},
+      mail = ${data.mail.trim() || null}
+    where id = ${id}
+  `;
+  revalidatePath("/parameters");
+}
+
+export async function deleteClientContacteAction(id: number) {
+  await requireUser();
+  await sql`delete from public.client_contactes where id = ${id}`;
   revalidatePath("/parameters");
 }
 
@@ -82,13 +109,11 @@ export async function updateConcepteDirectaAction(id: number, nom: string, preu:
 
 export async function deleteConcepteDirectaAction(id: number) {
   await requireUser();
-  // Restrict if used; surface gracefully.
   try {
     await sql`delete from public.concepte_despesa_directa where id = ${id}`;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("violates foreign key")) {
-      // Soft-deactivate instead.
       await sql`update public.concepte_despesa_directa set actiu = false where id = ${id}`;
     } else {
       throw e;

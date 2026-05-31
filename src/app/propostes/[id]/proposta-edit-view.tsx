@@ -16,13 +16,23 @@ import {
   updateServeiAction,
 } from "../actions";
 import type {
+  Client,
   PropostaDoc,
   PropostaDocLinia,
   PropostaDocPagament,
   PropostaDocServei,
 } from "@/types/db";
 import { formatEur } from "@/lib/format";
+import { Combobox, type ComboOption } from "@/components/combobox";
 import { buildPropostaHtml, buildWordDoc, FIXED_EXCLUSIONS, FIXED_INCLUSIONS, PROFESSIONAL, type DocData, type Lang } from "@/lib/proposta-doc";
+
+export interface CalculOption {
+  id: number;
+  num_proposta: string | null;
+  projecte: string | null;
+  client_nom: string | null;
+  total: string;
+}
 
 export function PropostaEditView({
   doc,
@@ -30,15 +40,24 @@ export function PropostaEditView({
   inclusions,
   exclusions,
   pagaments,
+  clients,
+  calculs,
 }: {
   doc: PropostaDoc;
   serveis: PropostaDocServei[];
   inclusions: PropostaDocLinia[];
   exclusions: PropostaDocLinia[];
   pagaments: PropostaDocPagament[];
+  clients: Client[];
+  calculs: CalculOption[];
 }) {
   const [lang, setLang] = useState<Lang>("ca");
+  const [clientId, setClientId] = useState<number | null>(doc.client_id);
+  const [calculId, setCalculId] = useState<number | null>(doc.calcul_id);
   const [, startTransition] = useTransition();
+
+  const client = clients.find((c) => c.id === clientId) ?? null;
+  const calcul = calculs.find((c) => c.id === calculId) ?? null;
 
   const data: DocData = {
     num: doc.num,
@@ -46,6 +65,15 @@ export function PropostaEditView({
     descripcio: doc.descripcio,
     adreca: doc.adreca,
     ciutat: doc.ciutat,
+    codiPostal: doc.codi_postal,
+    client: client
+      ? {
+          nom: client.nom,
+          cif: client.nif,
+          adreca: client.carrer,
+          ciutat: [client.codi_postal, client.ciutat].filter(Boolean).join(" ") || null,
+        }
+      : null,
     serveis: serveis.map((s) => ({ descripcio: s.descripcio, preu: parseFloat(s.preu) || 0 })),
     inclusions: inclusions.map((i) => i.text ?? ""),
     exclusions: exclusions.map((e) => e.text ?? ""),
@@ -55,8 +83,16 @@ export function PropostaEditView({
   const subtotal = data.serveis.reduce((s, x) => s + x.preu, 0);
   const iva = subtotal * 0.21;
 
+  const clientOpts: ComboOption[] = clients.map((c) => ({ id: c.id, label: c.nom, sub: c.nif ?? c.ciutat ?? undefined }));
+  const calculOpts: ComboOption[] = calculs.map((c) => ({
+    id: c.id,
+    label: c.num_proposta ? `${c.num_proposta}${c.projecte ? ` · ${c.projecte}` : ""}` : `#${c.id}`,
+    sub: c.client_nom ?? undefined,
+  }));
+
   function downloadWord() {
-    const html = buildWordDoc(data, lang);
+    const logo = typeof window !== "undefined" ? `${window.location.origin}/logo.jpg` : "/logo.jpg";
+    const html = buildWordDoc(data, lang, logo);
     const blob = new Blob(["﻿", html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -110,7 +146,37 @@ export function PropostaEditView({
             <label className="label">Ciutat</label>
             <DocInput doc={doc} field="ciutat" />
           </div>
+          <div>
+            <label className="label">Codi postal</label>
+            <DocInput doc={doc} field="codi_postal" />
+          </div>
         </div>
+      </section>
+
+      {/* Càlcul d'honoraris associat (optional) */}
+      <section className="no-print card">
+        <h2 className="text-lg font-semibold mb-3">Càlcul d&apos;honoraris associat (opcional)</h2>
+        <div className="max-w-md">
+          <Combobox
+            options={calculOpts}
+            value={calculId}
+            onChange={(v) => {
+              setCalculId(v);
+              startTransition(() => updatePropostaDocAction(doc.id, { calcul_id: v }));
+            }}
+            placeholder="Cerca per número o projecte…"
+            emptyLabel="Cap"
+            overlay
+          />
+        </div>
+        {calcul && (
+          <div className="mt-3 inline-flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm">
+            <span className="font-mono">{calcul.num_proposta}</span>
+            <span>{calcul.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
+            {calcul.client_nom && <span className="text-[var(--color-muted)]">{calcul.client_nom}</span>}
+            <span className="font-semibold">{formatEur(calcul.total)}</span>
+          </div>
+        )}
       </section>
 
       {/* Datos Profesionales (fixed) */}
@@ -123,6 +189,35 @@ export function PropostaEditView({
           <Info label="Ciutat" value={PROFESSIONAL.ciutat} />
         </dl>
         <p className="mt-3 text-xs text-[var(--color-muted)]">Aquestes dades són fixes i apareixen sempre al document.</p>
+      </section>
+
+      {/* Dades Client (lookup) */}
+      <section className="no-print card">
+        <h2 className="text-lg font-semibold mb-3">Dades Client</h2>
+        <div className="max-w-md">
+          <Combobox
+            options={clientOpts}
+            value={clientId}
+            onChange={(v) => {
+              setClientId(v);
+              startTransition(() => updatePropostaDocAction(doc.id, { client_id: v }));
+            }}
+            placeholder="Cerca client…"
+            emptyLabel="Cap client"
+            overlay
+          />
+        </div>
+        {client && (
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2 text-sm">
+            <Info label="Client" value={client.nom} />
+            <Info label="CIF" value={client.nif ?? "—"} />
+            <Info label="Adreça" value={client.carrer ?? "—"} />
+            <Info label="Ciutat" value={[client.codi_postal, client.ciutat].filter(Boolean).join(" ") || "—"} />
+          </dl>
+        )}
+        <p className="mt-3 text-xs text-[var(--color-muted)]">
+          Les dades es prenen del client a <a href="/parameters" className="underline">Base de Dades</a>.
+        </p>
       </section>
 
       {/* Serveis */}
@@ -227,7 +322,7 @@ function DateField({ doc }: { doc: PropostaDoc }) {
   );
 }
 
-function DocInput({ doc, field }: { doc: PropostaDoc; field: "adreca" | "ciutat" }) {
+function DocInput({ doc, field }: { doc: PropostaDoc; field: "adreca" | "ciutat" | "codi_postal" }) {
   const [v, setV] = useState(doc[field] ?? "");
   const [, startTransition] = useTransition();
   return (

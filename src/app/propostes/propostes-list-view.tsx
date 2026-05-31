@@ -6,13 +6,15 @@ import { deletePropostaDocAction } from "./actions";
 import { formatDataCa } from "@/lib/format";
 import type { PropostaDoc, PropostaDocEstat } from "@/types/db";
 
+type Row = PropostaDoc & { client_nom: string | null };
+
 const ESTAT_META: Record<PropostaDocEstat, { label: string; bg: string; text: string }> = {
   pendent: { label: "Pendent", bg: "#fef9c3", text: "#854d0e" },
   acceptada: { label: "Acceptada", bg: "#dcfce7", text: "#15803d" },
   rebutjada: { label: "Rebutjada", bg: "#fee2e2", text: "#b91c1c" },
 };
 
-export function PropostesListView({ rows }: { rows: PropostaDoc[] }) {
+export function PropostesListView({ rows }: { rows: Row[] }) {
   const [query, setQuery] = useState("");
   const [fEstat, setFEstat] = useState("");
 
@@ -20,7 +22,7 @@ export function PropostesListView({ rows }: { rows: PropostaDoc[] }) {
   const filtered = rows.filter((r) => {
     if (fEstat && r.estat !== fEstat) return false;
     if (q) {
-      const hay = `${r.num} ${r.descripcio ?? ""} ${r.ciutat ?? ""}`.toLowerCase();
+      const hay = `${r.num} ${r.descripcio ?? ""} ${r.client_nom ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -59,7 +61,7 @@ export function PropostesListView({ rows }: { rows: PropostaDoc[] }) {
               <th className="th text-center w-28">Núm.</th>
               <th className="th text-center w-32">Data</th>
               <th className="th text-center">Descripció</th>
-              <th className="th text-center">Ciutat</th>
+              <th className="th text-center">Client</th>
               <th className="th text-center w-32">Estat</th>
               <th className="th text-center w-32"></th>
             </tr>
@@ -72,7 +74,7 @@ export function PropostesListView({ rows }: { rows: PropostaDoc[] }) {
                   <td className="td text-center font-mono">{r.num}</td>
                   <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
                   <td className="td text-center">{r.descripcio ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td text-center">{r.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-center">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                   <td className="td text-center">
                     <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: m.bg, color: m.text }}>
                       {m.label}

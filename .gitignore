@@ -25,3 +25,8 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# local reference documents
+*.doc
+*.docx
+*.pdf

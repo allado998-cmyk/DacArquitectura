@@ -8,13 +8,14 @@ import { sql } from "@/lib/db";
 const ESTATS = ["pendent", "acceptada", "rebutjada"];
 
 async function nextNum(): Promise<string> {
+  const yy = String(new Date().getFullYear()).slice(-2);
   const rows = (await sql`
-    select num from public.proposta_doc where num like 'PH-%' order by num desc limit 1
+    select num from public.proposta_doc where num like ${"PH-" + yy + "-%"} order by num desc limit 1
   `) as { num: string }[];
   let next = 1;
-  const m = rows[0]?.num ? /-(\d{4})$/.exec(rows[0].num) : null;
+  const m = rows[0]?.num ? /-(\d{3})$/.exec(rows[0].num) : null;
   if (m) next = parseInt(m[1], 10) + 1;
-  return `PH-${String(next).padStart(4, "0")}`;
+  return `PH-${yy}-${String(next).padStart(3, "0")}`;
 }
 
 export async function createPropostaDocAction() {
@@ -48,21 +49,24 @@ export interface DocPatch {
   descripcio?: string | null;
   adreca?: string | null;
   ciutat?: string | null;
+  codi_postal?: string | null;
+  client_id?: number | null;
+  calcul_id?: number | null;
   estat?: string;
 }
 
+// Only the keys present in `patch` are updated (so editing one field never
+// clears the others).
 export async function updatePropostaDocAction(id: number, patch: DocPatch) {
   await requireUser();
-  const estat = patch.estat && ESTATS.includes(patch.estat) ? patch.estat : null;
-  await sql`
-    update public.proposta_doc set
-      data = coalesce(${patch.data ?? null}::date, data),
-      descripcio = ${patch.descripcio ?? null},
-      adreca = ${patch.adreca ?? null},
-      ciutat = ${patch.ciutat ?? null},
-      estat = coalesce(${estat}, estat)
-    where id = ${id}
-  `;
+  if (patch.data !== undefined) await sql`update public.proposta_doc set data = ${patch.data}::date where id = ${id}`;
+  if (patch.descripcio !== undefined) await sql`update public.proposta_doc set descripcio = ${patch.descripcio} where id = ${id}`;
+  if (patch.adreca !== undefined) await sql`update public.proposta_doc set adreca = ${patch.adreca} where id = ${id}`;
+  if (patch.ciutat !== undefined) await sql`update public.proposta_doc set ciutat = ${patch.ciutat} where id = ${id}`;
+  if (patch.codi_postal !== undefined) await sql`update public.proposta_doc set codi_postal = ${patch.codi_postal} where id = ${id}`;
+  if (patch.client_id !== undefined) await sql`update public.proposta_doc set client_id = ${patch.client_id} where id = ${id}`;
+  if (patch.calcul_id !== undefined) await sql`update public.proposta_doc set calcul_id = ${patch.calcul_id} where id = ${id}`;
+  if (patch.estat !== undefined && ESTATS.includes(patch.estat)) await sql`update public.proposta_doc set estat = ${patch.estat} where id = ${id}`;
   revalidatePath(`/propostes/${id}`);
   revalidatePath("/propostes");
 }

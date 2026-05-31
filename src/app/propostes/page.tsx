@@ -11,10 +11,13 @@ export default async function PropostesPage() {
   await requireUser();
 
   const rows = (await sql`
-    select id, num, to_char(data, 'YYYY-MM-DD') as data, descripcio, adreca, ciutat, estat, created_at, updated_at
-    from public.proposta_doc
-    order by num desc nulls last, id desc
-  `) as unknown as PropostaDoc[];
+    select d.id, d.num, to_char(d.data, 'YYYY-MM-DD') as data, d.descripcio, d.adreca, d.ciutat,
+           d.codi_postal, d.client_id, d.calcul_id, d.estat, d.created_at, d.updated_at,
+           c.nom as client_nom
+    from public.proposta_doc d
+    left join public.clients c on c.id = d.client_id
+    order by d.num desc nulls last, d.id desc
+  `) as unknown as (PropostaDoc & { client_nom: string | null })[];
 
   return (
     <>

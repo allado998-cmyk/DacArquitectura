@@ -119,11 +119,14 @@ export type PropostaDocEstat = "pendent" | "acceptada" | "rebutjada";
 
 export interface PropostaDoc {
   id: number;
-  num: string; // PH-XXXX
+  num: string; // PH-YY-NNN
   data: string; // ISO date
   descripcio: string | null;
   adreca: string | null;
   ciutat: string | null;
+  codi_postal: string | null;
+  client_id: number | null;
+  calcul_id: number | null;
   estat: PropostaDocEstat;
   created_at: string;
   updated_at: string;

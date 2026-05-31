@@ -23,8 +23,8 @@ export const FIXED_INCLUSIONS: Record<Lang, string[]> = {
 };
 
 export const FIXED_EXCLUSIONS: Record<Lang, string[]> = {
-  ca: ["Visat i despeses col·legials. No són obligatoris."],
-  es: ["Visado y gastos colegiales. No son obligatorios."],
+  ca: ["Visat i despeses col·legials. No són obligatoris.", "Tot allò que no estigui expressament indicat."],
+  es: ["Visado y gastos colegiales. No son obligatorios.", "Todo aquello que no esté expresamente indicado."],
 };
 
 interface Txt {
@@ -186,6 +186,13 @@ function eur(value: number, lang: Lang): string {
   }).format(value);
 }
 
+function num2(value: number, lang: Lang): string {
+  return new Intl.NumberFormat(lang === "ca" ? "ca-ES" : "es-ES", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function esc(s: string | null | undefined): string {
   return (s ?? "")
     .replace(/&/g, "&amp;")
@@ -200,6 +207,8 @@ export interface DocData {
   descripcio: string | null;
   adreca: string | null;
   ciutat: string | null;
+  codiPostal: string | null;
+  client: { nom: string; cif: string | null; adreca: string | null; ciutat: string | null } | null;
   serveis: { descripcio: string | null; preu: number }[];
   inclusions: string[];
   exclusions: string[];
@@ -207,125 +216,129 @@ export interface DocData {
 }
 
 // Returns the document body HTML (inline styles for Word/PDF portability).
-export function buildPropostaHtml(doc: DocData, lang: Lang): string {
+export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg"): string {
   const t = TXT[lang];
   const subtotal = doc.serveis.reduce((s, x) => s + (x.preu || 0), 0);
   const iva = subtotal * 0.21;
   const totalIva = subtotal + iva;
 
-  const muted = "color:#555;";
-  const h2 = "font-size:13px;font-weight:bold;margin:18px 0 6px;letter-spacing:.02em;";
-  const p = "margin:0 0 8px;line-height:1.45;text-align:justify;";
+  const grey = "#7a7a72";
+  const p = "margin:0 0 9px;line-height:1.45;text-align:justify;font-size:11px;";
+  const sub = "text-decoration:underline;font-weight:normal;margin:14px 0 8px;font-size:11.5px;";
 
   const inclusions = [...doc.inclusions.filter((x) => x.trim()), ...FIXED_INCLUSIONS[lang]];
   const exclusions = [...doc.exclusions.filter((x) => x.trim()), ...FIXED_EXCLUSIONS[lang]];
+  const ciutatLine = [doc.codiPostal, doc.ciutat].filter(Boolean).join(" ");
+
+  const bar = (title: string, right?: string) =>
+    `<div style="background:#e9e9e4;border-bottom:1px solid #c9c9c0;padding:3px 8px;margin:16px 0 8px;font-size:10px;letter-spacing:.06em;color:#444;text-transform:uppercase;display:flex;justify-content:space-between;">
+      <span>${esc(title)}</span>${right ? `<span style="font-style:italic;text-transform:none;">${esc(right)}</span>` : ""}
+    </div>`;
+
+  const row = (label: string, value: string) =>
+    `<div style="display:flex;padding:2px 8px;font-size:11px;">
+      <div style="width:90px;font-style:italic;color:${grey};font-size:9.5px;padding-top:1px;">${esc(label)}</div>
+      <div style="flex:1;">${value}</div>
+    </div>`;
 
   const serveiRows = doc.serveis
     .map(
-      (s) => `<tr>
-        <td style="padding:6px 8px;border:1px solid #ddd;">${esc(s.descripcio)}</td>
-        <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;white-space:nowrap;">${eur(s.preu || 0, lang)}</td>
+      (s, i) => `<tr>
+        <td style="padding:4px 8px;border:1px solid #ccc;width:28px;text-align:center;">${String(i + 1).padStart(2, "0")}</td>
+        <td style="padding:4px 8px;border:1px solid #ccc;">${esc(s.descripcio)}</td>
+        <td style="padding:4px 8px;border:1px solid #ccc;text-align:right;white-space:nowrap;width:120px;">${num2(s.preu || 0, lang)}</td>
       </tr>`,
     )
     .join("");
 
-  const pagamentRows = doc.pagaments
+  const pagamentLines = doc.pagaments
     .map(
-      (pg) => `<tr>
-        <td style="padding:5px 8px;border:1px solid #ddd;">${esc(pg.descripcio)}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;white-space:nowrap;">${pg.import != null ? eur(pg.import, lang) : ""}</td>
-      </tr>`,
+      (pg) => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 18px;font-size:11px;">
+        <span>- ${esc(pg.descripcio)}</span>
+        <span style="white-space:nowrap;">${pg.import != null ? `${eur(pg.import, lang)} ${t.mesIva}` : ""}</span>
+      </div>`,
     )
     .join("");
 
   const signature = `
-    <div style="margin-top:26px;line-height:1.5;">
-      <div>${t.barcelonaData(doc.data)}</div>
-      <div style="height:36px;"></div>
-      <div><strong>${PROFESSIONAL.signatari}</strong>, ${t.rolSignatari}</div>
-      <div>${t.adminSignatari}</div>
+    <div style="margin-top:24px;line-height:1.5;font-size:11px;">
+      <div style="margin-left:18px;">${t.barcelonaData(doc.data)}</div>
+      <div style="height:34px;"></div>
+      <div style="margin-left:18px;"><strong>${PROFESSIONAL.signatari}</strong>, <span style="font-style:italic;">${t.rolSignatari}</span></div>
+      <div style="margin-left:18px;font-style:italic;">${t.adminSignatari}</div>
     </div>`;
 
+  const footer = `<div style="font-size:8px;color:${grey};border-top:1px solid #ddd;margin-top:18px;padding-top:5px;">${esc(t.footer)}</div>`;
+
+  const clientSection = doc.client
+    ? bar("DADES CLIENT") +
+      row("client", esc(doc.client.nom)) +
+      row(t.cif, esc(doc.client.cif)) +
+      row("adreça", esc(doc.client.adreca)) +
+      row("ciutat", esc(doc.client.ciutat))
+    : "";
+
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:11.5px;color:#111;max-width:820px;margin:0 auto;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1f4d3f;padding-bottom:10px;">
-      <div>
-        <div style="font-size:18px;font-weight:bold;color:#1f4d3f;">${t.docTitle}</div>
-        <div style="${muted}">${esc(doc.num)} · ${formatLongDate(doc.data, lang)}</div>
-      </div>
-      <div style="text-align:right;font-size:10.5px;${muted}">
-        <div><strong>${PROFESSIONAL.societat}</strong></div>
-        <div>${t.cif}: ${PROFESSIONAL.cif}</div>
-        <div>${PROFESSIONAL.adreca}</div>
-        <div>${PROFESSIONAL.ciutat}</div>
-      </div>
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;max-width:820px;margin:0 auto;">
+    <div style="text-align:right;margin-bottom:4px;">
+      <img src="${logoUrl}" alt="DAC arquitectura" style="height:46px;width:auto;display:inline-block;" />
     </div>
 
-    <h2 style="${h2}">${t.dadesProposta}</h2>
-    <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="width:130px;${muted}padding:2px 0;">${t.descripcio}</td><td style="padding:2px 0;">${esc(doc.descripcio)}</td></tr>
-      <tr><td style="${muted}padding:2px 0;">${t.adreca}</td><td style="padding:2px 0;">${esc(doc.adreca)}</td></tr>
-      <tr><td style="${muted}padding:2px 0;">${t.ciutat}</td><td style="padding:2px 0;">${esc(doc.ciutat)}</td></tr>
-    </table>
+    ${bar("DADES PROPOSTA")}
+    ${row(t.num, `<span style="font-family:monospace;">${esc(doc.num)}</span>`)}
+    ${row(t.data, esc(formatLongDate(doc.data, lang)))}
+    ${row(t.descripcio, esc(doc.descripcio))}
+    ${row(t.adreca, esc(doc.adreca))}
+    ${row(t.ciutat, esc(ciutatLine))}
 
-    <h2 style="${h2}">${t.serveiTitle}</h2>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="background:#f2f4f2;">
-          <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">${t.concepte}</th>
-          <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;width:140px;">${t.import}</th>
-        </tr>
-      </thead>
+    ${bar("DADES PROFESSIONALS")}
+    ${row(t.societat, PROFESSIONAL.societat)}
+    ${row(t.cif, PROFESSIONAL.cif)}
+    ${row("adreça", PROFESSIONAL.adreca)}
+    ${row("ciutat", PROFESSIONAL.ciutat)}
+
+    ${clientSection}
+
+    ${bar(t.serveiTitle, "euros")}
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <tbody>${serveiRows}</tbody>
       <tfoot>
-        <tr><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${t.subtotal}</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(subtotal, lang)}</td></tr>
-        <tr><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${t.iva}</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(iva, lang)}</td></tr>
-        <tr style="font-weight:bold;background:#f2f4f2;"><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;">${t.totalIva}</td><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;">${eur(totalIva, lang)}</td></tr>
+        <tr style="font-weight:bold;"><td colspan="2" style="padding:4px 8px;border:1px solid #ccc;">${t.subtotal}</td><td style="padding:4px 8px;border:1px solid #ccc;text-align:right;">${num2(subtotal, lang)}</td></tr>
+        <tr><td colspan="2" style="padding:4px 8px;border:1px solid #ccc;">${t.iva}</td><td style="padding:4px 8px;border:1px solid #ccc;text-align:right;">${num2(iva, lang)}</td></tr>
+        <tr style="font-weight:bold;"><td colspan="2" style="padding:4px 8px;border:1px solid #ccc;">${t.totalIva}</td><td style="padding:4px 8px;border:1px solid #ccc;text-align:right;">${num2(totalIva, lang)}</td></tr>
       </tfoot>
     </table>
 
     ${signature}
+    ${footer}
 
-    <h2 style="${h2}margin-top:28px;border-top:1px solid #ddd;padding-top:14px;">${t.contingutTitle}</h2>
-
-    <h2 style="${h2}">${t.especificacionsTitle}</h2>
+    ${bar(t.contingutTitle)}
+    <div style="${sub}">${esc(t.especificacionsTitle)}</div>
     <p style="${p}">${esc(t.inclouIntro)}</p>
-    <ul style="margin:0 0 8px;padding-left:20px;line-height:1.5;">
-      ${inclusions.map((x) => `<li>${esc(x)}</li>`).join("")}
-    </ul>
+    <ul style="margin:0 0 8px;padding-left:22px;line-height:1.5;font-size:11px;">${inclusions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
 
-    <h2 style="${h2}">${t.exclusionsTitle}</h2>
+    <div style="${sub}">${esc(t.exclusionsTitle)}</div>
     <p style="${p}">${esc(t.exclouIntro)}</p>
-    <ul style="margin:0 0 8px;padding-left:20px;line-height:1.5;">
-      ${exclusions.map((x) => `<li>${esc(x)}</li>`).join("")}
-    </ul>
+    <ul style="margin:0 0 8px;padding-left:22px;line-height:1.5;font-size:11px;">${exclusions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
 
-    <h2 style="${h2}">${t.condicionsTitle}</h2>
-    <div style="font-weight:bold;margin:8px 0 4px;">${t.ofertaTitle}</div>
+    ${bar(t.condicionsTitle)}
+    <div style="${sub}">${t.ofertaTitle}</div>
     ${t.ofertaText.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
-    <div style="font-weight:bold;margin:8px 0 4px;">${t.terminisTitle}</div>
+    <div style="${sub}">${t.terminisTitle}</div>
     <p style="${p}">${esc(t.terminisText)}</p>
-    <div style="font-weight:bold;margin:8px 0 4px;">${t.pagamentTitle}</div>
+    <div style="${sub}">${t.pagamentTitle}</div>
     <p style="${p}">${esc(t.pagamentText)}</p>
-    ${
-      pagamentRows
-        ? `<table style="width:100%;border-collapse:collapse;margin:6px 0;">
-            <tbody>${pagamentRows}</tbody>
-          </table>`
-        : ""
-    }
+    ${pagamentLines}
 
-    <div style="font-weight:bold;margin:14px 0 4px;">${t.acceptacioTitle}</div>
-    <div style="font-size:15px;font-weight:bold;color:#1f4d3f;margin-bottom:8px;">${eur(subtotal, lang)} ${t.mesIva}</div>
+    <div style="${sub}">${t.acceptacioTitle}</div>
     ${t.acceptacioText.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
-
-    <p style="font-size:9px;${muted}border-top:1px solid #ddd;margin-top:18px;padding-top:6px;">${esc(t.footer)}</p>
     ${t.tancament.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
 
     ${signature}
+    ${footer}
   </div>`;
 }
 
-export function buildWordDoc(doc: DocData, lang: Lang): string {
-  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title></head><body>${buildPropostaHtml(doc, lang)}</body></html>`;
+export function buildWordDoc(doc: DocData, lang: Lang, logoUrl?: string): string {
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title></head><body>${buildPropostaHtml(doc, lang, logoUrl)}</body></html>`;
 }

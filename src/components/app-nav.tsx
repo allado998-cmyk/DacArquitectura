@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/login/actions";
 
-export function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" }) {
+export function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" }) {
   return (
     <header className="border-b border-[var(--color-line)] bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center gap-6">
@@ -27,6 +27,12 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
             className={`px-3 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Honoraris
+          </Link>
+          <Link
+            href="/propostes"
+            className={`px-3 py-1.5 rounded-md ${current === "propostes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            Propostes
           </Link>
           <Link
             href="/parameters"

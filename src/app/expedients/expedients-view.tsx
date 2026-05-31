@@ -158,6 +158,32 @@ function ExpedientsList({
   tipologies: Tipologia[];
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
+  const [query, setQuery] = useState("");
+  const [fAny, setFAny] = useState("");
+  const [fClient, setFClient] = useState("");
+  const [fCiutat, setFCiutat] = useState("");
+
+  const anys = useMemo(() => Array.from(new Set(rows.map((r) => anyOf(r.num_expedient)))).sort().reverse(), [rows]);
+  const clientsList = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.client_nom ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [rows],
+  );
+  const ciutats = useMemo(
+    () => Array.from(new Set(rows.map((r) => (r.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [rows],
+  );
+
+  const q = query.trim().toLowerCase();
+  const filtered = rows.filter((r) => {
+    if (fAny && anyOf(r.num_expedient) !== fAny) return false;
+    if (fClient && (r.client_nom ?? "") !== fClient) return false;
+    if (fCiutat && (r.ciutat ?? "").trim() !== fCiutat) return false;
+    if (q) {
+      const hay = `${r.num_expedient} ${r.projecte ?? ""} ${r.client_nom ?? ""} ${r.ciutat ?? ""} ${r.tipologia_nom ?? ""} ${r.categoria ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
 
   if (rows.length === 0) {
     return (
@@ -169,6 +195,34 @@ function ExpedientsList({
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-56">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Projecte, client, ciutat, núm.…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Any</label>
+          <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
+            <option value="">Tots</option>
+            {anys.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Client</label>
+          <select className="input" value={fClient} onChange={(e) => setFClient(e.target.value)}>
+            <option value="">Tots</option>
+            {clientsList.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Ciutat</label>
+          <select className="input" value={fCiutat} onChange={(e) => setFCiutat(e.target.value)}>
+            <option value="">Totes</option>
+            {ciutats.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
       <div className="table-wrap">
         <table className="w-full">
           <thead>
@@ -187,9 +241,12 @@ function ExpedientsList({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {filtered.map((r) => (
               <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} tipologies={tipologies} onOpen={() => setDetail(r)} />
             ))}
+            {filtered.length === 0 && (
+              <tr><td className="td text-[var(--color-muted)]" colSpan={11}>Cap resultat.</td></tr>
+            )}
           </tbody>
         </table>
       </div>

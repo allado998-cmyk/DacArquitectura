@@ -115,6 +115,43 @@ export interface Dedicacio {
   created_at: string;
 }
 
+export type PropostaDocEstat = "pendent" | "acceptada" | "rebutjada";
+
+export interface PropostaDoc {
+  id: number;
+  num: string; // PH-XXXX
+  data: string; // ISO date
+  descripcio: string | null;
+  adreca: string | null;
+  ciutat: string | null;
+  estat: PropostaDocEstat;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PropostaDocServei {
+  id: number;
+  doc_id: number;
+  descripcio: string | null;
+  preu: string;
+  ordre: number;
+}
+
+export interface PropostaDocLinia {
+  id: number;
+  doc_id: number;
+  text: string | null;
+  ordre: number;
+}
+
+export interface PropostaDocPagament {
+  id: number;
+  doc_id: number;
+  descripcio: string | null;
+  import: string | null;
+  ordre: number;
+}
+
 export interface ClientStats {
   client_id: number;
   n: number;

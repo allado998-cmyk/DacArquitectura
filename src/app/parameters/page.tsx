@@ -2,14 +2,14 @@ import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ParametersView } from "./parameters-view";
-import type { Client, ConcepteDespesaDirecta, ConcepteAltraDespesa } from "@/types/db";
+import type { Client, ClientStats, ConcepteDespesaDirecta, ConcepteAltraDespesa } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function ParametersPage() {
   await requireUser();
 
-  const [clients, conceptesDirectes, conceptesAltres] = await Promise.all([
+  const [clients, clientStats, conceptesDirectes, conceptesAltres] = await Promise.all([
     sql`
       select c.id, c.nom, c.nif, c.carrer, c.ciutat, c.codi_postal, c.contacte, c.created_at,
         coalesce(
@@ -26,6 +26,16 @@ export default async function ParametersPage() {
       group by c.id
       order by c.nom
     ` as unknown as Promise<Client[]>,
+    sql`
+      select client_id,
+             count(*)::int as n,
+             count(*) filter (where estat = 'obert')::int as oberts,
+             coalesce(sum(pressupost), 0)::text as pressupost_total,
+             coalesce(sum(pressupost) filter (where estat = 'obert'), 0)::text as pressupost_obert
+      from public.expedients
+      where client_id is not null
+      group by client_id
+    ` as unknown as Promise<ClientStats[]>,
     sql`select id, nom, preu_hora_default::text as preu_hora_default, actiu, ordre from public.concepte_despesa_directa order by ordre, nom` as unknown as Promise<ConcepteDespesaDirecta[]>,
     sql`select id, nom, preu_unitat_default::text as preu_unitat_default, actiu, ordre from public.concepte_altra_despesa order by ordre, nom` as unknown as Promise<ConcepteAltraDespesa[]>,
   ]);
@@ -40,6 +50,7 @@ export default async function ParametersPage() {
         </p>
         <ParametersView
           clients={clients}
+          clientStats={clientStats}
           conceptesDirectes={conceptesDirectes}
           conceptesAltres={conceptesAltres}
         />

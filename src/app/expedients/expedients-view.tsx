@@ -7,10 +7,12 @@ import {
   updateExpedientAction,
   type ExpedientPatch,
 } from "./actions";
-import type { Client, Expedient } from "@/types/db";
+import type { Client, Dedicacio, Expedient } from "@/types/db";
 import { formatEur } from "@/lib/format";
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS } from "@/lib/expedients";
 import { Combobox, type ComboOption } from "@/components/combobox";
+import { Modal } from "@/components/modal";
+import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, VBarChart } from "@/components/charts";
 
 type Tab = "llista" | "estadistiques";
 
@@ -23,13 +25,18 @@ function fmtDate(iso: string | null) {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+function fmtHores(h: number) {
+  return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round(h * 100) / 100) + " h";
+}
 
 export function ExpedientsView({
   expedients,
   clients,
+  dedicacions,
 }: {
   expedients: Expedient[];
   clients: Client[];
+  dedicacions: Dedicacio[];
 }) {
   const [tab, setTab] = useState<Tab>("llista");
   const [, startTransition] = useTransition();
@@ -37,8 +44,19 @@ export function ExpedientsView({
   const clientOpts: ComboOption[] = clients.map((c) => ({
     id: c.id,
     label: c.nom,
-    sub: c.nif ?? c.ciutat ?? undefined,
+    sub: c.ciutat ?? undefined,
   }));
+
+  const dedicByExp = useMemo(() => {
+    const map = new Map<number, Dedicacio[]>();
+    for (const d of dedicacions) {
+      if (d.expedient_id == null) continue;
+      const arr = map.get(d.expedient_id) ?? [];
+      arr.push(d);
+      map.set(d.expedient_id, arr);
+    }
+    return map;
+  }, [dedicacions]);
 
   return (
     <div>
@@ -61,7 +79,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} />}
     </div>
   );
@@ -121,7 +139,17 @@ function CategoriaBadge({ code }: { code: string | null }) {
 // Llista
 // ============================================================================
 
-function ExpedientsList({ rows, clientOpts }: { rows: Expedient[]; clientOpts: ComboOption[] }) {
+function ExpedientsList({
+  rows,
+  clientOpts,
+  dedicByExp,
+}: {
+  rows: Expedient[];
+  clientOpts: ComboOption[];
+  dedicByExp: Map<number, Dedicacio[]>;
+}) {
+  const [detail, setDetail] = useState<Expedient | null>(null);
+
   if (rows.length === 0) {
     return (
       <div className="card text-sm text-[var(--color-muted)]">
@@ -131,33 +159,49 @@ function ExpedientsList({ rows, clientOpts }: { rows: Expedient[]; clientOpts: C
   }
 
   return (
-    <div className="table-wrap">
-      <table className="w-full">
-        <thead>
-          <tr>
-            <th className="th w-28">Núm.</th>
-            <th className="th" style={{ minWidth: "16rem" }}>Projecte</th>
-            <th className="th" style={{ minWidth: "16rem" }}>Client</th>
-            <th className="th w-40">Ciutat</th>
-            <th className="th w-44">Categoria</th>
-            <th className="th w-28">Tipus</th>
-            <th className="th w-36">Pressupost</th>
-            <th className="th w-32">Tancat el</th>
-            <th className="th w-28">Estat</th>
-            <th className="th w-32"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="table-wrap">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="th w-28">Núm.</th>
+              <th className="th" style={{ minWidth: "16rem" }}>Projecte</th>
+              <th className="th" style={{ minWidth: "16rem" }}>Client</th>
+              <th className="th w-40">Ciutat</th>
+              <th className="th w-44">Categoria</th>
+              <th className="th w-28">Tipus</th>
+              <th className="th w-36">Pressupost</th>
+              <th className="th w-32">Tancat el</th>
+              <th className="th w-28">Estat</th>
+              <th className="th w-32"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} onOpen={() => setDetail(r)} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <DedicacioModal
+        expedient={detail}
+        dedicacions={detail ? dedicByExp.get(detail.id) ?? [] : []}
+        onClose={() => setDetail(null)}
+      />
+    </>
   );
 }
 
-function ExpedientRow({ row, clientOpts }: { row: Expedient; clientOpts: ComboOption[] }) {
+function ExpedientRow({
+  row,
+  clientOpts,
+  onOpen,
+}: {
+  row: Expedient;
+  clientOpts: ComboOption[];
+  onOpen: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -204,8 +248,8 @@ function ExpedientRow({ row, clientOpts }: { row: Expedient; clientOpts: ComboOp
 
   if (!editing) {
     return (
-      <tr>
-        <td className="td font-mono">{row.num_expedient}</td>
+      <tr className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={onOpen}>
+        <td className="td font-mono text-[var(--color-accent)]">{row.num_expedient}</td>
         <td className="td">{row.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
@@ -214,7 +258,7 @@ function ExpedientRow({ row, clientOpts }: { row: Expedient; clientOpts: ComboOp
         <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
         <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
         <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
-        <td className="td text-right whitespace-nowrap">
+        <td className="td text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => setEditing(true)}>
             Editar
           </button>
@@ -301,6 +345,77 @@ function ExpedientRow({ row, clientOpts }: { row: Expedient; clientOpts: ComboOp
   );
 }
 
+function DedicacioModal({
+  expedient,
+  dedicacions,
+  onClose,
+}: {
+  expedient: Expedient | null;
+  dedicacions: Dedicacio[];
+  onClose: () => void;
+}) {
+  const total = dedicacions.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
+  return (
+    <Modal
+      open={expedient != null}
+      onClose={onClose}
+      wide
+      title={
+        expedient && (
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm text-[var(--color-accent)]">{expedient.num_expedient}</span>
+              <Badge swatch={TIPUS[expedient.tipus]} label={TIPUS[expedient.tipus].label} />
+              <Badge swatch={ESTAT[expedient.estat]} label={ESTAT[expedient.estat].label} dot />
+            </div>
+            <h3 className="text-base font-semibold">{expedient.projecte ?? "Sense projecte"}</h3>
+          </div>
+        )
+      }
+    >
+      {expedient && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <KpiCard label="Hores dedicades" value={fmtHores(total)} accent="#1f4d3f" />
+            <KpiCard label="Dies" value={String(new Set(dedicacions.map((d) => d.data)).size)} accent="#3b82f6" />
+            <KpiCard label="Pressupost" value={formatEur(expedient.pressupost)} accent="#7c3aed" />
+          </div>
+
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
+            Dedicació vinculada
+          </h4>
+          {dedicacions.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">Encara no hi ha hores registrades en aquest expedient.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="th w-28">Data</th>
+                    <th className="th w-24 text-right">Hores</th>
+                    <th className="th">Tasca</th>
+                    <th className="th">Comentari</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dedicacions.map((d) => (
+                    <tr key={d.id}>
+                      <td className="td tabular-nums">{fmtDate(d.data)}</td>
+                      <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
+                      <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                      <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ============================================================================
 // Estadístiques
 // ============================================================================
@@ -350,37 +465,22 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
   const pressupostTotal = filtered.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   const pressupostPublic = filtered.filter((r) => r.tipus === "public").reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   const pressupostPrivat = pressupostTotal - pressupostPublic;
-  const pressupostObert = filtered
-    .filter((r) => r.estat === "obert")
-    .reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
+  const pressupostObert = filtered.filter((r) => r.estat === "obert").reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   const pressupostMitja = total ? pressupostTotal / total : 0;
-
-  const estatSegments = [
-    { label: "Oberts", value: oberts, color: ESTAT.obert.color },
-    { label: "Tancats", value: tancats, color: ESTAT.tancat.color },
-  ];
-  const tipusSegments = [
-    { label: "Privat", value: privats, color: TIPUS.privat.color, note: formatEur(pressupostPrivat) },
-    { label: "Públic", value: publics, color: TIPUS.public.color, note: formatEur(pressupostPublic) },
-  ];
 
   const byCiutat = groupBy(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
   const byAny = groupBy(filtered, (r) => anyOf(r.num_expedient)).sort((a, b) => a.key.localeCompare(b.key));
-  const catGroups = CATEGORIES.map((c) => {
-    const items = filtered.filter((r) => r.categoria === c.code);
-    return {
-      key: c.label,
-      color: c.color,
-      count: items.length,
-      pressupost: items.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0),
-    };
-  }).filter((g) => g.count > 0);
-  const senseCat = filtered.filter((r) => !r.categoria).length;
+  const catGroups = CATEGORIES.map((c) => ({
+    code: c.code,
+    label: c.label,
+    color: c.color,
+    count: filtered.filter((r) => r.categoria === c.code).length,
+  })).filter((g) => g.count > 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Filtres */}
-      <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
+      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
           <FilterSelect label="Estat" value={fEstat} onChange={setFEstat} options={[["obert", "Oberts"], ["tancat", "Tancats"]]} />
@@ -392,59 +492,65 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
 
       {/* KPIs */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Expedients" value={String(total)} accent="var(--color-accent)" hint={`${oberts} oberts · ${tancats} tancats`} />
-        <Kpi label="Pressupost total" value={formatEur(pressupostTotal)} accent="#0ea5e9" hint="Suma de tots els filtrats" />
-        <Kpi label="Pressupost en obert" value={formatEur(pressupostObert)} accent={ESTAT.obert.color} hint={`${oberts} expedients oberts`} />
-        <Kpi label="Pressupost mitjà" value={formatEur(pressupostMitja)} accent="#7c3aed" hint="Per expedient" />
+        <KpiCard label="Expedients" value={String(total)} accent="#1f4d3f" hint={`${oberts} oberts · ${tancats} tancats`} />
+        <KpiCard label="Pressupost total" value={formatEur(pressupostTotal)} accent="#0ea5e9" hint="Suma dels filtrats" />
+        <KpiCard label="Pressupost en obert" value={formatEur(pressupostObert)} accent="#ef4444" hint={`${oberts} oberts`} />
+        <KpiCard label="Pressupost mitjà" value={formatEur(pressupostMitja)} accent="#a855f7" hint="Per expedient" />
       </div>
 
       {/* Donuts */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <DonutCard title="Estat" segments={estatSegments} centerLabel={`${total}`} centerSub="expedients" />
-        <DonutCard title="Tipus" segments={tipusSegments} centerLabel={`${total}`} centerSub="expedients" />
+        <ChartCard title="Estat dels expedients" meta="oberts / tancats">
+          <GradientDonut
+            segments={[
+              { label: "Oberts", value: oberts, color: ESTAT.obert.color },
+              { label: "Tancats", value: tancats, color: ESTAT.tancat.color },
+            ]}
+            centerValue={String(total)}
+            centerLabel="expedients"
+          />
+        </ChartCard>
+        <ChartCard title="Tipus d'expedient" meta="privat / públic">
+          <GradientDonut
+            segments={[
+              { label: "Privat", value: privats, color: TIPUS.privat.color, note: formatEur(pressupostPrivat) },
+              { label: "Públic", value: publics, color: TIPUS.public.color, note: formatEur(pressupostPublic) },
+            ]}
+            centerValue={String(total)}
+            centerLabel="expedients"
+          />
+        </ChartCard>
       </div>
 
       {/* Pressupost per tipus */}
-      <div className="card">
-        <SectionTitle>Pressupost per tipus</SectionTitle>
+      <ChartCard title="Pressupost per tipus" meta="% del total">
         {pressupostTotal === 0 ? (
-          <Empty />
+          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
         ) : (
-          <StackedBudget
+          <StackedBar
             segments={[
               { label: "Privat", value: pressupostPrivat, color: TIPUS.privat.color },
               { label: "Públic", value: pressupostPublic, color: TIPUS.public.color },
             ]}
             total={pressupostTotal}
+            fmt={formatEur}
           />
         )}
-      </div>
+      </ChartCard>
 
       {/* Categoria */}
-      <div className="card">
-        <SectionTitle>Per categoria</SectionTitle>
-        {catGroups.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="space-y-3">
-            {catGroups.map((g) => (
-              <ColorBar key={g.key} label={g.key} color={g.color} count={g.count} pressupost={g.pressupost} max={Math.max(...catGroups.map((x) => x.count))} />
-            ))}
-            {senseCat > 0 && <p className="text-xs text-[var(--color-muted)] pt-1">{senseCat} sense categoria assignada.</p>}
-          </div>
-        )}
-      </div>
+      <ChartCard title="Expedients per categoria" meta="nombre">
+        <VBarChart bars={catGroups.map((g) => ({ label: g.label, value: g.count, color: g.color, display: String(g.count) }))} />
+      </ChartCard>
 
       {/* Ciutat + Any */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="card">
-          <SectionTitle>Per ciutat</SectionTitle>
-          <BarList groups={byCiutat} />
-        </div>
-        <div className="card">
-          <SectionTitle>Per any</SectionTitle>
-          <BarList groups={byAny} />
-        </div>
+        <ChartCard title="Expedients per ciutat" meta="nombre">
+          <HBarChart bars={byCiutat.map((g) => ({ label: g.key, value: g.count, color: "#6366f1", display: String(g.count) }))} />
+        </ChartCard>
+        <ChartCard title="Expedients per any" meta="nombre">
+          <VBarChart bars={byAny.map((g) => ({ label: g.key, value: g.count, color: "#1f4d3f", display: String(g.count) }))} />
+        </ChartCard>
       </div>
     </div>
   );
@@ -453,27 +559,17 @@ function StatsPanel({ rows }: { rows: Expedient[] }) {
 interface Group {
   key: string;
   count: number;
-  pressupost: number;
 }
 
 function groupBy(rows: Expedient[], keyFn: (r: Expedient) => string): Group[] {
   const map = new Map<string, Group>();
   for (const r of rows) {
     const key = keyFn(r);
-    const g = map.get(key) ?? { key, count: 0, pressupost: 0 };
+    const g = map.get(key) ?? { key, count: 0 };
     g.count += 1;
-    g.pressupost += parseFloat(r.pressupost) || 0;
     map.set(key, g);
   }
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] mb-4">{children}</h3>;
-}
-
-function Empty() {
-  return <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>;
 }
 
 function FilterSelect({
@@ -496,193 +592,6 @@ function FilterSelect({
           <option key={v} value={v}>{l}</option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function Kpi({ label, value, accent, hint }: { label: string; value: string; accent: string; hint?: string }) {
-  return (
-    <div className="relative overflow-hidden rounded-lg border border-[var(--color-line)] bg-white p-4">
-      <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
-      <div className="label mb-1">{label}</div>
-      <div className="text-2xl font-semibold tracking-tight tabular-nums" style={{ color: accent }}>
-        {value}
-      </div>
-      {hint && <div className="mt-1 text-xs text-[var(--color-muted)]">{hint}</div>}
-    </div>
-  );
-}
-
-function DonutCard({
-  title,
-  segments,
-  centerLabel,
-  centerSub,
-}: {
-  title: string;
-  segments: { label: string; value: number; color: string; note?: string }[];
-  centerLabel: string;
-  centerSub: string;
-}) {
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  return (
-    <div className="card">
-      <SectionTitle>{title}</SectionTitle>
-      {total === 0 ? (
-        <Empty />
-      ) : (
-        <div className="flex items-center gap-6">
-          <Donut segments={segments} centerLabel={centerLabel} centerSub={centerSub} />
-          <ul className="space-y-2 text-sm">
-            {segments.map((s) => (
-              <li key={s.label} className="flex items-start gap-2">
-                <span className="mt-1 inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: s.color }} />
-                <span>
-                  <span className="font-medium">{s.label}</span>{" "}
-                  <span className="text-[var(--color-muted)]">
-                    {s.value} · {total ? Math.round((s.value / total) * 100) : 0}%
-                  </span>
-                  {s.note && <span className="block text-xs text-[var(--color-muted)]">{s.note}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Donut({
-  segments,
-  size = 132,
-  thickness = 20,
-  centerLabel,
-  centerSub,
-}: {
-  segments: { label: string; value: number; color: string }[];
-  size?: number;
-  thickness?: number;
-  centerLabel: string;
-  centerSub: string;
-}) {
-  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
-  const r = (size - thickness) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0ee" strokeWidth={thickness} />
-        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-          {segments.map((s) => {
-            const len = (s.value / total) * c;
-            const el = (
-              <circle
-                key={s.label}
-                cx={size / 2}
-                cy={size / 2}
-                r={r}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={thickness}
-                strokeDasharray={`${len} ${c - len}`}
-                strokeDashoffset={-offset}
-                strokeLinecap="butt"
-              />
-            );
-            offset += len;
-            return el;
-          })}
-        </g>
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold tracking-tight tabular-nums">{centerLabel}</span>
-        <span className="text-xs text-[var(--color-muted)]">{centerSub}</span>
-      </div>
-    </div>
-  );
-}
-
-function StackedBudget({
-  segments,
-  total,
-}: {
-  segments: { label: string; value: number; color: string }[];
-  total: number;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex h-6 w-full overflow-hidden rounded-full bg-[var(--color-line)]">
-        {segments.map((s) => {
-          const pct = total ? (s.value / total) * 100 : 0;
-          if (pct <= 0) return null;
-          return (
-            <div
-              key={s.label}
-              className="h-full"
-              style={{ width: `${pct}%`, backgroundColor: s.color }}
-              title={`${s.label}: ${formatEur(s.value)} (${Math.round(pct)}%)`}
-            />
-          );
-        })}
-      </div>
-      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-        {segments.map((s) => {
-          const pct = total ? Math.round((s.value / total) * 100) : 0;
-          return (
-            <div key={s.label} className="flex items-center gap-2">
-              <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: s.color }} />
-              <span className="font-medium">{s.label}</span>
-              <span className="text-[var(--color-muted)] tabular-nums">{formatEur(s.value)} · {pct}%</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ColorBar({
-  label,
-  color,
-  count,
-  pressupost,
-  max,
-}: {
-  label: string;
-  color: string;
-  count: number;
-  pressupost: number;
-  max: number;
-}) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-sm mb-1">
-        <span className="flex items-center gap-2">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
-          {label}
-        </span>
-        <span className="whitespace-nowrap text-[var(--color-muted)] tabular-nums">
-          {count} · {formatEur(pressupost)}
-        </span>
-      </div>
-      <div className="h-2.5 rounded-full bg-[var(--color-line)]">
-        <div className="h-2.5 rounded-full" style={{ width: `${(count / Math.max(1, max)) * 100}%`, backgroundColor: color }} />
-      </div>
-    </div>
-  );
-}
-
-function BarList({ groups }: { groups: Group[] }) {
-  const max = Math.max(1, ...groups.map((g) => g.count));
-  if (groups.length === 0) return <Empty />;
-  return (
-    <div className="space-y-3">
-      {groups.map((g) => (
-        <ColorBar key={g.key} label={g.key} color="var(--color-accent)" count={g.count} pressupost={g.pressupost} max={max} />
-      ))}
     </div>
   );
 }

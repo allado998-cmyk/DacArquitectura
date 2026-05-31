@@ -2,14 +2,14 @@ import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ExpedientsView } from "./expedients-view";
-import type { Expedient, Client } from "@/types/db";
+import type { Expedient, Client, Dedicacio } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExpedientsPage() {
   await requireUser();
 
-  const [expedients, clients] = await Promise.all([
+  const [expedients, clients, dedicacions] = await Promise.all([
     sql`
       select e.id, e.num_expedient, e.projecte, e.client_id,
              c.nom as client_nom,
@@ -22,6 +22,13 @@ export default async function ExpedientsPage() {
       order by e.num_expedient desc
     ` as unknown as Promise<Expedient[]>,
     sql`select id, nom, nif, carrer, ciutat, codi_postal, contacte, created_at from public.clients order by nom` as unknown as Promise<Client[]>,
+    sql`
+      select id, expedient_id, to_char(data, 'YYYY-MM-DD') as data,
+             hores::text as hores, tasca, comentari
+      from public.dedicacions
+      where expedient_id is not null
+      order by data desc, id desc
+    ` as unknown as Promise<Dedicacio[]>,
   ]);
 
   return (
@@ -32,7 +39,7 @@ export default async function ExpedientsPage() {
         <p className="text-sm text-[var(--color-muted)] mb-6">
           Registre d&apos;expedients del despatx.
         </p>
-        <ExpedientsView expedients={expedients} clients={clients} />
+        <ExpedientsView expedients={expedients} clients={clients} dedicacions={dedicacions} />
       </main>
     </>
   );

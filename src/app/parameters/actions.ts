@@ -16,7 +16,6 @@ export async function createClientAction(nom: string) {
 
 export interface ClientPatch {
   nom: string;
-  nif: string;
   carrer: string;
   ciutat: string;
   codi_postal: string;
@@ -29,7 +28,6 @@ export async function updateClientAction(id: number, data: ClientPatch) {
   await sql`
     update public.clients set
       nom = ${nom},
-      nif = ${data.nif.trim() || null},
       carrer = ${data.carrer.trim() || null},
       ciutat = ${data.ciutat.trim() || null},
       codi_postal = ${data.codi_postal.trim() || null}

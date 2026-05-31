@@ -97,8 +97,9 @@ export interface Expedient {
 
 export interface Dedicacio {
   id: number;
-  expedient_id: number;
-  num_expedient?: string; // joined
+  expedient_id: number | null; // null when logged against an internal activity
+  activitat: string | null; // non-expedient work, e.g. "Treball de web"
+  num_expedient?: string | null; // joined
   projecte?: string | null; // joined (expedient free text)
   categoria?: ExpedientCategoria | null; // joined
   client_id?: number | null; // joined
@@ -108,4 +109,12 @@ export interface Dedicacio {
   tasca: string | null;
   comentari: string | null;
   created_at: string;
+}
+
+export interface ClientStats {
+  client_id: number;
+  n: number;
+  oberts: number;
+  pressupost_total: string;
+  pressupost_obert: string;
 }

@@ -4,14 +4,17 @@ import { useMemo, useState, useTransition } from "react";
 import { createDedicacioAction, deleteDedicacioAction } from "./actions";
 import type { Dedicacio, Expedient } from "@/types/db";
 import { Combobox, type ComboOption } from "@/components/combobox";
+import { Modal } from "@/components/modal";
 import { CATEGORIES, CATEGORY_BY_CODE } from "@/lib/expedients";
+import { ChartCard, HBarChart, KpiCard, VBarChart } from "@/components/charts";
 
-const ACCENT_RGB = "31, 77, 63"; // var(--color-accent) = #1f4d3f
+const ACCENT_RGB = "31, 77, 63";
 const MONTHS_CA = [
   "Gener", "Febrer", "Març", "Abril", "Maig", "Juny",
   "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre",
 ];
 const WEEKDAYS_CA = ["dl", "dt", "dc", "dj", "dv", "ds", "dg"];
+const ACTIVITAT_SUGGESTIONS = ["Treball de web", "Treball de factures", "Administració", "Formació", "Reunió interna"];
 
 type Tab = "registre" | "estadistiques";
 type Agrupacio = "dia" | "setmana" | "mes";
@@ -26,23 +29,18 @@ function daysInMonth(y: number, m: number) {
   return new Date(y, m + 1, 0).getDate();
 }
 function firstWeekdayMonday(y: number, m: number) {
-  return (new Date(y, m, 1).getDay() + 6) % 7; // 0 = Monday
+  return (new Date(y, m, 1).getDay() + 6) % 7;
 }
 function fmtHores(h: number) {
-  const r = Math.round(h * 100) / 100;
-  return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(r) + " h";
+  return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round(h * 100) / 100) + " h";
 }
 function formatDataLong(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("ca-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(
-    new Date(y, m - 1, d),
-  );
+  return new Intl.DateTimeFormat("ca-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(y, m - 1, d));
 }
 function formatDataMig(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("ca-ES", { weekday: "short", day: "numeric", month: "short" }).format(
-    new Date(y, m - 1, d),
-  );
+  return new Intl.DateTimeFormat("ca-ES", { weekday: "short", day: "numeric", month: "short" }).format(new Date(y, m - 1, d));
 }
 function formatDataShort(iso: string) {
   const [y, m, d] = iso.split("-");
@@ -60,6 +58,9 @@ function weekStart(iso: string) {
   dt.setDate(dt.getDate() - day);
   return dateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
+function targetLabel(d: Dedicacio) {
+  return d.num_expedient ?? d.activitat ?? "—";
+}
 
 export function DedicacioView({
   expedients,
@@ -74,11 +75,22 @@ export function DedicacioView({
 }) {
   const [tab, setTab] = useState<Tab>("registre");
 
+  // Search by number and project name (both live in the label).
   const expedientOpts: ComboOption[] = expedients.map((e) => ({
     id: e.id,
-    label: e.num_expedient,
-    sub: e.projecte ?? undefined,
+    label: e.projecte ? `${e.num_expedient} · ${e.projecte}` : e.num_expedient,
   }));
+
+  const activitatSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...ACTIVITAT_SUGGESTIONS,
+          ...dedicacions.map((d) => d.activitat ?? "").filter(Boolean),
+        ]),
+      ),
+    [dedicacions],
+  );
 
   return (
     <div>
@@ -89,13 +101,12 @@ export function DedicacioView({
 
       {tab === "registre" && (
         <div className="space-y-8">
-          <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} />
+          <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} activitatSuggestions={activitatSuggestions} />
           <Last7Days dedicacions={dedicacions} today={today} />
           <Calendar dedicacions={dedicacions} today={today} />
-          <ExpedientsDedicacio expedients={expedients} dedicacions={dedicacions} />
         </div>
       )}
-      {tab === "estadistiques" && <StatsTab dedicacions={dedicacions} />}
+      {tab === "estadistiques" && <StatsTab dedicacions={dedicacions} expedients={expedients} today={today} />}
     </div>
   );
 }
@@ -144,13 +155,17 @@ function EntryForm({
   expedientOpts,
   tasques,
   today,
+  activitatSuggestions,
 }: {
   expedientOpts: ComboOption[];
   tasques: string[];
   today: string;
+  activitatSuggestions: string[];
 }) {
+  const [mode, setMode] = useState<"expedient" | "activitat">("expedient");
   const [data, setData] = useState(today);
   const [expedientId, setExpedientId] = useState<number | null>(null);
+  const [activitat, setActivitat] = useState("");
   const [hores, setHores] = useState("");
   const [tasca, setTasca] = useState("");
   const [comentari, setComentari] = useState("");
@@ -159,8 +174,12 @@ function EntryForm({
 
   function submit() {
     setError(null);
-    if (!expedientId) {
+    if (mode === "expedient" && !expedientId) {
       setError("Selecciona un expedient.");
+      return;
+    }
+    if (mode === "activitat" && !activitat.trim()) {
+      setError("Indica l'activitat.");
       return;
     }
     const h = parseFloat(hores.replace(",", "."));
@@ -169,18 +188,43 @@ function EntryForm({
       return;
     }
     startTransition(async () => {
-      await createDedicacioAction({ expedientId, data, hores: h, tasca, comentari });
+      await createDedicacioAction({
+        expedientId: mode === "expedient" ? expedientId : null,
+        activitat: mode === "activitat" ? activitat : "",
+        data,
+        hores: h,
+        tasca,
+        comentari,
+      });
       setHores("");
       setTasca("");
       setComentari("");
+      if (mode === "activitat") setActivitat("");
     });
   }
 
   return (
     <div className="card">
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
         <h2 className="text-lg font-semibold tracking-tight">Registrar dedicació</h2>
         <span className="text-sm text-[var(--color-muted)] capitalize">{formatDataLong(today)}</span>
+      </div>
+
+      <div className="mb-4 inline-flex rounded-md border border-[var(--color-line)] p-0.5 text-sm">
+        <button
+          type="button"
+          className={`rounded px-3 py-1 ${mode === "expedient" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`}
+          onClick={() => setMode("expedient")}
+        >
+          Expedient
+        </button>
+        <button
+          type="button"
+          className={`rounded px-3 py-1 ${mode === "activitat" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`}
+          onClick={() => setMode("activitat")}
+        >
+          Altra activitat
+        </button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-12 items-end">
@@ -189,16 +233,27 @@ function EntryForm({
           <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
         </div>
         <div className="md:col-span-3">
-          <label className="label">Expedient</label>
-          <Combobox
-            options={expedientOpts}
-            value={expedientId}
-            onChange={setExpedientId}
-            placeholder="Cerca expedient…"
-            emptyLabel="Selecciona…"
-            allowEmpty={false}
-            overlay
-          />
+          <label className="label">{mode === "expedient" ? "Expedient" : "Activitat"}</label>
+          {mode === "expedient" ? (
+            <Combobox
+              options={expedientOpts}
+              value={expedientId}
+              onChange={setExpedientId}
+              placeholder="Cerca per número o projecte…"
+              emptyLabel="Selecciona…"
+              allowEmpty={false}
+              overlay
+            />
+          ) : (
+            <>
+              <input className="input" list="activitats-list" placeholder="Ex: Treball de web" value={activitat} onChange={(e) => setActivitat(e.target.value)} />
+              <datalist id="activitats-list">
+                {activitatSuggestions.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
+            </>
+          )}
         </div>
         <div className="md:col-span-1">
           <label className="label">Hores</label>
@@ -234,7 +289,7 @@ function EntryForm({
 // ============================================================================
 
 function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i)); // today first
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
 
   const byDate = useMemo(() => {
     const map = new Map<string, Dedicacio[]>();
@@ -269,7 +324,7 @@ function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: st
                   <ul className="space-y-1">
                     {items.map((d) => (
                       <li key={d.id} className="flex items-baseline gap-2 text-sm">
-                        <span className="font-mono text-xs text-[var(--color-muted)] w-16 shrink-0">{d.num_expedient}</span>
+                        <span className="font-mono text-xs text-[var(--color-muted)] w-28 shrink-0 truncate" title={targetLabel(d)}>{targetLabel(d)}</span>
                         <span className="font-medium tabular-nums w-14 shrink-0">{fmtHores(parseFloat(d.hores) || 0)}</span>
                         <span>{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</span>
                         {d.comentari && <span className="text-[var(--color-muted)]">· {d.comentari}</span>}
@@ -298,7 +353,7 @@ function cellStyle(hours: number, max: number): React.CSSProperties {
 }
 
 function Calendar({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
-  const [ty, tm] = today.split("-").map(Number); // tm 1-12
+  const [ty, tm] = today.split("-").map(Number);
 
   const months = useMemo(() => {
     const out: { year: number; month: number }[] = [];
@@ -403,122 +458,6 @@ function Legend({ max }: { max: number }) {
         <span key={i} className="inline-block h-3.5 w-3.5 rounded" style={cellStyle(h || (i === 0 ? 0 : 0.01), max)} />
       ))}
       <span>Més</span>
-      <span className="ml-2">(nombres = hores aprox.)</span>
-    </div>
-  );
-}
-
-// ============================================================================
-// Per-expedient breakdown
-// ============================================================================
-
-function ExpedientsDedicacio({
-  expedients,
-  dedicacions,
-}: {
-  expedients: Expedient[];
-  dedicacions: Dedicacio[];
-}) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const byExpedient = useMemo(() => {
-    const map = new Map<number, Dedicacio[]>();
-    for (const d of dedicacions) {
-      const arr = map.get(d.expedient_id) ?? [];
-      arr.push(d);
-      map.set(d.expedient_id, arr);
-    }
-    return map;
-  }, [dedicacions]);
-
-  const rows = expedients
-    .map((e) => {
-      const items = byExpedient.get(e.id) ?? [];
-      const total = items.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-      return { exp: e, items, total };
-    })
-    .filter((r) => r.items.length > 0)
-    .sort((a, b) => b.total - a.total);
-
-  if (rows.length === 0) {
-    return <div className="card text-sm text-[var(--color-muted)]">Encara no hi ha cap dedicació registrada.</div>;
-  }
-
-  return (
-    <div className="card">
-      <h2 className="text-lg font-semibold tracking-tight mb-4">Dedicació per expedient</h2>
-      <div className="divide-y divide-[var(--color-line)]">
-        {rows.map(({ exp, items, total }) => {
-          const open = openId === exp.id;
-          const cat = exp.categoria ? CATEGORY_BY_CODE[exp.categoria] : null;
-          return (
-            <div key={exp.id}>
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 py-3 text-left hover:bg-[var(--color-paper)] px-1 -mx-1 rounded"
-                onClick={() => setOpenId(open ? null : exp.id)}
-              >
-                <span className="text-[var(--color-muted)] text-xs w-4">{open ? "▾" : "▸"}</span>
-                <span className="font-mono text-sm w-20">{exp.num_expedient}</span>
-                {cat && <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cat.color }} title={cat.label} />}
-                <span className="flex-1 truncate text-sm">
-                  {exp.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
-                </span>
-                <span className="text-xs text-[var(--color-muted)]">{items.length} dies</span>
-                <span className="font-semibold tabular-nums w-20 text-right">{fmtHores(total)}</span>
-              </button>
-
-              {open && (
-                <div className="pb-3 pl-9 pr-1">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-[var(--color-muted)]">
-                        <th className="text-left font-medium py-1 w-28">Data</th>
-                        <th className="text-right font-medium py-1 w-20">Hores</th>
-                        <th className="text-left font-medium py-1 pl-4">Tasca</th>
-                        <th className="text-left font-medium py-1">Comentari</th>
-                        <th className="py-1 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((d) => (
-                        <tr key={d.id} className="border-t border-[var(--color-line)]">
-                          <td className="py-1.5 tabular-nums">{formatDataShort(d.data)}</td>
-                          <td className="py-1.5 text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
-                          <td className="py-1.5 pl-4">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                          <td className="py-1.5 text-[var(--color-muted)]">{d.comentari ?? ""}</td>
-                          <td className="py-1.5 text-right">
-                            <button
-                              type="button"
-                              className="text-red-700 hover:underline text-xs disabled:opacity-50"
-                              disabled={pending}
-                              onClick={() => {
-                                if (confirm("Eliminar aquesta dedicació?")) {
-                                  startTransition(() => deleteDedicacioAction(d.id));
-                                }
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-[var(--color-line)] font-semibold">
-                        <td className="py-1.5">Total</td>
-                        <td className="py-1.5 text-right tabular-nums">{fmtHores(total)}</td>
-                        <td colSpan={3}></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -527,40 +466,63 @@ function ExpedientsDedicacio({
 // Estadístiques
 // ============================================================================
 
-function StatsTab({ dedicacions }: { dedicacions: Dedicacio[] }) {
+function StatsTab({
+  dedicacions,
+  expedients,
+  today,
+}: {
+  dedicacions: Dedicacio[];
+  expedients: Expedient[];
+  today: string;
+}) {
+  const [fAny, setFAny] = useState("");
+  const [fExpedient, setFExpedient] = useState<number | null>(null);
   const [fClient, setFClient] = useState("");
   const [fCategoria, setFCategoria] = useState("");
   const [agrupacio, setAgrupacio] = useState<Agrupacio>("setmana");
+  const [fDia, setFDia] = useState("");
+  const [popupDia, setPopupDia] = useState<string | null>(null);
 
-  const clientNoms = useMemo(
-    () =>
-      Array.from(new Set(dedicacions.map((d) => d.client_nom ?? "").filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, "ca"),
-      ),
+  const anys = useMemo(
+    () => Array.from(new Set(dedicacions.map((d) => d.data.slice(0, 4)))).sort().reverse(),
     [dedicacions],
   );
+  const clientNoms = useMemo(
+    () => Array.from(new Set(dedicacions.map((d) => d.client_nom ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [dedicacions],
+  );
+  const expedientOpts: ComboOption[] = useMemo(() => {
+    const ids = new Set(dedicacions.map((d) => d.expedient_id).filter((x): x is number => x != null));
+    return expedients
+      .filter((e) => ids.has(e.id))
+      .map((e) => ({ id: e.id, label: e.projecte ? `${e.num_expedient} · ${e.projecte}` : e.num_expedient }));
+  }, [dedicacions, expedients]);
 
   const filtered = useMemo(
     () =>
       dedicacions.filter((d) => {
+        if (fAny && d.data.slice(0, 4) !== fAny) return false;
+        if (fExpedient != null && d.expedient_id !== fExpedient) return false;
         if (fClient && (d.client_nom ?? "") !== fClient) return false;
         if (fCategoria && (d.categoria ?? "") !== fCategoria) return false;
+        if (agrupacio === "dia" && fDia && d.data !== fDia) return false;
         return true;
       }),
-    [dedicacions, fClient, fCategoria],
+    [dedicacions, fAny, fExpedient, fClient, fCategoria, agrupacio, fDia],
   );
 
   const totalHores = filtered.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
   const dies = new Set(filtered.map((d) => d.data)).size;
-  const nExpedients = new Set(filtered.map((d) => d.expedient_id)).size;
+  const nExpedients = new Set(filtered.map((d) => d.expedient_id).filter(Boolean)).size;
 
   // Per categoria
-  const catRows = CATEGORIES.map((c) => {
-    const h = filtered.filter((d) => d.categoria === c.code).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-    return { key: c.label, color: c.color, hores: h };
-  }).filter((r) => r.hores > 0);
+  const catRows = CATEGORIES.map((c) => ({
+    label: c.label,
+    color: c.color,
+    hores: filtered.filter((d) => d.categoria === c.code).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0),
+  })).filter((r) => r.hores > 0);
   const senseCat = filtered.filter((d) => !d.categoria).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-  if (senseCat > 0) catRows.push({ key: "(Sense categoria)", color: "#9ca3af", hores: senseCat });
+  if (senseCat > 0) catRows.push({ label: "Sense categoria", color: "#9ca3af", hores: senseCat });
   catRows.sort((a, b) => b.hores - a.hores);
 
   // Per client
@@ -569,32 +531,42 @@ function StatsTab({ dedicacions }: { dedicacions: Dedicacio[] }) {
     const k = d.client_nom ?? "(Sense client)";
     clientMap.set(k, (clientMap.get(k) ?? 0) + (parseFloat(d.hores) || 0));
   }
-  const clientRows = Array.from(clientMap, ([key, hores]) => ({ key, hores })).sort((a, b) => b.hores - a.hores);
+  const clientRows = Array.from(clientMap, ([label, hores]) => ({ label, hores })).sort((a, b) => b.hores - a.hores);
 
-  // Evolució temporal
+  // Evolució
   const periodMap = new Map<string, number>();
   for (const d of filtered) {
-    let key: string;
-    if (agrupacio === "dia") key = d.data;
-    else if (agrupacio === "setmana") key = weekStart(d.data);
-    else key = d.data.slice(0, 7);
+    const key = agrupacio === "dia" ? d.data : agrupacio === "setmana" ? weekStart(d.data) : d.data.slice(0, 7);
     periodMap.set(key, (periodMap.get(key) ?? 0) + (parseFloat(d.hores) || 0));
   }
-  const periodRows = Array.from(periodMap, ([key, hores]) => ({ key, hores })).sort((a, b) =>
-    a.key.localeCompare(b.key),
-  );
+  const periodRows = Array.from(periodMap, ([key, hores]) => ({ key, hores })).sort((a, b) => a.key.localeCompare(b.key));
   function periodLabel(key: string) {
-    if (agrupacio === "dia") return formatDataShort(key);
-    if (agrupacio === "setmana") return `Setmana ${formatDataShort(key)}`;
+    if (agrupacio === "dia") return formatDataShort(key).slice(0, 5);
+    if (agrupacio === "setmana") return formatDataShort(key).slice(0, 5);
     const [y, m] = key.split("-").map(Number);
-    return `${MONTHS_CA[m - 1]} ${y}`;
+    return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
   }
 
+  const popupItems = popupDia ? dedicacions.filter((d) => d.data === popupDia) : [];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Filtres */}
-      <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
+          <div>
+            <label className="label">Any</label>
+            <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
+              <option value="">Tots</option>
+              {anys.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Projecte</label>
+            <Combobox options={expedientOpts} value={fExpedient} onChange={setFExpedient} placeholder="Cerca…" emptyLabel="Tots" overlay />
+          </div>
           <div>
             <label className="label">Client</label>
             <select className="input" value={fClient} onChange={(e) => setFClient(e.target.value)}>
@@ -621,67 +593,66 @@ function StatsTab({ dedicacions }: { dedicacions: Dedicacio[] }) {
               <option value="mes">Per mes</option>
             </select>
           </div>
+          <div>
+            <label className="label">Veure un dia</label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                className="input"
+                value={fDia}
+                onChange={(e) => setFDia(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-ghost px-3 shrink-0"
+                disabled={!fDia}
+                onClick={() => fDia && setPopupDia(fDia)}
+              >
+                Obrir
+              </button>
+            </div>
+          </div>
         </div>
+        {agrupacio === "dia" && fDia && (
+          <p className="mt-2 text-xs text-[var(--color-muted)]">Mostrant només el dia {formatDataShort(fDia)}.</p>
+        )}
       </div>
 
       {/* KPIs */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Hores totals" value={fmtHores(totalHores)} accent="var(--color-accent)" />
-        <Kpi label="Dies treballats" value={String(dies)} accent="#0ea5e9" />
-        <Kpi label="Expedients" value={String(nExpedients)} accent="#7c3aed" />
-        <Kpi label="Mitjana / dia" value={fmtHores(dies ? totalHores / dies : 0)} accent="#f59e0b" />
+        <KpiCard label="Hores totals" value={fmtHores(totalHores)} accent="#1f4d3f" />
+        <KpiCard label="Dies treballats" value={String(dies)} accent="#0ea5e9" />
+        <KpiCard label="Expedients" value={String(nExpedients)} accent="#a855f7" />
+        <KpiCard label="Mitjana / dia" value={fmtHores(dies ? totalHores / dies : 0)} accent="#f59e0b" />
       </div>
 
       {/* Categoria + Client */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="card">
-          <SectionTitle>Hores per categoria</SectionTitle>
-          <HoursBars rows={catRows} totalHores={totalHores} />
-        </div>
-        <div className="card">
-          <SectionTitle>Hores per client</SectionTitle>
-          <HoursBars rows={clientRows.map((r) => ({ ...r, color: "var(--color-accent)" }))} totalHores={totalHores} />
-        </div>
+        <ChartCard title="Hores per categoria">
+          <HBarChart bars={catRows.map((r) => ({ label: r.label, value: r.hores, color: r.color, display: fmtHores(r.hores) }))} />
+        </ChartCard>
+        <ChartCard title="Hores per client">
+          <HBarChart bars={clientRows.map((r) => ({ label: r.label, value: r.hores, color: "#6366f1", display: fmtHores(r.hores) }))} />
+        </ChartCard>
       </div>
 
       {/* Evolució */}
-      <div className="card">
-        <SectionTitle>Evolució ({agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes"})</SectionTitle>
-        {periodRows.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="space-y-2.5">
-            {periodRows.map((p) => (
-              <div key={p.key}>
-                <div className="flex items-baseline justify-between text-sm mb-1">
-                  <span>{periodLabel(p.key)}</span>
-                  <span className="text-[var(--color-muted)] tabular-nums">{fmtHores(p.hores)}</span>
-                </div>
-                <div className="h-2.5 rounded-full bg-[var(--color-line)]">
-                  <div
-                    className="h-2.5 rounded-full bg-[var(--color-accent)]"
-                    style={{ width: `${(p.hores / Math.max(1, ...periodRows.map((x) => x.hores))) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ChartCard title="Evolució" meta={agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes"}>
+        <VBarChart bars={periodRows.map((p) => ({ label: periodLabel(p.key), value: p.hores, color: "#8b5cf6", display: fmtHores(p.hores) }))} />
+      </ChartCard>
 
       {/* Detall */}
-      <div className="card">
-        <SectionTitle>Detall</SectionTitle>
+      <ChartCard title="Detall" meta={`${filtered.length} registres`}>
         {filtered.length === 0 ? (
-          <Empty />
+          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
         ) : (
           <div className="table-wrap">
             <table className="w-full">
               <thead>
                 <tr>
                   <th className="th w-28">Data</th>
-                  <th className="th w-24">Expedient</th>
-                  <th className="th">Projecte</th>
+                  <th className="th w-28">Expedient</th>
+                  <th className="th">Projecte / activitat</th>
                   <th className="th w-36">Categoria</th>
                   <th className="th">Client</th>
                   <th className="th">Tasca</th>
@@ -694,11 +665,11 @@ function StatsTab({ dedicacions }: { dedicacions: Dedicacio[] }) {
                   return (
                     <tr key={d.id}>
                       <td className="td tabular-nums">{formatDataShort(d.data)}</td>
-                      <td className="td font-mono">{d.num_expedient}</td>
-                      <td className="td">{d.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                      <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                      <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                       <td className="td">
                         {cat ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: cat.bg, color: cat.text }}>
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: cat.bg, color: cat.text }}>
                             {cat.label}
                           </span>
                         ) : (
@@ -715,49 +686,72 @@ function StatsTab({ dedicacions }: { dedicacions: Dedicacio[] }) {
             </table>
           </div>
         )}
-      </div>
+      </ChartCard>
+
+      <DiaModal dia={popupDia} items={popupItems} onClose={() => setPopupDia(null)} />
     </div>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] mb-4">{children}</h3>;
-}
-function Empty() {
-  return <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>;
-}
-function Kpi({ label, value, accent }: { label: string; value: string; accent: string }) {
+function DiaModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
+  const [, startTransition] = useTransition();
+  const total = items.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
   return (
-    <div className="relative overflow-hidden rounded-lg border border-[var(--color-line)] bg-white p-4">
-      <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
-      <div className="label mb-1">{label}</div>
-      <div className="text-2xl font-semibold tracking-tight tabular-nums" style={{ color: accent }}>{value}</div>
-    </div>
-  );
-}
-
-function HoursBars({ rows, totalHores }: { rows: { key: string; color: string; hores: number }[]; totalHores: number }) {
-  const max = Math.max(1, ...rows.map((r) => r.hores));
-  if (rows.length === 0) return <Empty />;
-  return (
-    <div className="space-y-3">
-      {rows.map((r) => (
-        <div key={r.key}>
-          <div className="flex items-baseline justify-between text-sm mb-1">
-            <span className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: r.color }} />
-              {r.key}
-            </span>
-            <span className="text-[var(--color-muted)] tabular-nums">
-              {fmtHores(r.hores)}
-              {totalHores ? ` · ${Math.round((r.hores / totalHores) * 100)}%` : ""}
-            </span>
+    <Modal
+      open={dia != null}
+      onClose={onClose}
+      wide
+      title={
+        dia && (
+          <div>
+            <h3 className="text-base font-semibold capitalize">{formatDataLong(dia)}</h3>
+            <span className="text-sm text-[var(--color-muted)]">{fmtHores(total)} · {items.length} registres</span>
           </div>
-          <div className="h-2.5 rounded-full bg-[var(--color-line)]">
-            <div className="h-2.5 rounded-full" style={{ width: `${(r.hores / max) * 100}%`, backgroundColor: r.color }} />
-          </div>
+        )
+      }
+    >
+      {items.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">Sense dedicació aquest dia.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="th w-28">Expedient</th>
+                <th className="th">Projecte / activitat</th>
+                <th className="th">Tasca</th>
+                <th className="th">Comentari</th>
+                <th className="th w-20 text-right">Hores</th>
+                <th className="th w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((d) => (
+                <tr key={d.id}>
+                  <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
+                  <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
+                  <td className="td text-right">
+                    <button
+                      type="button"
+                      className="text-red-700 hover:underline text-xs"
+                      onClick={() => {
+                        if (confirm("Eliminar aquesta dedicació?")) {
+                          startTransition(() => deleteDedicacioAction(d.id));
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ))}
-    </div>
+      )}
+    </Modal>
   );
 }

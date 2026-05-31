@@ -269,6 +269,7 @@ function ClientEditor({
   onDeleted: () => void;
 }) {
   const [nom, setNom] = useState(client.nom);
+  const [nif, setNif] = useState(client.nif ?? "");
   const [carrer, setCarrer] = useState(client.carrer ?? "");
   const [ciutat, setCiutat] = useState(client.ciutat ?? "");
   const [codiPostal, setCodiPostal] = useState(client.codi_postal ?? "");
@@ -276,9 +277,10 @@ function ClientEditor({
 
   function persist() {
     if (!nom.trim()) return;
-    const patch: ClientPatch = { nom, carrer, ciutat, codi_postal: codiPostal };
+    const patch: ClientPatch = { nom, nif, carrer, ciutat, codi_postal: codiPostal };
     if (
       nom !== client.nom ||
+      nif !== (client.nif ?? "") ||
       carrer !== (client.carrer ?? "") ||
       ciutat !== (client.ciutat ?? "") ||
       codiPostal !== (client.codi_postal ?? "")
@@ -303,6 +305,9 @@ function ClientEditor({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Nom">
           <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
+        </Field>
+        <Field label="NIF / CIF">
+          <input className="input" value={nif} onChange={(e) => setNif(e.target.value)} onBlur={persist} />
         </Field>
         <Field label="Carrer">
           <input className="input" value={carrer} onChange={(e) => setCarrer(e.target.value)} onBlur={persist} />

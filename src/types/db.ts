@@ -60,3 +60,21 @@ export interface PropostaAltraDespesaLine {
   preu_unitat: string;
   ordre: number;
 }
+
+export type ExpedientEstat = "obert" | "tancat";
+export type ExpedientCategoria = "re" | "co" | "ed" | "rec" | "do";
+export type ExpedientVisibilitat = "public" | "privat";
+
+export interface Expedient {
+  id: number;
+  num_expedient: string; // YY-NNNN
+  projecte: string | null;
+  client: string | null;
+  ciutat: string | null;
+  estat: ExpedientEstat;
+  categoria: ExpedientCategoria | null;
+  visibilitat: ExpedientVisibilitat;
+  pressupost: string; // numeric arrives as string from neon
+  created_at: string;
+  updated_at: string;
+}

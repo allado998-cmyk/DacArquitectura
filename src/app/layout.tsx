@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DacArquitectura",
   description: "Eines internes de DacArquitectura",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({

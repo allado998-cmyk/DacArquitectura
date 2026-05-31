@@ -18,6 +18,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Honoraris</h2>
             <p className="text-sm text-[var(--color-muted)]">Crear i gestionar propostes d'honoraris.</p>
           </Link>
+          <Link href="/expedients" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Expedients</h2>
+            <p className="text-sm text-[var(--color-muted)]">Registre d'expedients i estadístiques.</p>
+          </Link>
           <Link href="/parameters" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Paràmetres</h2>
             <p className="text-sm text-[var(--color-muted)]">Projectes, clients i catàlegs de despeses.</p>

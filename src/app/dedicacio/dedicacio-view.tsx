@@ -14,6 +14,7 @@ const MONTHS_CA = [
   "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre",
 ];
 const WEEKDAYS_CA = ["dl", "dt", "dc", "dj", "dv", "ds", "dg"];
+const WEEKDAY_NAMES = ["Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"];
 const ACTIVITAT_SUGGESTIONS = ["Treball de web", "Treball de factures", "Administració", "Formació", "Reunió interna"];
 
 type Tab = "registre" | "estadistiques";
@@ -371,6 +372,7 @@ function cellStyle(hours: number, max: number): React.CSSProperties {
 function Calendar({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
   const [ty, tm] = today.split("-").map(Number);
   const [offset, setOffset] = useState(0); // 0 = current month
+  const [popupDia, setPopupDia] = useState<string | null>(null);
 
   const base = new Date(ty, tm - 1 + offset, 1);
   const year = base.getFullYear();
@@ -420,10 +422,14 @@ function Calendar({ dedicacions, today }: { dedicacions: Dedicacio[]; today: str
           const hours = hoursByDate.get(iso) ?? 0;
           const isToday = iso === today;
           return (
-            <div
+            <button
+              type="button"
               key={iso}
+              onClick={() => setPopupDia(iso)}
               title={hours ? `${formatDataShort(iso)} · ${fmtHores(hours)}` : formatDataShort(iso)}
-              className={`relative min-h-16 rounded-lg p-1.5 ${isToday ? "ring-2 ring-[var(--color-accent)] ring-offset-1" : ""}`}
+              className={`relative min-h-16 rounded-lg p-1.5 text-left transition hover:ring-2 hover:ring-[var(--color-accent)]/40 ${
+                isToday ? "ring-2 ring-[var(--color-accent)] ring-offset-1" : ""
+              }`}
               style={cellStyle(hours, max)}
             >
               <span className="absolute left-1.5 top-1 text-[11px] font-medium opacity-70">{d}</span>
@@ -432,12 +438,14 @@ function Calendar({ dedicacions, today }: { dedicacions: Dedicacio[]; today: str
                   {fmtHores(hours)}
                 </span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
 
       <Legend max={max} />
+
+      <DayModal dia={popupDia} items={popupDia ? dedicacions.filter((d) => d.data === popupDia) : []} onClose={() => setPopupDia(null)} />
     </div>
   );
 }
@@ -472,9 +480,15 @@ function StatsTab({
   const [fExpedient, setFExpedient] = useState<number | null>(null);
   const [fClient, setFClient] = useState("");
   const [fCategoria, setFCategoria] = useState("");
-  const [agrupacio, setAgrupacio] = useState<Agrupacio>("setmana");
-  const [fDia, setFDia] = useState("");
-  const [popupDia, setPopupDia] = useState<string | null>(null);
+  const [dStart, setDStart] = useState("");
+  const [dEnd, setDEnd] = useState("");
+
+  function quickRange(kind: "dia" | "setmana" | "mes") {
+    if (kind === "dia") setDStart(today);
+    else if (kind === "setmana") setDStart(addDays(today, -6));
+    else setDStart(addDays(today, -29));
+    setDEnd(today);
+  }
 
   const anys = useMemo(
     () => Array.from(new Set(dedicacions.map((d) => d.data.slice(0, 4)))).sort().reverse(),
@@ -498,10 +512,11 @@ function StatsTab({
         if (fExpedient != null && d.expedient_id !== fExpedient) return false;
         if (fClient && (d.client_nom ?? "") !== fClient) return false;
         if (fCategoria && (d.categoria ?? "") !== fCategoria) return false;
-        if (agrupacio === "dia" && fDia && d.data !== fDia) return false;
+        if (dStart && d.data < dStart) return false;
+        if (dEnd && d.data > dEnd) return false;
         return true;
       }),
-    [dedicacions, fAny, fExpedient, fClient, fCategoria, agrupacio, fDia],
+    [dedicacions, fAny, fExpedient, fClient, fCategoria, dStart, dEnd],
   );
 
   const totalHores = filtered.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
@@ -526,7 +541,15 @@ function StatsTab({
   }
   const clientRows = Array.from(clientMap, ([label, hores]) => ({ label, hores })).sort((a, b) => b.hores - a.hores);
 
-  // Evolució
+  // Evolució — granularity auto-derived from the active date span.
+  const spanDays = (() => {
+    const dates = filtered.map((d) => d.data).sort();
+    const from = dStart || dates[0];
+    const to = dEnd || dates[dates.length - 1];
+    if (!from || !to) return 0;
+    return Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  })();
+  const agrupacio: Agrupacio = spanDays <= 31 ? "dia" : spanDays <= 140 ? "setmana" : "mes";
   const periodMap = new Map<string, number>();
   for (const d of filtered) {
     const key = agrupacio === "dia" ? d.data : agrupacio === "setmana" ? weekStart(d.data) : d.data.slice(0, 7);
@@ -534,19 +557,29 @@ function StatsTab({
   }
   const periodRows = Array.from(periodMap, ([key, hores]) => ({ key, hores })).sort((a, b) => a.key.localeCompare(b.key));
   function periodLabel(key: string) {
-    if (agrupacio === "dia") return formatDataShort(key).slice(0, 5);
-    if (agrupacio === "setmana") return formatDataShort(key).slice(0, 5);
-    const [y, m] = key.split("-").map(Number);
-    return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
+    if (agrupacio === "mes") {
+      const [y, m] = key.split("-").map(Number);
+      return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
+    }
+    return formatDataShort(key).slice(0, 5);
   }
 
-  const popupItems = popupDia ? dedicacions.filter((d) => d.data === popupDia) : [];
+  // Per dia de la setmana — totals i mitjanes
+  const weekdayAgg = WEEKDAY_NAMES.map((label) => ({ label, total: 0, dates: new Set<string>() }));
+  for (const d of filtered) {
+    const [y, m, da] = d.data.split("-").map(Number);
+    const wd = (new Date(y, m - 1, da).getDay() + 6) % 7;
+    weekdayAgg[wd].total += parseFloat(d.hores) || 0;
+    weekdayAgg[wd].dates.add(d.data);
+  }
+  const weekdayRows = weekdayAgg.map((w) => ({ label: w.label, total: w.total, avg: w.dates.size ? w.total / w.dates.size : 0 }));
+  const weekdayMax = Math.max(1, ...weekdayRows.map((w) => w.total));
 
   return (
     <div className="space-y-6">
       {/* Filtres */}
-      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
+      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="label">Any</label>
             <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
@@ -578,37 +611,28 @@ function StatsTab({
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="label">Agrupació</label>
-            <select className="input" value={agrupacio} onChange={(e) => setAgrupacio(e.target.value as Agrupacio)}>
-              <option value="dia">Per dia</option>
-              <option value="setmana">Per setmana</option>
-              <option value="mes">Per mes</option>
-            </select>
+            <label className="label">Des de</label>
+            <input type="date" className="input" value={dStart} onChange={(e) => setDStart(e.target.value)} />
           </div>
           <div>
-            <label className="label">Veure un dia</label>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                className="input"
-                value={fDia}
-                onChange={(e) => setFDia(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn-ghost px-3 shrink-0"
-                disabled={!fDia}
-                onClick={() => fDia && setPopupDia(fDia)}
-              >
-                Obrir
+            <label className="label">Fins a</label>
+            <input type="date" className="input" value={dEnd} onChange={(e) => setDEnd(e.target.value)} />
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="btn-ghost" onClick={() => quickRange("dia")}>Últim dia</button>
+            <button type="button" className="btn-ghost" onClick={() => quickRange("setmana")}>Última setmana</button>
+            <button type="button" className="btn-ghost" onClick={() => quickRange("mes")}>Últim mes</button>
+            {(dStart || dEnd) && (
+              <button type="button" className="text-sm text-[var(--color-muted)] hover:underline px-2" onClick={() => { setDStart(""); setDEnd(""); }}>
+                Esborrar
               </button>
-            </div>
+            )}
           </div>
         </div>
-        {agrupacio === "dia" && fDia && (
-          <p className="mt-2 text-xs text-[var(--color-muted)]">Mostrant només el dia {formatDataShort(fDia)}.</p>
-        )}
       </div>
 
       {/* KPIs */}
@@ -632,6 +656,35 @@ function StatsTab({
       {/* Evolució */}
       <ChartCard title="Evolució" meta={agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes"}>
         <VBarChart bars={periodRows.map((p) => ({ label: periodLabel(p.key), value: p.hores, color: "#8b5cf6", display: fmtHores(p.hores) }))} />
+      </ChartCard>
+
+      {/* Per dia de la setmana */}
+      <ChartCard title="Per dia de la setmana" meta="total i mitjana">
+        <div className="space-y-3">
+          {weekdayRows.map((w) => (
+            <div key={w.label} className="flex items-center gap-3">
+              <span className="w-24 shrink-0 text-sm">{w.label}</span>
+              <div className="relative h-7 flex-1 rounded-full bg-[var(--color-paper)]">
+                <div
+                  className="flex h-7 items-center justify-end rounded-full pr-2"
+                  style={{
+                    width: `${Math.max((w.total / weekdayMax) * 100, w.total > 0 ? 8 : 0)}%`,
+                    background: "linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 100%)",
+                  }}
+                >
+                  {w.total > 0 && (
+                    <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--color-ink)]">
+                      {fmtHores(w.total)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="w-28 shrink-0 text-right text-xs text-[var(--color-muted)] tabular-nums">
+                mitjana {fmtHores(w.avg)}
+              </span>
+            </div>
+          ))}
+        </div>
       </ChartCard>
 
       {/* Detall */}
@@ -680,13 +733,11 @@ function StatsTab({
           </div>
         )}
       </ChartCard>
-
-      <DiaModal dia={popupDia} items={popupItems} onClose={() => setPopupDia(null)} />
     </div>
   );
 }
 
-function DiaModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
+function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
   const [, startTransition] = useTransition();
   const total = items.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
   return (

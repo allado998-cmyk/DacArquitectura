@@ -36,6 +36,20 @@ export async function createPropostaAction() {
   const id = rows[0]?.id;
   if (!id) throw new Error("No s'ha pogut crear la proposta.");
 
+  // Always include a "Responsabilitat Civil" altres line by default.
+  const rc = (await sql`
+    select id, preu_unitat_default::text as preu
+    from public.concepte_altra_despesa
+    where nom ilike 'Responsabilitat Civil'
+    order by id limit 1
+  `) as { id: number; preu: string }[];
+  if (rc[0]) {
+    await sql`
+      insert into public.proposta_altra_despesa_line (proposta_id, concepte_id, unitats, preu_unitat, ordre)
+      values (${id}, ${rc[0].id}, 0, ${rc[0].preu}, 10)
+    `;
+  }
+
   redirect(`/honoraris/${id}`);
 }
 

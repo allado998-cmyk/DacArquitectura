@@ -28,7 +28,12 @@ export default async function HonorarisListPage() {
     cross join lateral (
       select
         coalesce((select sum(hores * preu_hora) from public.proposta_despesa_directa_line where proposta_id = p.id), 0)
-        + coalesce((select sum(unitats * preu_unitat) from public.proposta_altra_despesa_line where proposta_id = p.id), 0) as base
+        + coalesce((
+            select sum(adl.unitats * adl.preu_unitat)
+            from public.proposta_altra_despesa_line adl
+            join public.concepte_altra_despesa ca on ca.id = adl.concepte_id
+            where adl.proposta_id = p.id and ca.nom not ilike 'Responsabilitat Civil'
+          ), 0) as base
     ) b
     order by p.num_proposta desc nulls last, p.id desc
   `) as unknown as PropostaListRow[];

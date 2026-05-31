@@ -11,12 +11,6 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           <Link
-            href="/honoraris"
-            className={`px-3 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
-          >
-            Honoraris
-          </Link>
-          <Link
             href="/expedients"
             className={`px-3 py-1.5 rounded-md ${current === "expedients" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
@@ -27,6 +21,12 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
             className={`px-3 py-1.5 rounded-md ${current === "dedicacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Dedicació
+          </Link>
+          <Link
+            href="/honoraris"
+            className={`px-3 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            Honoraris
           </Link>
           <Link
             href="/parameters"

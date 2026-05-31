@@ -29,6 +29,10 @@ function n(v: string | number | null | undefined): number {
   return Number.isFinite(x) ? x : 0;
 }
 
+function isRC(l: { concepte_nom?: string }): boolean {
+  return (l.concepte_nom ?? "").toLowerCase().includes("responsabilitat civil");
+}
+
 export function HonorarisView({
   proposta,
   clients,
@@ -67,15 +71,17 @@ export function HonorarisView({
     () => linesDirectes.reduce((s, l) => s + n(l.hores) * n(l.preu_hora), 0),
     [linesDirectes]
   );
-  const totalAltres = useMemo(
-    () => linesAltres.reduce((s, l) => s + n(l.unitats) * n(l.preu_unitat), 0),
+  // Responsabilitat Civil is derived from the final total, so it is excluded
+  // from the base that determines that total (otherwise it would be circular).
+  const baseAltres = useMemo(
+    () => linesAltres.filter((l) => !isRC(l)).reduce((s, l) => s + n(l.unitats) * n(l.preu_unitat), 0),
     [linesAltres]
   );
 
   // Direct + other costs are "the project itself"; indirectes & benefici are
   // percentages OF THE FINAL total. If they are 30% and 20%, the project is the
   // remaining 50% → total = base / (1 - 0.30 - 0.20).
-  const base = totalDirectes + totalAltres;
+  const base = totalDirectes + baseAltres;
   const pIndN = Math.max(0, n(pInd));
   const pBenN = Math.max(0, n(pBen));
   const denom = 1 - (pIndN + pBenN) / 100;
@@ -88,6 +94,11 @@ export function HonorarisView({
   const totalHonorarisFinal = totalOverride === "" ? totalHonorarisComputed : n(totalOverride);
   const iva = totalHonorarisFinal * IVA_RATE;
   const totalAIngresar = totalHonorarisFinal + iva;
+
+  // Responsabilitat Civil: its "unitats" mirror the final total → cost = total × rate.
+  const rcLine = linesAltres.find(isRC);
+  const rcTotal = rcLine ? totalHonorarisFinal * n(rcLine.preu_unitat) : 0;
+  const totalAltres = baseAltres + rcTotal;
 
   // Helpers ----------------------------------------------------------------
 
@@ -381,7 +392,9 @@ export function HonorarisView({
                 </tr>
               )}
               {linesAltres.map((l) => {
-                const total = n(l.unitats) * n(l.preu_unitat);
+                const rc = isRC(l);
+                const unit = rc ? totalHonorarisFinal : n(l.unitats);
+                const total = unit * n(l.preu_unitat);
                 return (
                   <tr key={l.id}>
                     <td className="td">
@@ -401,15 +414,25 @@ export function HonorarisView({
                       </select>
                     </td>
                     <td className="td">
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="input text-right"
-                        value={l.unitats}
-                        onChange={(e) => updateAltraLocal(l.id, { unitats: e.target.value })}
-                        onBlur={() => persistAltra(l.id, { unitats: n(l.unitats) })}
-                      />
+                      {rc ? (
+                        <input
+                          type="text"
+                          readOnly
+                          className="input text-right bg-[var(--color-paper)] text-[var(--color-muted)]"
+                          value={unit.toFixed(2)}
+                          title="Igual al Total Honoraris del Resum Final"
+                        />
+                      ) : (
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          className="input text-right"
+                          value={l.unitats}
+                          onChange={(e) => updateAltraLocal(l.id, { unitats: e.target.value })}
+                          onBlur={() => persistAltra(l.id, { unitats: n(l.unitats) })}
+                        />
+                      )}
                     </td>
                     <td className="td">
                       <input
@@ -456,7 +479,7 @@ export function HonorarisView({
           <SummaryRow label={`Projecte — despeses directes + altres (${projecteShare.toFixed(0)}%)`} value={formatEur(base)} />
           <div className="pl-4 text-xs text-[var(--color-muted)] space-y-1">
             <div className="flex items-center justify-between"><span>· Despeses Directes</span><span className="font-mono">{formatEur(totalDirectes)}</span></div>
-            <div className="flex items-center justify-between"><span>· Altres Despeses</span><span className="font-mono">{formatEur(totalAltres)}</span></div>
+            <div className="flex items-center justify-between"><span>· Altres Despeses</span><span className="font-mono">{formatEur(baseAltres)}</span></div>
           </div>
           <SummaryRowPercent
             label="Despeses Indirectes"
@@ -481,6 +504,11 @@ export function HonorarisView({
             <span className="font-semibold">Total Honoraris</span>
             <span className="font-semibold font-mono">{formatEur(totalHonorarisComputed)}</span>
           </div>
+          {rcLine && (
+            <p className="text-xs text-[var(--color-muted)]">
+              Responsabilitat Civil = Total Honoraris × {(n(rcLine.preu_unitat) * 100).toFixed(2)}% = {formatEur(rcTotal)} (no inclòs al total).
+            </p>
+          )}
         </div>
       </section>
 

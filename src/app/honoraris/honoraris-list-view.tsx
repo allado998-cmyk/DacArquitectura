@@ -83,23 +83,23 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th w-28">Núm.</th>
-              <th className="th w-32">Data</th>
-              <th className="th">Projecte</th>
-              <th className="th">Client</th>
-              <th className="th w-40 text-right">Preu</th>
-              <th className="th w-32"></th>
+              <th className="th text-center w-28">Núm.</th>
+              <th className="th text-center w-32">Data</th>
+              <th className="th text-center">Projecte</th>
+              <th className="th text-center">Client</th>
+              <th className="th text-center w-40">Preu</th>
+              <th className="th text-center w-32"></th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id}>
-                <td className="td font-mono">{r.num_proposta ?? r.id}</td>
-                <td className="td tabular-nums">{formatDataCa(r.data)}</td>
-                <td className="td">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td text-right tabular-nums">{formatEur(r.total)}</td>
-                <td className="td text-right whitespace-nowrap">
+                <td className="td text-center font-mono">{r.num_proposta ?? r.id}</td>
+                <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
+                <td className="td text-center">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td text-center">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td text-center tabular-nums">{formatEur(r.total)}</td>
+                <td className="td text-center whitespace-nowrap">
                   <Link href={`/honoraris/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>
                   <form action={deletePropostaAction} className="inline">
                     <input type="hidden" name="id" value={r.id} />
@@ -110,15 +110,15 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td className="td text-[var(--color-muted)]" colSpan={6}>Cap resultat.</td>
+                <td className="td text-center text-[var(--color-muted)]" colSpan={6}>Cap resultat.</td>
               </tr>
             )}
           </tbody>
           {filtered.length > 0 && (
             <tfoot>
               <tr className="bg-[var(--color-paper)]">
-                <td className="td font-semibold" colSpan={4}>Total ({filtered.length})</td>
-                <td className="td text-right font-semibold tabular-nums">{formatEur(totalSum)}</td>
+                <td className="td text-center font-semibold" colSpan={4}>Total ({filtered.length})</td>
+                <td className="td text-center font-semibold tabular-nums">{formatEur(totalSum)}</td>
                 <td className="td"></td>
               </tr>
             </tfoot>

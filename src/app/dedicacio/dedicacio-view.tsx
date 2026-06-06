@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createDedicacioAction, deleteDedicacioAction } from "./actions";
+import { createDedicacioAction, deleteDedicacioAction, updateDedicacioAction } from "./actions";
 import type { Dedicacio, Expedient } from "@/types/db";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
@@ -285,9 +285,46 @@ function EntryForm({
 // Últims 7 dies
 // ============================================================================
 
+function dedTarget(d: Dedicacio) {
+  return d.num_expedient ? `${d.num_expedient}${d.projecte ? ` · ${d.projecte}` : ""}` : d.activitat ?? "—";
+}
+
+function DedEditRow({ d }: { d: Dedicacio }) {
+  const [hores, setHores] = useState(d.hores);
+  const [tasca, setTasca] = useState(d.tasca ?? "");
+  const [comentari, setComentari] = useState(d.comentari ?? "");
+  const [, startTransition] = useTransition();
+  return (
+    <li className="flex flex-wrap items-center gap-2 text-sm">
+      <input
+        type="number"
+        step="0.25"
+        min="0"
+        className="input w-16 py-1 text-right"
+        value={hores}
+        onChange={(e) => setHores(e.target.value)}
+        onBlur={() => {
+          const h = parseFloat(hores);
+          if (Number.isFinite(h) && h > 0 && String(h) !== d.hores) startTransition(() => updateDedicacioAction(d.id, { hores: h }));
+        }}
+      />
+      <span className="font-medium truncate max-w-[14rem]" title={dedTarget(d)}>{dedTarget(d)}</span>
+      <input className="input flex-1 min-w-32 py-1" placeholder="Tasca" value={tasca} onChange={(e) => setTasca(e.target.value)} onBlur={() => { if (tasca !== (d.tasca ?? "")) startTransition(() => updateDedicacioAction(d.id, { tasca })); }} />
+      <input className="input flex-1 min-w-32 py-1" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={() => { if (comentari !== (d.comentari ?? "")) startTransition(() => updateDedicacioAction(d.id, { comentari })); }} />
+      <button
+        type="button"
+        className="shrink-0 text-red-700 hover:text-red-900 text-sm"
+        onClick={() => { if (confirm("Eliminar aquesta dedicació?")) startTransition(() => deleteDedicacioAction(d.id)); }}
+        title="Eliminar"
+      >
+        ✕
+      </button>
+    </li>
+  );
+}
+
 function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
-  const [pending, startTransition] = useTransition();
 
   const byDate = useMemo(() => {
     const map = new Map<string, Dedicacio[]>();
@@ -319,34 +356,8 @@ function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: st
                 {items.length === 0 ? (
                   <p className="text-sm text-[var(--color-muted)]">Sense dedicació.</p>
                 ) : (
-                  <ul className="space-y-1">
-                    {items.map((d) => {
-                      const exp = d.num_expedient
-                        ? `${d.num_expedient}${d.projecte ? ` · ${d.projecte}` : ""}`
-                        : d.activitat ?? "—";
-                      return (
-                        <li key={d.id} className="flex items-baseline gap-2 text-sm">
-                          <span className="w-14 shrink-0 text-right font-semibold tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</span>
-                          <span className="font-medium truncate max-w-[22rem]" title={exp}>{exp}</span>
-                          {d.tasca && <span className="text-[var(--color-muted)]">· {d.tasca}</span>}
-                          {d.comentari && <span className="text-[var(--color-muted)]">· {d.comentari}</span>}
-                          <button
-                            type="button"
-                            className="ml-2 shrink-0 text-red-700 hover:text-red-900 text-sm disabled:opacity-50"
-                            disabled={pending}
-                            onClick={() => {
-                              if (confirm("Eliminar aquesta dedicació?")) {
-                                startTransition(() => deleteDedicacioAction(d.id));
-                              }
-                            }}
-                            aria-label="Eliminar"
-                            title="Eliminar"
-                          >
-                            ✕
-                          </button>
-                        </li>
-                      );
-                    })}
+                  <ul className="space-y-1.5">
+                    {items.map((d) => <DedEditRow key={d.id} d={d} />)}
                   </ul>
                 )}
               </div>
@@ -737,8 +748,36 @@ function StatsTab({
   );
 }
 
-function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
+function DayModalRow({ d }: { d: Dedicacio }) {
+  const [hores, setHores] = useState(d.hores);
+  const [tasca, setTasca] = useState(d.tasca ?? "");
+  const [comentari, setComentari] = useState(d.comentari ?? "");
   const [, startTransition] = useTransition();
+  return (
+    <tr>
+      <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td"><input className="input py-1" placeholder="Tasca" value={tasca} onChange={(e) => setTasca(e.target.value)} onBlur={() => { if (tasca !== (d.tasca ?? "")) startTransition(() => updateDedicacioAction(d.id, { tasca })); }} /></td>
+      <td className="td"><input className="input py-1" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={() => { if (comentari !== (d.comentari ?? "")) startTransition(() => updateDedicacioAction(d.id, { comentari })); }} /></td>
+      <td className="td">
+        <input
+          type="number"
+          step="0.25"
+          min="0"
+          className="input w-20 py-1 text-right"
+          value={hores}
+          onChange={(e) => setHores(e.target.value)}
+          onBlur={() => { const h = parseFloat(hores); if (Number.isFinite(h) && h > 0 && String(h) !== d.hores) startTransition(() => updateDedicacioAction(d.id, { hores: h })); }}
+        />
+      </td>
+      <td className="td text-right">
+        <button type="button" className="text-red-700 hover:underline text-xs" onClick={() => { if (confirm("Eliminar aquesta dedicació?")) startTransition(() => deleteDedicacioAction(d.id)); }}>✕</button>
+      </td>
+    </tr>
+  );
+}
+
+function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
   const total = items.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
   return (
     <Modal
@@ -770,28 +809,7 @@ function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicaci
               </tr>
             </thead>
             <tbody>
-              {items.map((d) => (
-                <tr key={d.id}>
-                  <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
-                  <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
-                  <td className="td text-right">
-                    <button
-                      type="button"
-                      className="text-red-700 hover:underline text-xs"
-                      onClick={() => {
-                        if (confirm("Eliminar aquesta dedicació?")) {
-                          startTransition(() => deleteDedicacioAction(d.id));
-                        }
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {items.map((d) => <DayModalRow key={d.id} d={d} />)}
             </tbody>
           </table>
         </div>

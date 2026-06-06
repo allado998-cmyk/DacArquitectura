@@ -45,3 +45,27 @@ export async function deleteDedicacioAction(id: number) {
   await sql`delete from public.dedicacions where id = ${id}`;
   revalidatePath("/dedicacio");
 }
+
+export interface DedicacioPatch {
+  data?: string;
+  hores?: number;
+  tasca?: string;
+  comentari?: string;
+}
+
+export async function updateDedicacioAction(id: number, patch: DedicacioPatch) {
+  await requireUser();
+  if (patch.data !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(patch.data)) {
+    await sql`update public.dedicacions set data = ${patch.data}::date where id = ${id}`;
+  }
+  if (patch.hores !== undefined && Number.isFinite(patch.hores) && patch.hores > 0) {
+    await sql`update public.dedicacions set hores = ${patch.hores} where id = ${id}`;
+  }
+  if (patch.tasca !== undefined) {
+    await sql`update public.dedicacions set tasca = ${patch.tasca.trim() || null} where id = ${id}`;
+  }
+  if (patch.comentari !== undefined) {
+    await sql`update public.dedicacions set comentari = ${patch.comentari.trim() || null} where id = ${id}`;
+  }
+  revalidatePath("/dedicacio");
+}

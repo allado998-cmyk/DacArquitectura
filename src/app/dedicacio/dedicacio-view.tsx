@@ -15,7 +15,6 @@ const MONTHS_CA = [
 ];
 const WEEKDAYS_CA = ["dl", "dt", "dc", "dj", "dv", "ds", "dg"];
 const WEEKDAY_NAMES = ["Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"];
-const ACTIVITAT_SUGGESTIONS = ["Treball de web", "Treball de factures", "Administració", "Formació", "Reunió interna"];
 
 type Tab = "registre" | "estadistiques";
 type Agrupacio = "dia" | "setmana" | "mes";
@@ -78,17 +77,6 @@ export function DedicacioView({
     label: e.projecte ? `${e.num_expedient} · ${e.projecte}` : e.num_expedient,
   }));
 
-  const activitatSuggestions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...ACTIVITAT_SUGGESTIONS,
-          ...dedicacions.map((d) => d.activitat ?? "").filter(Boolean),
-        ]),
-      ),
-    [dedicacions],
-  );
-
   return (
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-6 border-b border-[var(--color-line)]">
@@ -98,9 +86,9 @@ export function DedicacioView({
 
       {tab === "registre" && (
         <div className="space-y-8">
-          <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} activitatSuggestions={activitatSuggestions} />
-          <Last7Days dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />
-          <Calendar dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />
+          <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} />
+          <Last7Days dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} />
+          <Calendar dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} />
         </div>
       )}
       {tab === "estadistiques" && <StatsTab dedicacions={dedicacions} expedients={expedients} today={today} />}
@@ -152,17 +140,13 @@ function EntryForm({
   expedientOpts,
   tasques,
   today,
-  activitatSuggestions,
 }: {
   expedientOpts: ComboOption[];
   tasques: string[];
   today: string;
-  activitatSuggestions: string[];
 }) {
-  const [mode, setMode] = useState<"expedient" | "activitat">("expedient");
   const [data, setData] = useState(today);
   const [expedientId, setExpedientId] = useState<number | null>(null);
-  const [activitat, setActivitat] = useState("");
   const [hores, setHores] = useState("");
   const [tasca, setTasca] = useState("");
   const [comentari, setComentari] = useState("");
@@ -171,12 +155,8 @@ function EntryForm({
 
   function submit() {
     setError(null);
-    if (mode === "expedient" && !expedientId) {
+    if (!expedientId) {
       setError("Selecciona un expedient.");
-      return;
-    }
-    if (mode === "activitat" && !activitat.trim()) {
-      setError("Indica l'activitat.");
       return;
     }
     const h = parseFloat(hores.replace(",", "."));
@@ -185,18 +165,10 @@ function EntryForm({
       return;
     }
     startTransition(async () => {
-      await createDedicacioAction({
-        expedientId: mode === "expedient" ? expedientId : null,
-        activitat: mode === "activitat" ? activitat : "",
-        data,
-        hores: h,
-        tasca,
-        comentari,
-      });
+      await createDedicacioAction({ expedientId, activitat: "", data, hores: h, tasca, comentari });
       setHores("");
       setTasca("");
       setComentari("");
-      if (mode === "activitat") setActivitat("");
     });
   }
 
@@ -207,50 +179,22 @@ function EntryForm({
         <span className="text-sm text-[var(--color-muted)] capitalize">{formatDataLong(today)}</span>
       </div>
 
-      <div className="mb-4 inline-flex rounded-md border border-[var(--color-line)] p-0.5 text-sm">
-        <button
-          type="button"
-          className={`rounded px-3 py-1 ${mode === "expedient" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`}
-          onClick={() => setMode("expedient")}
-        >
-          Expedient
-        </button>
-        <button
-          type="button"
-          className={`rounded px-3 py-1 ${mode === "activitat" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`}
-          onClick={() => setMode("activitat")}
-        >
-          Altra activitat
-        </button>
-      </div>
-
       <div className="grid gap-3 md:grid-cols-12 items-end">
         <div className="md:col-span-2">
           <label className="label">Data</label>
           <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
         </div>
         <div className="md:col-span-3">
-          <label className="label">{mode === "expedient" ? "Expedient" : "Activitat"}</label>
-          {mode === "expedient" ? (
-            <Combobox
-              options={expedientOpts}
-              value={expedientId}
-              onChange={setExpedientId}
-              placeholder="Cerca per número o projecte…"
-              emptyLabel="Selecciona…"
-              allowEmpty={false}
-              overlay
-            />
-          ) : (
-            <>
-              <input className="input" list="activitats-list" placeholder="Ex: Treball de web" value={activitat} onChange={(e) => setActivitat(e.target.value)} />
-              <datalist id="activitats-list">
-                {activitatSuggestions.map((a) => (
-                  <option key={a} value={a} />
-                ))}
-              </datalist>
-            </>
-          )}
+          <label className="label">Expedient</label>
+          <Combobox
+            options={expedientOpts}
+            value={expedientId}
+            onChange={setExpedientId}
+            placeholder="Cerca per número o projecte…"
+            emptyLabel="Selecciona…"
+            allowEmpty={false}
+            overlay
+          />
         </div>
         <div className="md:col-span-1">
           <label className="label">Hores</label>
@@ -310,12 +254,10 @@ function Last7Days({
   dedicacions,
   today,
   expedientOpts,
-  activitatSuggestions,
 }: {
   dedicacions: Dedicacio[];
   today: string;
   expedientOpts: ComboOption[];
-  activitatSuggestions: string[];
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
   const [editing, setEditing] = useState<Dedicacio | null>(null);
@@ -370,7 +312,7 @@ function Last7Days({
         })}
       </div>
 
-      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />
+      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} expedientOpts={expedientOpts} />
     </div>
   );
 }
@@ -379,12 +321,10 @@ function DedicacioEditModal({
   d,
   onClose,
   expedientOpts,
-  activitatSuggestions,
 }: {
   d: Dedicacio | null;
   onClose: () => void;
   expedientOpts: ComboOption[];
-  activitatSuggestions: string[];
 }) {
   return (
     <Modal
@@ -392,7 +332,7 @@ function DedicacioEditModal({
       onClose={onClose}
       title={d && <h3 className="text-base font-semibold">Editar dedicació</h3>}
     >
-      {d && <DedicacioForm key={d.id} d={d} onClose={onClose} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />}
+      {d && <DedicacioForm key={d.id} d={d} onClose={onClose} expedientOpts={expedientOpts} />}
     </Modal>
   );
 }
@@ -401,16 +341,12 @@ function DedicacioForm({
   d,
   onClose,
   expedientOpts,
-  activitatSuggestions,
 }: {
   d: Dedicacio;
   onClose: () => void;
   expedientOpts: ComboOption[];
-  activitatSuggestions: string[];
 }) {
-  const [mode, setMode] = useState<"expedient" | "activitat">(d.expedient_id != null ? "expedient" : "activitat");
   const [expedientId, setExpedientId] = useState<number | null>(d.expedient_id ?? null);
-  const [activitat, setActivitat] = useState(d.activitat ?? "");
   const [data, setData] = useState(d.data);
   const [hores, setHores] = useState(d.hores);
   const [tasca, setTasca] = useState(d.tasca ?? "");
@@ -420,12 +356,8 @@ function DedicacioForm({
 
   function save() {
     setError(null);
-    if (mode === "expedient" && !expedientId) {
+    if (!expedientId) {
       setError("Selecciona un expedient.");
-      return;
-    }
-    if (mode === "activitat" && !activitat.trim()) {
-      setError("Indica l'activitat.");
       return;
     }
     const h = parseFloat(hores);
@@ -435,8 +367,8 @@ function DedicacioForm({
         hores: Number.isFinite(h) ? h : undefined,
         tasca,
         comentari,
-        expedientId: mode === "expedient" ? expedientId : null,
-        activitat: mode === "activitat" ? activitat : "",
+        expedientId,
+        activitat: "",
       });
       onClose();
     });
@@ -444,24 +376,10 @@ function DedicacioForm({
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-md border border-[var(--color-line)] p-0.5 text-sm">
-        <button type="button" className={`rounded px-3 py-1 ${mode === "expedient" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`} onClick={() => setMode("expedient")}>Expedient</button>
-        <button type="button" className={`rounded px-3 py-1 ${mode === "activitat" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)]"}`} onClick={() => setMode("activitat")}>Altra activitat</button>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className="label">{mode === "expedient" ? "Expedient" : "Activitat"}</label>
-          {mode === "expedient" ? (
-            <Combobox options={expedientOpts} value={expedientId} onChange={setExpedientId} placeholder="Cerca per número o projecte…" emptyLabel="Selecciona…" allowEmpty={false} overlay />
-          ) : (
-            <>
-              <input className="input" list="ded-act-list" placeholder="Ex: Treball de web" value={activitat} onChange={(e) => setActivitat(e.target.value)} />
-              <datalist id="ded-act-list">
-                {activitatSuggestions.map((a) => <option key={a} value={a} />)}
-              </datalist>
-            </>
-          )}
+          <label className="label">Expedient</label>
+          <Combobox options={expedientOpts} value={expedientId} onChange={setExpedientId} placeholder="Cerca per número o projecte…" emptyLabel="Selecciona…" allowEmpty={false} overlay />
         </div>
         <div>
           <label className="label">Data</label>
@@ -504,12 +422,10 @@ function Calendar({
   dedicacions,
   today,
   expedientOpts,
-  activitatSuggestions,
 }: {
   dedicacions: Dedicacio[];
   today: string;
   expedientOpts: ComboOption[];
-  activitatSuggestions: string[];
 }) {
   const [ty, tm] = today.split("-").map(Number);
   const [offset, setOffset] = useState(0); // 0 = current month
@@ -586,7 +502,7 @@ function Calendar({
 
       <Legend max={max} />
 
-      <DayModal dia={popupDia} items={popupDia ? dedicacions.filter((d) => d.data === popupDia) : []} onClose={() => setPopupDia(null)} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />
+      <DayModal dia={popupDia} items={popupDia ? dedicacions.filter((d) => d.data === popupDia) : []} onClose={() => setPopupDia(null)} expedientOpts={expedientOpts} />
     </div>
   );
 }
@@ -883,13 +799,11 @@ function DayModal({
   items,
   onClose,
   expedientOpts,
-  activitatSuggestions,
 }: {
   dia: string | null;
   items: Dedicacio[];
   onClose: () => void;
   expedientOpts: ComboOption[];
-  activitatSuggestions: string[];
 }) {
   const [editing, setEditing] = useState<Dedicacio | null>(null);
   const [, startTransition] = useTransition();
@@ -941,7 +855,7 @@ function DayModal({
         </div>
       )}
 
-      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} expedientOpts={expedientOpts} activitatSuggestions={activitatSuggestions} />
+      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} expedientOpts={expedientOpts} />
     </Modal>
   );
 }

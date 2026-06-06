@@ -51,6 +51,8 @@ export interface DedicacioPatch {
   hores?: number;
   tasca?: string;
   comentari?: string;
+  expedientId?: number | null; // set together with activitat to switch target
+  activitat?: string;
 }
 
 export async function updateDedicacioAction(id: number, patch: DedicacioPatch) {
@@ -66,6 +68,14 @@ export async function updateDedicacioAction(id: number, patch: DedicacioPatch) {
   }
   if (patch.comentari !== undefined) {
     await sql`update public.dedicacions set comentari = ${patch.comentari.trim() || null} where id = ${id}`;
+  }
+  // Target: expedient or internal activity (mutually exclusive).
+  if (patch.expedientId !== undefined) {
+    const expedientId = patch.expedientId && Number.isFinite(patch.expedientId) ? patch.expedientId : null;
+    const activitat = expedientId ? null : (patch.activitat?.trim() || null);
+    if (expedientId || activitat) {
+      await sql`update public.dedicacions set expedient_id = ${expedientId}, activitat = ${activitat} where id = ${id}`;
+    }
   }
   revalidatePath("/dedicacio");
 }

@@ -85,8 +85,8 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
             <tr>
               <th className="th text-center w-28">Núm.</th>
               <th className="th text-center w-32">Data</th>
-              <th className="th text-center">Projecte</th>
-              <th className="th text-center">Client</th>
+              <th className="th text-left">Projecte</th>
+              <th className="th text-left">Client</th>
               <th className="th text-center w-40">Preu</th>
               <th className="th text-center w-32"></th>
             </tr>
@@ -96,8 +96,8 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
               <tr key={r.id}>
                 <td className="td text-center font-mono">{r.num_proposta ?? r.id}</td>
                 <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
-                <td className="td text-center">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td text-center">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td text-left">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td text-left">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td text-center tabular-nums">{formatEur(r.total)}</td>
                 <td className="td text-center whitespace-nowrap">
                   <Link href={`/honoraris/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>

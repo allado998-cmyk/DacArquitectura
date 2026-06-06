@@ -289,42 +289,27 @@ function dedTarget(d: Dedicacio) {
   return d.num_expedient ? `${d.num_expedient}${d.projecte ? ` · ${d.projecte}` : ""}` : d.activitat ?? "—";
 }
 
-function DedEditRow({ d }: { d: Dedicacio }) {
-  const [hores, setHores] = useState(d.hores);
-  const [tasca, setTasca] = useState(d.tasca ?? "");
-  const [comentari, setComentari] = useState(d.comentari ?? "");
-  const [, startTransition] = useTransition();
+function EditDeleteBtns({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
   return (
-    <li className="flex flex-wrap items-center gap-2 text-sm">
-      <input
-        type="number"
-        step="0.25"
-        min="0"
-        className="input w-16 py-1 text-right"
-        value={hores}
-        onChange={(e) => setHores(e.target.value)}
-        onBlur={() => {
-          const h = parseFloat(hores);
-          if (Number.isFinite(h) && h > 0 && String(h) !== d.hores) startTransition(() => updateDedicacioAction(d.id, { hores: h }));
-        }}
-      />
-      <span className="font-medium truncate max-w-[14rem]" title={dedTarget(d)}>{dedTarget(d)}</span>
-      <input className="input flex-1 min-w-32 py-1" placeholder="Tasca" value={tasca} onChange={(e) => setTasca(e.target.value)} onBlur={() => { if (tasca !== (d.tasca ?? "")) startTransition(() => updateDedicacioAction(d.id, { tasca })); }} />
-      <input className="input flex-1 min-w-32 py-1" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={() => { if (comentari !== (d.comentari ?? "")) startTransition(() => updateDedicacioAction(d.id, { comentari })); }} />
+    <span className="flex shrink-0 items-center gap-1">
+      <button type="button" title="Editar" aria-label="Editar" className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-accent)] hover:bg-[var(--color-paper)]" onClick={onEdit}>✎</button>
       <button
         type="button"
-        className="shrink-0 text-red-700 hover:text-red-900 text-sm"
-        onClick={() => { if (confirm("Eliminar aquesta dedicació?")) startTransition(() => deleteDedicacioAction(d.id)); }}
         title="Eliminar"
+        aria-label="Eliminar"
+        className="inline-flex h-6 w-6 items-center justify-center rounded text-red-700 hover:bg-red-50"
+        onClick={() => { if (confirm("Eliminar aquesta dedicació?")) onDelete(); }}
       >
         ✕
       </button>
-    </li>
+    </span>
   );
 }
 
 function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: string }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
+  const [editing, setEditing] = useState<Dedicacio | null>(null);
+  const [, startTransition] = useTransition();
 
   const byDate = useMemo(() => {
     const map = new Map<string, Dedicacio[]>();
@@ -357,13 +342,84 @@ function Last7Days({ dedicacions, today }: { dedicacions: Dedicacio[]; today: st
                   <p className="text-sm text-[var(--color-muted)]">Sense dedicació.</p>
                 ) : (
                   <ul className="space-y-1.5">
-                    {items.map((d) => <DedEditRow key={d.id} d={d} />)}
+                    {items.map((d) => (
+                      <li key={d.id} className="flex items-center gap-2 text-sm">
+                        <span className="w-14 shrink-0 text-right font-semibold tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</span>
+                        <span className="font-medium truncate max-w-[18rem]" title={dedTarget(d)}>{dedTarget(d)}</span>
+                        {d.tasca && <span className="truncate text-[var(--color-muted)]">· {d.tasca}</span>}
+                        {d.comentari && <span className="truncate text-[var(--color-muted)]">· {d.comentari}</span>}
+                        <span className="ml-auto" />
+                        <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
             </div>
           );
         })}
+      </div>
+
+      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} />
+    </div>
+  );
+}
+
+function DedicacioEditModal({ d, onClose }: { d: Dedicacio | null; onClose: () => void }) {
+  return (
+    <Modal
+      open={d != null}
+      onClose={onClose}
+      title={d && (
+        <div>
+          <h3 className="text-base font-semibold">Editar dedicació</h3>
+          <span className="text-sm text-[var(--color-muted)]">{dedTarget(d)}</span>
+        </div>
+      )}
+    >
+      {d && <DedicacioForm key={d.id} d={d} onClose={onClose} />}
+    </Modal>
+  );
+}
+
+function DedicacioForm({ d, onClose }: { d: Dedicacio; onClose: () => void }) {
+  const [data, setData] = useState(d.data);
+  const [hores, setHores] = useState(d.hores);
+  const [tasca, setTasca] = useState(d.tasca ?? "");
+  const [comentari, setComentari] = useState(d.comentari ?? "");
+  const [pending, startTransition] = useTransition();
+
+  function save() {
+    const h = parseFloat(hores);
+    startTransition(async () => {
+      await updateDedicacioAction(d.id, { data, hores: Number.isFinite(h) ? h : undefined, tasca, comentari });
+      onClose();
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label">Data</label>
+          <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Hores</label>
+          <input type="number" step="0.25" min="0" className="input text-right" value={hores} onChange={(e) => setHores(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Fent què</label>
+          <input className="input" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Comentari</label>
+          <input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
       </div>
     </div>
   );
@@ -748,36 +804,9 @@ function StatsTab({
   );
 }
 
-function DayModalRow({ d }: { d: Dedicacio }) {
-  const [hores, setHores] = useState(d.hores);
-  const [tasca, setTasca] = useState(d.tasca ?? "");
-  const [comentari, setComentari] = useState(d.comentari ?? "");
-  const [, startTransition] = useTransition();
-  return (
-    <tr>
-      <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-      <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-      <td className="td"><input className="input py-1" placeholder="Tasca" value={tasca} onChange={(e) => setTasca(e.target.value)} onBlur={() => { if (tasca !== (d.tasca ?? "")) startTransition(() => updateDedicacioAction(d.id, { tasca })); }} /></td>
-      <td className="td"><input className="input py-1" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={() => { if (comentari !== (d.comentari ?? "")) startTransition(() => updateDedicacioAction(d.id, { comentari })); }} /></td>
-      <td className="td">
-        <input
-          type="number"
-          step="0.25"
-          min="0"
-          className="input w-20 py-1 text-right"
-          value={hores}
-          onChange={(e) => setHores(e.target.value)}
-          onBlur={() => { const h = parseFloat(hores); if (Number.isFinite(h) && h > 0 && String(h) !== d.hores) startTransition(() => updateDedicacioAction(d.id, { hores: h })); }}
-        />
-      </td>
-      <td className="td text-right">
-        <button type="button" className="text-red-700 hover:underline text-xs" onClick={() => { if (confirm("Eliminar aquesta dedicació?")) startTransition(() => deleteDedicacioAction(d.id)); }}>✕</button>
-      </td>
-    </tr>
-  );
-}
-
 function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicacio[]; onClose: () => void }) {
+  const [editing, setEditing] = useState<Dedicacio | null>(null);
+  const [, startTransition] = useTransition();
   const total = items.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
   return (
     <Modal
@@ -805,15 +834,28 @@ function DayModal({ dia, items, onClose }: { dia: string | null; items: Dedicaci
                 <th className="th">Tasca</th>
                 <th className="th">Comentari</th>
                 <th className="th w-20 text-right">Hores</th>
-                <th className="th w-8"></th>
+                <th className="th w-20"></th>
               </tr>
             </thead>
             <tbody>
-              {items.map((d) => <DayModalRow key={d.id} d={d} />)}
+              {items.map((d) => (
+                <tr key={d.id}>
+                  <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
+                  <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
+                  <td className="td text-right">
+                    <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <DedicacioEditModal d={editing} onClose={() => setEditing(null)} />
     </Modal>
   );
 }

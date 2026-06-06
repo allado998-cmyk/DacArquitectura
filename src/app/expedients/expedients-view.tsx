@@ -158,6 +158,7 @@ function ExpedientsList({
   tipologies: Tipologia[];
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
+  const [editing, setEditing] = useState<Expedient | null>(null);
   const [query, setQuery] = useState("");
   const [fAny, setFAny] = useState("");
   const [fClient, setFClient] = useState("");
@@ -267,7 +268,7 @@ function ExpedientsList({
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <ExpedientRow key={r.id} row={r} clientOpts={clientOpts} tipologies={tipologies} onOpen={() => setDetail(r)} />
+              <ExpedientRow key={r.id} row={r} onOpen={() => setDetail(r)} onEdit={() => setEditing(r)} />
             ))}
             {filtered.length === 0 && (
               <tr><td className="td text-[var(--color-muted)]" colSpan={11}>Cap resultat.</td></tr>
@@ -281,24 +282,88 @@ function ExpedientsList({
         dedicacions={detail ? dedicByExp.get(detail.id) ?? [] : []}
         onClose={() => setDetail(null)}
       />
+
+      <ExpedientEditModal row={editing} clientOpts={clientOpts} tipologies={tipologies} onClose={() => setEditing(null)} />
     </>
   );
 }
 
 function ExpedientRow({
   row,
+  onOpen,
+  onEdit,
+}: {
+  row: Expedient;
+  onOpen: () => void;
+  onEdit: () => void;
+}) {
+  const [, startTransition] = useTransition();
+  return (
+    <tr className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={onOpen}>
+      <td className="td font-mono text-[var(--color-accent)]">{row.num_expedient}</td>
+      <td className="td">{row.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td"><CategoriaBadge code={row.categoria} /></td>
+      <td className="td"><TipologiaBadge nom={row.tipologia_nom} /></td>
+      <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
+      <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
+      <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
+      <td className="td whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1">
+          <IconBtn title="Editar" onClick={onEdit} className="text-[var(--color-accent)]">✎</IconBtn>
+          <IconBtn
+            title="Eliminar"
+            className="text-red-700"
+            onClick={() => {
+              if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
+                startTransition(() => deleteExpedientAction(row.id));
+              }
+            }}
+          >
+            ✕
+          </IconBtn>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function ExpedientEditModal({
+  row,
   clientOpts,
   tipologies,
-  onOpen,
+  onClose,
+}: {
+  row: Expedient | null;
+  clientOpts: ComboOption[];
+  tipologies: Tipologia[];
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      open={row != null}
+      onClose={onClose}
+      wide
+      title={row && <h3 className="text-base font-semibold">Editar expedient <span className="font-mono">{row.num_expedient}</span></h3>}
+    >
+      {row && <ExpedientForm key={row.id} row={row} clientOpts={clientOpts} tipologies={tipologies} onClose={onClose} />}
+    </Modal>
+  );
+}
+
+function ExpedientForm({
+  row,
+  clientOpts,
+  tipologies,
+  onClose,
 }: {
   row: Expedient;
   clientOpts: ComboOption[];
   tipologies: Tipologia[];
-  onOpen: () => void;
+  onClose: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [pending, startTransition] = useTransition();
-
   const [num, setNum] = useState(row.num_expedient);
   const [projecte, setProjecte] = useState(row.projecte ?? "");
   const [clientId, setClientId] = useState<number | null>(row.client_id);
@@ -309,19 +374,7 @@ function ExpedientRow({
   const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
   const [dataTancament, setDataTancament] = useState(row.data_tancament ?? "");
-
-  function reset() {
-    setNum(row.num_expedient);
-    setProjecte(row.projecte ?? "");
-    setClientId(row.client_id);
-    setCiutat(row.ciutat ?? "");
-    setCategoria(row.categoria ?? "");
-    setTipologiaId(row.tipologia_id != null ? String(row.tipologia_id) : "");
-    setEstat(row.estat);
-    setTipus(row.tipus);
-    setPressupost(row.pressupost);
-    setDataTancament(row.data_tancament ?? "");
-  }
+  const [pending, startTransition] = useTransition();
 
   function save() {
     if (!num.trim()) return;
@@ -339,115 +392,79 @@ function ExpedientRow({
     };
     startTransition(async () => {
       await updateExpedientAction(row.id, patch);
-      setEditing(false);
+      onClose();
     });
   }
 
-  if (!editing) {
-    return (
-      <tr className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={onOpen}>
-        <td className="td font-mono text-[var(--color-accent)]">{row.num_expedient}</td>
-        <td className="td">{row.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-        <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-        <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-        <td className="td"><CategoriaBadge code={row.categoria} /></td>
-        <td className="td"><TipologiaBadge nom={row.tipologia_nom} /></td>
-        <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
-        <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
-        <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-        <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
-        <td className="td whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-end gap-1">
-            <IconBtn title="Editar" onClick={() => setEditing(true)} className="text-[var(--color-accent)]">✎</IconBtn>
-            <IconBtn
-              title="Eliminar"
-              className="text-red-700"
-              onClick={() => {
-                if (confirm(`Eliminar l'expedient ${row.num_expedient}?`)) {
-                  startTransition(() => deleteExpedientAction(row.id));
-                }
-              }}
-            >
-              ✕
-            </IconBtn>
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
   return (
-    <tr style={{ backgroundColor: "var(--color-paper)" }}>
-      <td className="td align-top">
-        <input className="input font-mono" value={num} onChange={(e) => setNum(e.target.value)} />
-      </td>
-      <td className="td align-top">
-        <input className="input" value={projecte} onChange={(e) => setProjecte(e.target.value)} placeholder="Nom del projecte" />
-      </td>
-      <td className="td align-top">
-        <Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" overlay />
-      </td>
-      <td className="td align-top">
-        <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} placeholder="Ciutat" />
-      </td>
-      <td className="td align-top">
-        <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          <option value="">—</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.code} value={c.code}>{c.label}</option>
-          ))}
-        </select>
-      </td>
-      <td className="td align-top">
-        <select className="input" value={tipologiaId} onChange={(e) => setTipologiaId(e.target.value)}>
-          <option value="">—</option>
-          {tipologies.map((t) => (
-            <option key={t.id} value={t.id}>{t.nom}</option>
-          ))}
-        </select>
-      </td>
-      <td className="td align-top">
-        <select className="input" value={tipus} onChange={(e) => setTipus(e.target.value as typeof tipus)}>
-          <option value="privat">Privat</option>
-          <option value="public">Públic</option>
-        </select>
-      </td>
-      <td className="td align-top">
-        <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
-      </td>
-      <td className="td align-top">
-        <input type="date" className="input" value={dataTancament} onChange={(e) => setDataTancament(e.target.value)} />
-      </td>
-      <td className="td align-top">
-        <select
-          className="input"
-          value={estat}
-          onChange={(e) => {
-            const next = e.target.value as typeof estat;
-            setEstat(next);
-            if (next === "tancat" && !dataTancament) setDataTancament(todayLocal());
-          }}
-        >
-          <option value="obert">Obert</option>
-          <option value="tancat">Tancat</option>
-        </select>
-      </td>
-      <td className="td align-top whitespace-nowrap">
-        <div className="flex items-center justify-end gap-1">
-          <IconBtn title="Desar" onClick={save} disabled={pending} className="text-[var(--color-accent)]">✓</IconBtn>
-          <IconBtn
-            title="Cancel·lar"
-            className="text-[var(--color-muted)]"
-            onClick={() => {
-              reset();
-              setEditing(false);
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label">Número</label>
+          <input className="input font-mono" value={num} onChange={(e) => setNum(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Projecte</label>
+          <input className="input" value={projecte} onChange={(e) => setProjecte(e.target.value)} placeholder="Nom del projecte" />
+        </div>
+        <div>
+          <label className="label">Client</label>
+          <Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Cap client" overlay />
+        </div>
+        <div>
+          <label className="label">Ciutat</label>
+          <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} placeholder="Ciutat" />
+        </div>
+        <div>
+          <label className="label">Categoria</label>
+          <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <option value="">—</option>
+            {CATEGORIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Tipologia</label>
+          <select className="input" value={tipologiaId} onChange={(e) => setTipologiaId(e.target.value)}>
+            <option value="">—</option>
+            {tipologies.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Tipus</label>
+          <select className="input" value={tipus} onChange={(e) => setTipus(e.target.value as typeof tipus)}>
+            <option value="privat">Privat</option>
+            <option value="public">Públic</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Pressupost (€)</label>
+          <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Estat</label>
+          <select
+            className="input"
+            value={estat}
+            onChange={(e) => {
+              const next = e.target.value as typeof estat;
+              setEstat(next);
+              if (next === "tancat" && !dataTancament) setDataTancament(todayLocal());
             }}
           >
-            ✕
-          </IconBtn>
+            <option value="obert">Obert</option>
+            <option value="tancat">Tancat</option>
+          </select>
         </div>
-      </td>
-    </tr>
+        <div>
+          <label className="label">Tancat el</label>
+          <input type="date" className="input" value={dataTancament} onChange={(e) => setDataTancament(e.target.value)} />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
+      </div>
+    </div>
   );
 }
 

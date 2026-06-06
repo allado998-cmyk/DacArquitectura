@@ -236,7 +236,7 @@ function ExpedientsList({
           <label className="label">Tipologia</label>
           <select className="input" value={fTipologia} onChange={(e) => setFTipologia(e.target.value)}>
             <option value="">Totes</option>
-            {tipologies.map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
+            {[...tipologies].sort((a, b) => a.nom.localeCompare(b.nom, "ca")).map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
           </select>
         </div>
         <div>
@@ -369,7 +369,7 @@ function ExpedientForm({
   const [clientId, setClientId] = useState<number | null>(row.client_id);
   const [ciutat, setCiutat] = useState(row.ciutat ?? "");
   const [categoria, setCategoria] = useState<string>(row.categoria ?? "");
-  const [tipologiaId, setTipologiaId] = useState<string>(row.tipologia_id != null ? String(row.tipologia_id) : "");
+  const [tipologiaId, setTipologiaId] = useState<number | null>(row.tipologia_id);
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
@@ -384,7 +384,7 @@ function ExpedientForm({
       client_id: clientId,
       ciutat,
       categoria,
-      tipologia_id: tipologiaId ? Number(tipologiaId) : null,
+      tipologia_id: tipologiaId,
       estat,
       tipus,
       pressupost: parseFloat(pressupost) || 0,
@@ -424,10 +424,14 @@ function ExpedientForm({
         </div>
         <div>
           <label className="label">Tipologia</label>
-          <select className="input" value={tipologiaId} onChange={(e) => setTipologiaId(e.target.value)}>
-            <option value="">—</option>
-            {tipologies.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
-          </select>
+          <Combobox
+            options={[...tipologies].sort((a, b) => a.nom.localeCompare(b.nom, "ca")).map((t) => ({ id: t.id, label: t.nom }))}
+            value={tipologiaId}
+            onChange={setTipologiaId}
+            placeholder="Cerca tipologia…"
+            emptyLabel="—"
+            overlay
+          />
         </div>
         <div>
           <label className="label">Tipus</label>

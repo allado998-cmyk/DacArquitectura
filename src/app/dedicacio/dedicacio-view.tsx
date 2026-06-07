@@ -306,17 +306,20 @@ function Last7Days({
                 {items.length === 0 ? (
                   <p className="text-sm text-[var(--color-muted)]">Sense dedicació.</p>
                 ) : (
-                  <ul className="space-y-1.5">
-                    {items.map((d) => (
-                      <li key={d.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-14 shrink-0 text-right font-semibold tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</span>
-                        <span className="font-medium truncate max-w-[18rem]" title={dedTarget(d)}>{dedTarget(d)}</span>
-                        {d.tasca && <span className="truncate text-[var(--color-muted)]">· {d.tasca}</span>}
-                        {d.comentari && <span className="truncate text-[var(--color-muted)]">· {d.comentari}</span>}
-                        <span className="ml-auto" />
-                        <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
-                      </li>
-                    ))}
+                  <ul className="space-y-2">
+                    {items.map((d) => {
+                      const sub = [d.tasca, d.comentari].filter(Boolean).join(" · ");
+                      return (
+                        <li key={d.id} className="flex items-start gap-2 text-sm">
+                          <span className="w-12 shrink-0 text-right font-semibold tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium">{dedTarget(d)}</div>
+                            {sub && <div className="truncate text-xs text-[var(--color-muted)]">{sub}</div>}
+                          </div>
+                          <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

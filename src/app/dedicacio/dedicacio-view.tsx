@@ -70,6 +70,7 @@ export function DedicacioView({
   today: string;
 }) {
   const [tab, setTab] = useState<Tab>("registre");
+  const [showForm, setShowForm] = useState(false);
 
   // Search by number and project name (both live in the label).
   const expedientOpts: ComboOption[] = expedients.map((e) => ({
@@ -85,13 +86,32 @@ export function DedicacioView({
       </div>
 
       {tab === "registre" && (
-        <div className="space-y-8">
-          <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} />
+        <div className="space-y-6">
+          <button
+            type="button"
+            className="btn-primary w-full justify-center py-3.5 text-base sm:w-auto"
+            onClick={() => setShowForm(true)}
+          >
+            + Nova dedicació
+          </button>
           <Last7Days dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} />
           <Calendar dedicacions={dedicacions} today={today} expedientOpts={expedientOpts} />
         </div>
       )}
       {tab === "estadistiques" && <StatsTab dedicacions={dedicacions} expedients={expedients} today={today} />}
+
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={
+          <div>
+            <h3 className="text-base font-semibold">Registrar dedicació</h3>
+            <span className="text-sm text-[var(--color-muted)] capitalize">{formatDataLong(today)}</span>
+          </div>
+        }
+      >
+        <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} onDone={() => setShowForm(false)} />
+      </Modal>
     </div>
   );
 }
@@ -140,10 +160,12 @@ function EntryForm({
   expedientOpts,
   tasques,
   today,
+  onDone,
 }: {
   expedientOpts: ComboOption[];
   tasques: string[];
   today: string;
+  onDone: () => void;
 }) {
   const [data, setData] = useState(today);
   const [expedientId, setExpedientId] = useState<number | null>(null);
@@ -166,61 +188,52 @@ function EntryForm({
     }
     startTransition(async () => {
       await createDedicacioAction({ expedientId, activitat: "", data, hores: h, tasca, comentari });
-      setHores("");
-      setTasca("");
-      setComentari("");
+      onDone();
     });
   }
 
   return (
-    <div className="card">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-        <h2 className="text-lg font-semibold tracking-tight">Registrar dedicació</h2>
-        <span className="text-sm text-[var(--color-muted)] capitalize">{formatDataLong(today)}</span>
+    <div className="space-y-4">
+      <div>
+        <label className="label">Expedient</label>
+        <Combobox
+          options={expedientOpts}
+          value={expedientId}
+          onChange={setExpedientId}
+          placeholder="Cerca per número o projecte…"
+          emptyLabel="Selecciona…"
+          allowEmpty={false}
+          overlay
+        />
       </div>
-
-      <div className="grid gap-3 md:grid-cols-12 items-end">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
           <label className="label">Data</label>
           <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
         </div>
-        <div className="md:col-span-3">
-          <label className="label">Expedient</label>
-          <Combobox
-            options={expedientOpts}
-            value={expedientId}
-            onChange={setExpedientId}
-            placeholder="Cerca per número o projecte…"
-            emptyLabel="Selecciona…"
-            allowEmpty={false}
-            overlay
-          />
-        </div>
-        <div className="md:col-span-1">
+        <div>
           <label className="label">Hores</label>
-          <input type="number" step="0.25" min="0" className="input text-right" placeholder="5" value={hores} onChange={(e) => setHores(e.target.value)} />
+          <input type="number" inputMode="decimal" step="0.25" min="0" className="input text-right" placeholder="5" value={hores} onChange={(e) => setHores(e.target.value)} />
         </div>
-        <div className="md:col-span-3">
-          <label className="label">Fent què</label>
-          <input className="input" list="tasques-list" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
-          <datalist id="tasques-list">
-            {tasques.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </div>
-        <div className="md:col-span-3">
-          <label className="label">Comentari</label>
-          <input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} />
-        </div>
+      </div>
+      <div>
+        <label className="label">Fent què</label>
+        <input className="input" list="tasques-list" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
+        <datalist id="tasques-list">
+          {tasques.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </div>
+      <div>
+        <label className="label">Comentari</label>
+        <input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} />
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <button type="button" className="btn-primary" onClick={submit} disabled={pending}>
-          {pending ? "Desant…" : "+ Afegir dedicació"}
-        </button>
-        {error && <span className="text-sm text-red-700">{error}</span>}
-      </div>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      <button type="button" className="btn-primary w-full justify-center py-3 text-base" onClick={submit} disabled={pending}>
+        {pending ? "Desant…" : "+ Afegir dedicació"}
+      </button>
     </div>
   );
 }
@@ -462,7 +475,7 @@ function Calendar({
           <span className="min-w-36 text-center text-sm font-medium">{MONTHS_CA[month]} {year}</span>
           <button type="button" className="btn-ghost px-2 py-1" onClick={() => setOffset((o) => o + 1)}>›</button>
         </div>
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <Stat label="Hores del mes" value={fmtHores(total)} />
           <Stat label="Dies treballats" value={String(dies)} />
           <Stat label="Mitjana / dia" value={fmtHores(dies ? total / dies : 0)} />

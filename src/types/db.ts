@@ -93,6 +93,7 @@ export interface Expedient {
   tipologia_id: number | null;
   tipologia_nom: string | null; // joined
   tipus: ExpedientTipus;
+  direccio_obres: boolean;
   pressupost: string; // numeric arrives as string from neon
   pressupost_origen: "manual" | "calcul" | "proposta";
   calcul_id: number | null;

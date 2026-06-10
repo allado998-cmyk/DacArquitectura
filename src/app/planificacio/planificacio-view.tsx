@@ -14,6 +14,7 @@ export interface PlanItem {
   client_nom: string | null;
   ciutat: string | null;
   tipus: "public" | "privat";
+  direccio_obres: boolean;
   tipologia_nom: string | null;
   pressupost: string;
   data_inici: string | null;
@@ -26,12 +27,22 @@ export interface PlanItem {
 export interface Visita {
   expedient_id: number;
   data: string;
+  hores: string;
+  comentari: string | null;
+  ciutat: string | null;
 }
 
-const DAY_W = 30;
-const LABEL_W = 240;
+interface VisitaPt {
+  idx: number;
+  data: string;
+  hores: string;
+  comentari: string | null;
+  ciutat: string | null;
+}
+
+const LABEL_W = 220;
 const BACK_DAYS = 14;
-const FWD_DAYS = 42; // 6 weeks forward
+const FWD_DAYS = 42; // 6 weeks
 const TOTAL = BACK_DAYS + FWD_DAYS; // 56 days
 const MONTHS = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Des"];
 
@@ -55,31 +66,40 @@ function fmtShort(iso: string | null) {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
 }
+function fmtLong(iso: string) {
+  const { y, m, d, dt } = parts(iso);
+  const wd = ["dg", "dl", "dt", "dc", "dj", "dv", "ds"][dt.getDay()];
+  return `${wd} ${d} ${MONTHS[m - 1]} ${y}`;
+}
 function fmtHores(v: string | number | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
   return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100) + " h";
 }
 
 export function PlanificacioView({ items, visites, today }: { items: PlanItem[]; visites: Visita[]; today: string }) {
+  const [tab, setTab] = useState<"do" | "resta">("resta");
+  const [weekOffset, setWeekOffset] = useState(0);
   const [editing, setEditing] = useState<PlanItem | null>(null);
 
-  const start = useMemo(() => addDays(today, -BACK_DAYS), [today]);
+  const start = useMemo(() => addDays(today, -BACK_DAYS + weekOffset * 7), [today, weekOffset]);
   const days = useMemo(() => Array.from({ length: TOTAL }, (_, i) => addDays(start, i)), [start]);
-  const todayIdx = BACK_DAYS;
+  const todayIdx = dayIndex(today, start);
 
   const visitsByExp = useMemo(() => {
-    const map = new Map<number, number[]>();
+    const map = new Map<number, VisitaPt[]>();
     for (const v of visites) {
       const idx = dayIndex(v.data, start);
       if (idx < 0 || idx > TOTAL - 1) continue;
       const arr = map.get(v.expedient_id) ?? [];
-      arr.push(idx);
+      arr.push({ idx, data: v.data, hores: v.hores, comentari: v.comentari, ciutat: v.ciutat });
       map.set(v.expedient_id, arr);
     }
     return map;
   }, [visites, start]);
 
-  const gridW = LABEL_W + DAY_W * TOTAL;
+  const doItems = items.filter((it) => it.direccio_obres);
+  const restaItems = items.filter((it) => !it.direccio_obres);
+  const shown = tab === "do" ? doItems : restaItems;
 
   const monthSegments: { label: string; span: number }[] = [];
   for (const iso of days) {
@@ -92,124 +112,162 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
 
   return (
     <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-lg border border-[var(--color-line)] p-0.5 text-sm">
+          <TabBtn active={tab === "resta"} onClick={() => setTab("resta")}>Projectes ({restaItems.length})</TabBtn>
+          <TabBtn active={tab === "do"} onClick={() => setTab("do")}>Direcció d&apos;obres ({doItems.length})</TabBtn>
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w - 1)} title="Setmana anterior">‹</button>
+          <button type="button" className="btn-ghost px-3 py-1.5 disabled:opacity-50" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>Avui</button>
+          <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w + 1)} title="Setmana següent">›</button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--color-muted)]">
-        <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-ink)]" /> Visita d&apos;obra</span>
-        <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-[var(--color-accent-soft)]" /> Avui</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border-2 border-white bg-[var(--color-accent)] shadow" /> Visita d&apos;obra
+        </span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-[var(--color-accent-soft)]" /> Avui</span>
         <span className="text-amber-700">⚠ sense dates de planificació</span>
       </div>
 
-      <div className="rounded-2xl border border-[var(--color-line)] bg-white shadow-sm overflow-x-auto">
-        <div style={{ minWidth: gridW }}>
-          {/* Month header */}
-          <div className="flex border-b border-[var(--color-line)]">
-            <div className="shrink-0" style={{ width: LABEL_W }} />
+      <div className="rounded-2xl border border-[var(--color-line)] bg-white shadow-sm">
+        {/* Month header */}
+        <div className="flex border-b border-[var(--color-line)]">
+          <div className="shrink-0" style={{ width: LABEL_W }} />
+          <div className="flex flex-1">
             {monthSegments.map((seg, i) => (
-              <div key={i} className="border-l border-[var(--color-line)] px-2 py-1 text-xs font-medium text-[var(--color-muted)]" style={{ width: seg.span * DAY_W }}>
+              <div key={i} className="border-l border-[var(--color-line)] px-2 py-0.5 text-xs font-medium text-[var(--color-muted)]" style={{ flexGrow: seg.span, flexBasis: 0 }}>
                 {seg.label}
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Day header */}
-          <div className="flex border-b border-[var(--color-line)]">
-            <div className="sticky left-0 z-10 shrink-0 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" style={{ width: LABEL_W }}>
-              Expedient
-            </div>
+        {/* Day header */}
+        <div className="flex border-b border-[var(--color-line)]">
+          <div className="shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" style={{ width: LABEL_W }}>Expedient</div>
+          <div className="flex flex-1">
             {days.map((iso, i) => {
               const { dt, d } = parts(iso);
               const wd = dt.getDay();
               const weekend = wd === 0 || wd === 6;
               const isToday = i === todayIdx;
               return (
-                <div
-                  key={iso}
-                  className="shrink-0 border-l border-[var(--color-line)] py-1 text-center text-[10px] leading-tight"
-                  style={{ width: DAY_W, backgroundColor: isToday ? "var(--color-accent-soft)" : weekend ? "#f6f6f3" : undefined }}
-                >
+                <div key={iso} className="flex-1 border-l border-[var(--color-line)] py-0.5 text-center text-[9px] leading-tight" style={{ backgroundColor: isToday ? "var(--color-accent-soft)" : weekend ? "#f6f6f3" : undefined }}>
                   <div className="text-[var(--color-muted)]">{["dg", "dl", "dt", "dc", "dj", "dv", "ds"][wd]}</div>
                   <div className={isToday ? "font-bold text-[var(--color-accent)]" : "tabular-nums"}>{d}</div>
                 </div>
               );
             })}
           </div>
-
-          {/* Rows */}
-          {items.length === 0 ? (
-            <div className="px-3 py-6 text-sm text-[var(--color-muted)]">Cap expedient obert.</div>
-          ) : (
-            items.map((it) => {
-              const missing = !it.data_inici || !it.data_final;
-              const visitIdxs = visitsByExp.get(it.id) ?? [];
-              const cat = it.categoria ? CATEGORY_BY_CODE[it.categoria] : null;
-              const color = cat?.color ?? "#1f4d3f";
-
-              let bar: { left: number; width: number } | null = null;
-              if (it.data_inici && it.data_final) {
-                const si = dayIndex(it.data_inici, start);
-                const ei = Math.max(si, dayIndex(it.data_final, start));
-                if (ei >= 0 && si <= TOTAL - 1) {
-                  const clStart = Math.max(0, si);
-                  const clEnd = Math.min(TOTAL - 1, ei);
-                  bar = { left: clStart * DAY_W, width: (clEnd - clStart + 1) * DAY_W };
-                }
-              }
-
-              return (
-                <div key={it.id} className="flex items-stretch border-b border-[var(--color-line)] last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => setEditing(it)}
-                    className="sticky left-0 z-10 flex shrink-0 items-center gap-2 bg-white px-3 py-2 text-left hover:bg-[var(--color-paper)]"
-                    style={{ width: LABEL_W }}
-                  >
-                    {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
-                    <span className="truncate text-sm">
-                      <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>{" "}
-                      {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
-                    </span>
-                  </button>
-                  <div className="relative shrink-0" style={{ width: DAY_W * TOTAL, minHeight: 40 }}>
-                    <div className="absolute inset-0 flex">
-                      {days.map((iso, i) => {
-                        const wd = parts(iso).dt.getDay();
-                        const weekend = wd === 0 || wd === 6;
-                        return (
-                          <div
-                            key={iso}
-                            className="border-l border-[var(--color-line)]"
-                            style={{ width: DAY_W, backgroundColor: i === todayIdx ? "var(--color-accent-soft)" : weekend ? "#f9f9f7" : undefined }}
-                          />
-                        );
-                      })}
-                    </div>
-                    {bar && (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(it)}
-                        title={`${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}`}
-                        className="absolute top-1/2 flex h-6 -translate-y-1/2 items-center overflow-hidden rounded-md px-2 text-xs font-medium text-white shadow-sm"
-                        style={{ left: bar.left + 2, width: Math.max(bar.width - 4, 8), background: `linear-gradient(90deg, ${color}cc, ${color})` }}
-                      >
-                        <span className="truncate">{it.projecte ?? it.num_expedient}</span>
-                      </button>
-                    )}
-                    {visitIdxs.map((idx, k) => (
-                      <span
-                        key={k}
-                        title="Visita d'obra"
-                        className="absolute top-1.5 z-20 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white bg-[var(--color-ink)]"
-                        style={{ left: idx * DAY_W + DAY_W / 2 }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          )}
         </div>
+
+        {/* Rows */}
+        {shown.length === 0 ? (
+          <div className="px-3 py-6 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
+        ) : (
+          shown.map((it) => (
+            <GanttRow key={it.id} it={it} vis={visitsByExp.get(it.id) ?? []} days={days} start={start} todayIdx={todayIdx} onOpen={() => setEditing(it)} />
+          ))
+        )}
       </div>
 
       <ExpedientInfoModal item={editing} onClose={() => setEditing(null)} />
+    </div>
+  );
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={`rounded-md px-3 py-1.5 ${active ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}>
+      {children}
+    </button>
+  );
+}
+
+function GanttRow({
+  it,
+  vis,
+  days,
+  start,
+  todayIdx,
+  onOpen,
+}: {
+  it: PlanItem;
+  vis: VisitaPt[];
+  days: string[];
+  start: string;
+  todayIdx: number;
+  onOpen: () => void;
+}) {
+  const [hover, setHover] = useState<VisitaPt | null>(null);
+  const missing = !it.data_inici || !it.data_final;
+  const cat = it.categoria ? CATEGORY_BY_CODE[it.categoria] : null;
+  const color = cat?.color ?? "#1f4d3f";
+
+  let bar: { leftPct: number; widthPct: number } | null = null;
+  if (it.data_inici && it.data_final) {
+    const si = dayIndex(it.data_inici, start);
+    const ei = Math.max(si, dayIndex(it.data_final, start));
+    if (ei >= 0 && si <= TOTAL - 1) {
+      const clStart = Math.max(0, si);
+      const clEnd = Math.min(TOTAL - 1, ei);
+      bar = { leftPct: (clStart / TOTAL) * 100, widthPct: ((clEnd - clStart + 1) / TOTAL) * 100 };
+    }
+  }
+
+  return (
+    <div className="flex items-stretch border-b border-[var(--color-line)] last:border-b-0">
+      <button type="button" onClick={onOpen} className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-left hover:bg-[var(--color-paper)]" style={{ width: LABEL_W }}>
+        {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
+        <span className="truncate text-xs">
+          <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>{" "}
+          {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
+        </span>
+      </button>
+      <div className="relative flex flex-1" style={{ minHeight: 30 }}>
+        {days.map((iso, i) => {
+          const wd = parts(iso).dt.getDay();
+          const weekend = wd === 0 || wd === 6;
+          return <div key={iso} className="flex-1 border-l border-[var(--color-line)]" style={{ backgroundColor: i === todayIdx ? "var(--color-accent-soft)" : weekend ? "#f9f9f7" : undefined }} />;
+        })}
+        {bar && (
+          <button
+            type="button"
+            onClick={onOpen}
+            title={`${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}`}
+            className="absolute top-1/2 flex h-4 -translate-y-1/2 items-center overflow-hidden rounded px-1.5 text-[11px] font-medium text-white"
+            style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, background: `linear-gradient(90deg, ${color}cc, ${color})` }}
+          >
+            <span className="truncate">{it.projecte ?? it.num_expedient}</span>
+          </button>
+        )}
+        {vis.map((v, k) => (
+          <button
+            key={k}
+            type="button"
+            onMouseEnter={() => setHover(v)}
+            onMouseLeave={() => setHover((h) => (h === v ? null : h))}
+            className="absolute top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[var(--color-accent)] shadow transition hover:scale-150"
+            style={{ left: `${((v.idx + 0.5) / TOTAL) * 100}%` }}
+            aria-label="Visita d'obra"
+          />
+        ))}
+        {hover && (
+          <div
+            className="pointer-events-none absolute bottom-full z-30 mb-1 w-48 -translate-x-1/2 rounded-lg border border-[var(--color-line)] bg-white p-2 text-xs shadow-lg"
+            style={{ left: `${((hover.idx + 0.5) / TOTAL) * 100}%` }}
+          >
+            <div className="font-semibold text-[var(--color-accent)]">Visita d&apos;obra</div>
+            <div className="capitalize">{fmtLong(hover.data)}</div>
+            <div className="text-[var(--color-muted)]">{fmtHores(hover.hores)}{hover.ciutat ? ` · ${hover.ciutat}` : ""}</div>
+            {hover.comentari && <div className="mt-0.5 text-[var(--color-muted)]">{hover.comentari}</div>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -227,6 +285,7 @@ function ExpedientInfoModal({ item, onClose }: { item: PlanItem | null; onClose:
               <span className="font-mono text-sm text-[var(--color-accent)]">{item.num_expedient}</span>
               <Badge swatch={TIPUS[item.tipus]} label={TIPUS[item.tipus].label} />
               <Badge swatch={ESTAT.obert} label={ESTAT.obert.label} dot />
+              {item.direccio_obres && <span className="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">Direcció d&apos;obres</span>}
             </div>
             <h3 className="text-base font-semibold">{item.projecte ?? "Sense projecte"}</h3>
           </div>
@@ -266,7 +325,6 @@ function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void 
 
   return (
     <div className="space-y-5">
-      {/* Info */}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
         <Info label="Client" value={item.client_nom ?? "—"} />
         <Info label="Ciutat" value={item.ciutat ?? "—"} />
@@ -276,7 +334,6 @@ function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void 
         <Info label="Tancat el" value={fmtShort(item.data_tancament)} />
       </dl>
 
-      {/* Hours planned vs actual */}
       {planned > 0 && (
         <div className="rounded-xl border border-[var(--color-line)] p-4">
           <div className="mb-2 flex items-baseline justify-between">
@@ -286,13 +343,10 @@ function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void 
           <div className="h-3 w-full rounded-full bg-[var(--color-line)]">
             <div className="h-3 rounded-full bg-[var(--color-accent)]" style={{ width: `${Math.min(100, pct ?? 0)}%` }} />
           </div>
-          <div className="mt-2 text-sm text-[var(--color-muted)]">
-            {fmtHores(actual)} fetes de {fmtHores(planned)} planificades
-          </div>
+          <div className="mt-2 text-sm text-[var(--color-muted)]">{fmtHores(actual)} fetes de {fmtHores(planned)} planificades</div>
         </div>
       )}
 
-      {/* Dates */}
       <div>
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Dates de planificació</div>
         <div className="grid grid-cols-2 gap-3">

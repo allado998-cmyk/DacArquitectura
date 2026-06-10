@@ -401,6 +401,7 @@ function ExpedientForm({
   const [tipologiaId, setTipologiaId] = useState<number | null>(row.tipologia_id);
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
+  const [direccioObres, setDireccioObres] = useState(row.direccio_obres);
   const [pressupost, setPressupost] = useState(row.pressupost);
   const [origen, setOrigen] = useState(row.pressupost_origen);
   const [calculId, setCalculId] = useState<number | null>(row.calcul_id);
@@ -437,6 +438,7 @@ function ExpedientForm({
       tipologia_id: tipologiaId,
       estat,
       tipus,
+      direccio_obres: direccioObres,
       pressupost: parseFloat(pressupost) || 0,
       pressupost_origen: origen,
       calcul_id: calculId,
@@ -493,6 +495,13 @@ function ExpedientForm({
           <select className="input" value={tipus} onChange={(e) => setTipus(e.target.value as typeof tipus)}>
             <option value="privat">Privat</option>
             <option value="public">Públic</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Direcció d&apos;obres?</label>
+          <select className="input" value={direccioObres ? "si" : "no"} onChange={(e) => setDireccioObres(e.target.value === "si")}>
+            <option value="no">No</option>
+            <option value="si">Sí</option>
           </select>
         </div>
         <div className="sm:col-span-2 rounded-lg border border-[var(--color-line)] p-3 space-y-3">

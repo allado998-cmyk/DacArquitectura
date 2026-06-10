@@ -47,6 +47,7 @@ export interface ExpedientPatch {
   categoria: string; // "" means none
   tipologia_id: number | null;
   tipus: string;
+  direccio_obres: boolean;
   pressupost: number; // manual value
   pressupost_origen: string; // manual | calcul | proposta
   calcul_id: number | null;
@@ -120,6 +121,7 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       categoria = ${categoria},
       tipologia_id = ${tipologiaId},
       tipus = ${tipus},
+      direccio_obres = ${!!data.direccio_obres},
       pressupost = ${effective},
       pressupost_origen = ${origen},
       calcul_id = ${calculId},

@@ -12,7 +12,7 @@ export default async function PlanificacioPage() {
   const [items, visites] = await Promise.all([
     sql`
       select e.id, e.num_expedient, e.projecte, e.categoria, c.nom as client_nom,
-             e.ciutat, e.tipus, t.nom as tipologia_nom,
+             e.ciutat, e.tipus, e.direccio_obres, t.nom as tipologia_nom,
              e.pressupost::text as pressupost,
              to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
              to_char(e.data_final, 'YYYY-MM-DD') as data_final,
@@ -26,7 +26,8 @@ export default async function PlanificacioPage() {
       order by e.data_inici nulls last, e.num_expedient
     ` as unknown as Promise<PlanItem[]>,
     sql`
-      select d.expedient_id, to_char(d.data, 'YYYY-MM-DD') as data
+      select d.expedient_id, to_char(d.data, 'YYYY-MM-DD') as data,
+             d.hores::text as hores, d.comentari, e.ciutat
       from public.dedicacions d
       join public.expedients e on e.id = d.expedient_id
       where e.estat = 'obert' and e.num_expedient not like '00-%' and d.tasca ilike '%visita%obr%'

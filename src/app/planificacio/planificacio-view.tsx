@@ -46,6 +46,7 @@ export interface FitaTipus {
 }
 
 const LABEL_W = 220;
+const HOURS_W = 78;
 const BACK_DAYS = 14;
 const FWD_DAYS = 42;
 const TOTAL = BACK_DAYS + FWD_DAYS;
@@ -93,6 +94,10 @@ function fmtLong(iso: string) {
 function fmtHores(v: string | number | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
   return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100) + " h";
+}
+function hc(v: string | number | null | undefined) {
+  const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
+  return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 1 }).format(Math.round((n || 0) * 10) / 10) + "h";
 }
 function itemColor(it: PlanItem) {
   if (it.categoria === "do") return COLOR_DO;
@@ -208,7 +213,7 @@ export function PlanificacioView({
       {/* Desktop gantt */}
       <div className="hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-sm sm:block">
         <div className="flex border-b border-[var(--color-line)]">
-          <div className="shrink-0" style={{ width: LABEL_W }} />
+          <div className="shrink-0" style={{ width: LABEL_W + HOURS_W }} />
           <div className="flex flex-1">
             {monthSegments.map((seg, i) => (
               <div key={i} className="border-l border-[var(--color-line)] px-2 py-0.5 text-xs font-medium text-[var(--color-muted)]" style={{ flexGrow: seg.span, flexBasis: 0 }}>{seg.label}</div>
@@ -217,6 +222,10 @@ export function PlanificacioView({
         </div>
         <div className="flex border-b border-[var(--color-line)]">
           <div className="shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" style={{ width: LABEL_W }}>Expedient</div>
+          <div className="shrink-0 border-l border-[var(--color-line)] px-1 py-1 text-center text-[9px] uppercase leading-tight text-[var(--color-muted)]" style={{ width: HOURS_W }}>
+            <div>Fetes</div>
+            <div>Plan.</div>
+          </div>
           <div className="flex flex-1">
             {days.map((iso, i) => {
               const { dt, d } = parts(iso);
@@ -272,6 +281,10 @@ function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string
         {hasDates ? `${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}` : "Sense dates de planificació"}
         {visites > 0 && ` · ${visites} visita${visites === 1 ? "" : "s"} d'obra`}
       </div>
+      <div className="mt-1 text-xs">
+        <span className="font-semibold text-[var(--color-accent)]">{hc(it.actual_hores)}</span>
+        <span className="text-[var(--color-muted)]"> fetes / {(parseFloat(it.planned_hores) || 0) > 0 ? hc(it.planned_hores) : "—"} plan.</span>
+      </div>
       {hasDates && <div className="mt-2 h-2 w-full rounded-full bg-[var(--color-line)]"><div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} /></div>}
     </button>
   );
@@ -287,6 +300,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
   const [tip, setTip] = useState<Tip | null>(null);
   const missing = !it.data_inici || !it.data_final;
   const color = itemColor(it);
+  const planned = parseFloat(it.planned_hores) || 0;
 
   let bar: { leftPct: number; widthPct: number; showStart: boolean; showEnd: boolean } | null = null;
   if (it.data_inici && it.data_final) {
@@ -305,6 +319,14 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
         {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
         <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
       </button>
+      <div
+        className="flex shrink-0 flex-col justify-center border-l border-[var(--color-line)] px-1 text-right text-[11px] leading-tight"
+        style={{ width: HOURS_W }}
+        title={`Fetes ${fmtHores(it.actual_hores)} / Planificades ${planned > 0 ? fmtHores(planned) : "—"}`}
+      >
+        <span className="font-semibold tabular-nums text-[var(--color-accent)]">{hc(it.actual_hores)}</span>
+        <span className="tabular-nums text-[var(--color-muted)]">{planned > 0 ? hc(planned) : "—"}</span>
+      </div>
       <div className="relative flex flex-1" style={{ minHeight: 32 }}>
         {days.map((iso, i) => {
           const wd = parts(iso).dt.getDay();

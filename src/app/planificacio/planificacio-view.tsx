@@ -5,6 +5,7 @@ import { Modal } from "@/components/modal";
 import { CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
 import { formatEur } from "@/lib/format";
 import { updateExpedientDatesAction } from "@/app/expedients/actions";
+import { addFitaAction, deleteFitaAction } from "./actions";
 
 export interface PlanItem {
   id: number;
@@ -23,7 +24,6 @@ export interface PlanItem {
   planned_hores: string;
   actual_hores: string;
 }
-
 export interface Visita {
   expedient_id: number;
   data: string;
@@ -31,20 +31,38 @@ export interface Visita {
   comentari: string | null;
   ciutat: string | null;
 }
-
-interface VisitaPt {
-  idx: number;
+export interface Fita {
+  id: number;
+  expedient_id: number;
   data: string;
-  hores: string;
-  comentari: string | null;
-  ciutat: string | null;
+  tipus_id: number;
+  nom: string;
+  forma: string;
+}
+export interface FitaTipus {
+  id: number;
+  nom: string;
+  forma: string;
 }
 
 const LABEL_W = 220;
 const BACK_DAYS = 14;
-const FWD_DAYS = 42; // 6 weeks
-const TOTAL = BACK_DAYS + FWD_DAYS; // 56 days
+const FWD_DAYS = 42;
+const TOTAL = BACK_DAYS + FWD_DAYS;
 const MONTHS = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Des"];
+const COLOR_DO = "#14b8a6"; // docència — turquoise
+const COLOR_DIR = "#dc2626"; // direcció d'obres — vermell
+const COLOR_REST = "#2563eb"; // resta — blau
+const FITA_COLOR = "#7c3aed";
+const FORMES: { value: string; label: string }[] = [
+  { value: "diamond", label: "Diamant" },
+  { value: "circle", label: "Cercle" },
+  { value: "square", label: "Quadrat" },
+  { value: "triangle", label: "Triangle" },
+  { value: "star", label: "Estrella" },
+];
+
+type TabKey = "resta" | "do" | "docencia" | "tots";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -68,16 +86,44 @@ function fmtShort(iso: string | null) {
 }
 function fmtLong(iso: string) {
   const { y, m, d, dt } = parts(iso);
-  const wd = ["dg", "dl", "dt", "dc", "dj", "dv", "ds"][dt.getDay()];
-  return `${wd} ${d} ${MONTHS[m - 1]} ${y}`;
+  return `${["dg", "dl", "dt", "dc", "dj", "dv", "ds"][dt.getDay()]} ${d} ${MONTHS[m - 1]} ${y}`;
 }
 function fmtHores(v: string | number | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
   return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100) + " h";
 }
+function itemColor(it: PlanItem) {
+  if (it.categoria === "do") return COLOR_DO;
+  if (it.direccio_obres) return COLOR_DIR;
+  return COLOR_REST;
+}
 
-export function PlanificacioView({ items, visites, today }: { items: PlanItem[]; visites: Visita[]; today: string }) {
-  const [tab, setTab] = useState<"do" | "resta">("resta");
+function Shape({ forma, color, size = 13 }: { forma: string; color: string; size?: number }) {
+  const s = size;
+  const stroke = "#fff";
+  if (forma === "circle") return <svg width={s} height={s}><circle cx={s / 2} cy={s / 2} r={s / 2 - 1} fill={color} stroke={stroke} /></svg>;
+  if (forma === "square") return <svg width={s} height={s}><rect x={1} y={1} width={s - 2} height={s - 2} rx={1.5} fill={color} stroke={stroke} /></svg>;
+  if (forma === "triangle") return <svg width={s} height={s}><polygon points={`${s / 2},1 ${s - 1},${s - 1} 1,${s - 1}`} fill={color} stroke={stroke} /></svg>;
+  if (forma === "star") return (
+    <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z" fill={color} stroke={stroke} strokeWidth="1" /></svg>
+  );
+  return <svg width={s} height={s}><rect x={s * 0.2} y={s * 0.2} width={s * 0.6} height={s * 0.6} transform={`rotate(45 ${s / 2} ${s / 2})`} fill={color} stroke={stroke} /></svg>;
+}
+
+export function PlanificacioView({
+  items,
+  visites,
+  fites,
+  fitaTipus,
+  today,
+}: {
+  items: PlanItem[];
+  visites: Visita[];
+  fites: Fita[];
+  fitaTipus: FitaTipus[];
+  today: string;
+}) {
+  const [tab, setTab] = useState<TabKey>("tots");
   const [weekOffset, setWeekOffset] = useState(0);
   const [editing, setEditing] = useState<PlanItem | null>(null);
 
@@ -86,26 +132,33 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
   const todayIdx = dayIndex(today, start);
 
   const visitsByExp = useMemo(() => {
-    const map = new Map<number, VisitaPt[]>();
-    for (const v of visites) {
-      const idx = dayIndex(v.data, start);
-      if (idx < 0 || idx > TOTAL - 1) continue;
-      const arr = map.get(v.expedient_id) ?? [];
-      arr.push({ idx, data: v.data, hores: v.hores, comentari: v.comentari, ciutat: v.ciutat });
-      map.set(v.expedient_id, arr);
-    }
+    const map = new Map<number, Visita[]>();
+    for (const v of visites) (map.get(v.expedient_id) ?? map.set(v.expedient_id, []).get(v.expedient_id)!).push(v);
     return map;
-  }, [visites, start]);
-
+  }, [visites]);
+  const fitesByExp = useMemo(() => {
+    const map = new Map<number, Fita[]>();
+    for (const f of fites) (map.get(f.expedient_id) ?? map.set(f.expedient_id, []).get(f.expedient_id)!).push(f);
+    return map;
+  }, [fites]);
   const visitCountByExp = useMemo(() => {
     const m = new Map<number, number>();
     for (const v of visites) m.set(v.expedient_id, (m.get(v.expedient_id) ?? 0) + 1);
     return m;
   }, [visites]);
 
-  const doItems = items.filter((it) => it.direccio_obres);
-  const restaItems = items.filter((it) => !it.direccio_obres);
-  const shown = tab === "do" ? doItems : restaItems;
+  const counts = {
+    resta: items.filter((it) => !it.direccio_obres && it.categoria !== "do").length,
+    do: items.filter((it) => it.direccio_obres).length,
+    docencia: items.filter((it) => it.categoria === "do").length,
+    tots: items.length,
+  };
+  const shown = items.filter((it) => {
+    if (tab === "do") return it.direccio_obres;
+    if (tab === "docencia") return it.categoria === "do";
+    if (tab === "resta") return !it.direccio_obres && it.categoria !== "do";
+    return true;
+  });
 
   const monthSegments: { label: string; span: number }[] = [];
   for (const iso of days) {
@@ -118,11 +171,12 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-[var(--color-line)] p-0.5 text-sm">
-          <TabBtn active={tab === "resta"} onClick={() => setTab("resta")}>Projectes ({restaItems.length})</TabBtn>
-          <TabBtn active={tab === "do"} onClick={() => setTab("do")}>Direcció d&apos;obres ({doItems.length})</TabBtn>
+        <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--color-line)] p-0.5 text-sm">
+          <TabBtn active={tab === "tots"} onClick={() => setTab("tots")}>Tots ({counts.tots})</TabBtn>
+          <TabBtn active={tab === "resta"} onClick={() => setTab("resta")}>Projectes ({counts.resta})</TabBtn>
+          <TabBtn active={tab === "do"} onClick={() => setTab("do")}>Direcció d&apos;obres ({counts.do})</TabBtn>
+          <TabBtn active={tab === "docencia"} onClick={() => setTab("docencia")}>Docència ({counts.docencia})</TabBtn>
         </div>
         <div className="hidden items-center gap-1 sm:flex">
           <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w - 1)} title="Setmana anterior">‹</button>
@@ -132,39 +186,33 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
       </div>
 
       <div className="hidden flex-wrap items-center gap-4 text-xs text-[var(--color-muted)] sm:flex">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full border-2 border-white bg-[var(--color-accent)] shadow" /> Visita d&apos;obra
-        </span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-[var(--color-accent-soft)]" /> Avui</span>
-        <span className="text-amber-700">⚠ sense dates de planificació</span>
+        <Legend color={COLOR_REST} label="Projectes" />
+        <Legend color={COLOR_DIR} label="Direcció d'obres" />
+        <Legend color={COLOR_DO} label="Docència" />
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full border-2 border-white bg-[var(--color-accent)] shadow" /> Visita d&apos;obra</span>
+        <span className="flex items-center gap-1.5"><Shape forma="diamond" color={FITA_COLOR} size={12} /> Fita</span>
+        <span className="text-amber-700">⚠ sense dates</span>
       </div>
 
-      {/* Mobile: compact list */}
+      {/* Mobile list */}
       <div className="space-y-2 sm:hidden">
         {shown.length === 0 ? (
           <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
         ) : (
-          shown.map((it) => (
-            <MobileRow key={it.id} it={it} today={today} visites={visitCountByExp.get(it.id) ?? 0} onOpen={() => setEditing(it)} />
-          ))
+          shown.map((it) => <MobileRow key={it.id} it={it} today={today} visites={visitCountByExp.get(it.id) ?? 0} onOpen={() => setEditing(it)} />)
         )}
       </div>
 
-      {/* Desktop: gantt */}
+      {/* Desktop gantt */}
       <div className="hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-sm sm:block">
-        {/* Month header */}
         <div className="flex border-b border-[var(--color-line)]">
           <div className="shrink-0" style={{ width: LABEL_W }} />
           <div className="flex flex-1">
             {monthSegments.map((seg, i) => (
-              <div key={i} className="border-l border-[var(--color-line)] px-2 py-0.5 text-xs font-medium text-[var(--color-muted)]" style={{ flexGrow: seg.span, flexBasis: 0 }}>
-                {seg.label}
-              </div>
+              <div key={i} className="border-l border-[var(--color-line)] px-2 py-0.5 text-xs font-medium text-[var(--color-muted)]" style={{ flexGrow: seg.span, flexBasis: 0 }}>{seg.label}</div>
             ))}
           </div>
         </div>
-
-        {/* Day header */}
         <div className="flex border-b border-[var(--color-line)]">
           <div className="shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" style={{ width: LABEL_W }}>Expedient</div>
           <div className="flex flex-1">
@@ -182,25 +230,29 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
             })}
           </div>
         </div>
-
-        {/* Rows */}
         {shown.length === 0 ? (
           <div className="px-3 py-6 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
         ) : (
           shown.map((it) => (
-            <GanttRow key={it.id} it={it} vis={visitsByExp.get(it.id) ?? []} days={days} start={start} todayIdx={todayIdx} onOpen={() => setEditing(it)} />
+            <GanttRow key={it.id} it={it} vis={visitsByExp.get(it.id) ?? []} fites={fitesByExp.get(it.id) ?? []} days={days} start={start} todayIdx={todayIdx} onOpen={() => setEditing(it)} />
           ))
         )}
       </div>
 
-      <ExpedientInfoModal item={editing} onClose={() => setEditing(null)} />
+      <ExpedientInfoModal item={editing} fites={editing ? fitesByExp.get(editing.id) ?? [] : []} fitaTipus={fitaTipus} onClose={() => setEditing(null)} />
     </div>
   );
 }
 
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: color }} /> {label}</span>;
+}
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className={`rounded-md px-3 py-1.5 ${active ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}>{children}</button>;
+}
+
 function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string; visites: number; onOpen: () => void }) {
-  const cat = it.categoria ? CATEGORY_BY_CODE[it.categoria] : null;
-  const color = cat?.color ?? "#1f4d3f";
+  const color = itemColor(it);
   const hasDates = !!(it.data_inici && it.data_final);
   let pct = 0;
   if (hasDates) {
@@ -211,61 +263,37 @@ function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string
   return (
     <button type="button" onClick={onOpen} className="block w-full rounded-xl border border-[var(--color-line)] bg-white p-3 text-left shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-sm">
-          <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>{" "}
-          {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
-        </span>
-        {!hasDates && <span className="shrink-0 text-amber-600" title="Sense dates">⚠</span>}
+        <span className="min-w-0 truncate text-sm"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
+        {!hasDates && <span className="shrink-0 text-amber-600">⚠</span>}
       </div>
       <div className="mt-1 text-xs text-[var(--color-muted)]">
         {hasDates ? `${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}` : "Sense dates de planificació"}
         {visites > 0 && ` · ${visites} visita${visites === 1 ? "" : "s"} d'obra`}
       </div>
-      {hasDates && (
-        <div className="mt-2 h-2 w-full rounded-full bg-[var(--color-line)]">
-          <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-        </div>
-      )}
+      {hasDates && <div className="mt-2 h-2 w-full rounded-full bg-[var(--color-line)]"><div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} /></div>}
     </button>
   );
 }
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className={`rounded-md px-3 py-1.5 ${active ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}>
-      {children}
-    </button>
-  );
+interface Tip {
+  pct: number;
+  title: string;
+  lines: string[];
 }
 
-function GanttRow({
-  it,
-  vis,
-  days,
-  start,
-  todayIdx,
-  onOpen,
-}: {
-  it: PlanItem;
-  vis: VisitaPt[];
-  days: string[];
-  start: string;
-  todayIdx: number;
-  onOpen: () => void;
-}) {
-  const [hover, setHover] = useState<VisitaPt | null>(null);
+function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanItem; vis: Visita[]; fites: Fita[]; days: string[]; start: string; todayIdx: number; onOpen: () => void }) {
+  const [tip, setTip] = useState<Tip | null>(null);
   const missing = !it.data_inici || !it.data_final;
-  const cat = it.categoria ? CATEGORY_BY_CODE[it.categoria] : null;
-  const color = cat?.color ?? "#1f4d3f";
+  const color = itemColor(it);
 
-  let bar: { leftPct: number; widthPct: number } | null = null;
+  let bar: { leftPct: number; widthPct: number; showStart: boolean; showEnd: boolean } | null = null;
   if (it.data_inici && it.data_final) {
     const si = dayIndex(it.data_inici, start);
     const ei = Math.max(si, dayIndex(it.data_final, start));
     if (ei >= 0 && si <= TOTAL - 1) {
       const clStart = Math.max(0, si);
       const clEnd = Math.min(TOTAL - 1, ei);
-      bar = { leftPct: (clStart / TOTAL) * 100, widthPct: ((clEnd - clStart + 1) / TOTAL) * 100 };
+      bar = { leftPct: (clStart / TOTAL) * 100, widthPct: ((clEnd - clStart + 1) / TOTAL) * 100, showStart: si >= 0, showEnd: ei <= TOTAL - 1 };
     }
   }
 
@@ -273,48 +301,83 @@ function GanttRow({
     <div className="flex items-stretch border-b border-[var(--color-line)] last:border-b-0">
       <button type="button" onClick={onOpen} className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-left hover:bg-[var(--color-paper)]" style={{ width: LABEL_W }}>
         {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
-        <span className="truncate text-xs">
-          <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>{" "}
-          {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
-        </span>
+        <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
       </button>
-      <div className="relative flex flex-1" style={{ minHeight: 30 }}>
+      <div className="relative flex flex-1" style={{ minHeight: 36 }}>
         {days.map((iso, i) => {
           const wd = parts(iso).dt.getDay();
           const weekend = wd === 0 || wd === 6;
           return <div key={iso} className="flex-1 border-l border-[var(--color-line)]" style={{ backgroundColor: i === todayIdx ? "var(--color-accent-soft)" : weekend ? "#f9f9f7" : undefined }} />;
         })}
+
         {bar && (
-          <button
-            type="button"
-            onClick={onOpen}
-            title={`${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}`}
-            className="absolute top-1/2 flex h-4 -translate-y-1/2 items-center overflow-hidden rounded px-1.5 text-[11px] font-medium text-white"
-            style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, background: `linear-gradient(90deg, ${color}cc, ${color})` }}
-          >
-            <span className="truncate">{it.projecte ?? it.num_expedient}</span>
-          </button>
+          <>
+            <button type="button" onClick={onOpen} className="absolute top-1/2 h-3 -translate-y-1/2 rounded" style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }} aria-label="Període" />
+            {bar.showStart && (
+              <div
+                className="absolute top-1/2 z-10 h-4 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
+                style={{ left: `${bar.leftPct}%` }}
+                onMouseEnter={() => setTip({ pct: bar!.leftPct, title: "Inici", lines: [fmtLong(it.data_inici!)] })}
+                onMouseLeave={() => setTip(null)}
+                onClick={onOpen}
+              >
+                <div className="mx-auto h-full w-[3px] rounded" style={{ backgroundColor: color, filter: "brightness(0.7)" }} />
+              </div>
+            )}
+            {bar.showEnd && (
+              <div
+                className="absolute top-1/2 z-10 h-4 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
+                style={{ left: `${bar.leftPct + bar.widthPct}%` }}
+                onMouseEnter={() => setTip({ pct: bar!.leftPct + bar!.widthPct, title: "Final (previsió)", lines: [fmtLong(it.data_final!)] })}
+                onMouseLeave={() => setTip(null)}
+                onClick={onOpen}
+              >
+                <div className="mx-auto h-full w-[3px] rounded" style={{ backgroundColor: color, filter: "brightness(0.7)" }} />
+              </div>
+            )}
+          </>
         )}
-        {vis.map((v, k) => (
-          <button
-            key={k}
-            type="button"
-            onMouseEnter={() => setHover(v)}
-            onMouseLeave={() => setHover((h) => (h === v ? null : h))}
-            className="absolute top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[var(--color-accent)] shadow transition hover:scale-150"
-            style={{ left: `${((v.idx + 0.5) / TOTAL) * 100}%` }}
-            aria-label="Visita d'obra"
-          />
-        ))}
-        {hover && (
-          <div
-            className="pointer-events-none absolute bottom-full z-30 mb-1 w-48 -translate-x-1/2 rounded-lg border border-[var(--color-line)] bg-white p-2 text-xs shadow-lg"
-            style={{ left: `${((hover.idx + 0.5) / TOTAL) * 100}%` }}
-          >
-            <div className="font-semibold text-[var(--color-accent)]">Visita d&apos;obra</div>
-            <div className="capitalize">{fmtLong(hover.data)}</div>
-            <div className="text-[var(--color-muted)]">{fmtHores(hover.hores)}{hover.ciutat ? ` · ${hover.ciutat}` : ""}</div>
-            {hover.comentari && <div className="mt-0.5 text-[var(--color-muted)]">{hover.comentari}</div>}
+
+        {/* Fites (top lane) */}
+        {fites.map((f) => {
+          const idx = dayIndex(f.data, start);
+          if (idx < 0 || idx > TOTAL - 1) return null;
+          const pct = ((idx + 0.5) / TOTAL) * 100;
+          return (
+            <span
+              key={f.id}
+              className="absolute top-0.5 z-20 -translate-x-1/2 cursor-default transition hover:scale-125"
+              style={{ left: `${pct}%` }}
+              onMouseEnter={() => setTip({ pct, title: f.nom, lines: [fmtLong(f.data)] })}
+              onMouseLeave={() => setTip(null)}
+            >
+              <Shape forma={f.forma} color={FITA_COLOR} />
+            </span>
+          );
+        })}
+
+        {/* Visites (bottom lane) */}
+        {vis.map((v, k) => {
+          const idx = dayIndex(v.data, start);
+          if (idx < 0 || idx > TOTAL - 1) return null;
+          const pct = ((idx + 0.5) / TOTAL) * 100;
+          return (
+            <button
+              key={k}
+              type="button"
+              onMouseEnter={() => setTip({ pct, title: "Visita d'obra", lines: [fmtLong(v.data), `${fmtHores(v.hores)}${v.ciutat ? ` · ${v.ciutat}` : ""}`, ...(v.comentari ? [v.comentari] : [])] })}
+              onMouseLeave={() => setTip(null)}
+              className="absolute bottom-0.5 z-20 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-[var(--color-accent)] shadow transition hover:scale-150"
+              style={{ left: `${pct}%` }}
+              aria-label="Visita d'obra"
+            />
+          );
+        })}
+
+        {tip && (
+          <div className="pointer-events-none absolute bottom-full z-30 mb-1 w-48 -translate-x-1/2 rounded-lg border border-[var(--color-line)] bg-white p-2 text-xs shadow-lg" style={{ left: `${tip.pct}%` }}>
+            <div className="font-semibold text-[var(--color-accent)]">{tip.title}</div>
+            {tip.lines.map((l, i) => <div key={i} className="capitalize text-[var(--color-muted)]">{l}</div>)}
           </div>
         )}
       </div>
@@ -322,54 +385,64 @@ function GanttRow({
   );
 }
 
-function ExpedientInfoModal({ item, onClose }: { item: PlanItem | null; onClose: () => void }) {
+function ExpedientInfoModal({ item, fites, fitaTipus, onClose }: { item: PlanItem | null; fites: Fita[]; fitaTipus: FitaTipus[]; onClose: () => void }) {
   return (
     <Modal
       open={item != null}
       onClose={onClose}
       wide
-      title={
-        item && (
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-[var(--color-accent)]">{item.num_expedient}</span>
-              <Badge swatch={TIPUS[item.tipus]} label={TIPUS[item.tipus].label} />
-              <Badge swatch={ESTAT.obert} label={ESTAT.obert.label} dot />
-              {item.direccio_obres && <span className="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">Direcció d&apos;obres</span>}
-            </div>
-            <h3 className="text-base font-semibold">{item.projecte ?? "Sense projecte"}</h3>
+      title={item && (
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-[var(--color-accent)]">{item.num_expedient}</span>
+            <Badge swatch={TIPUS[item.tipus]} label={TIPUS[item.tipus].label} />
+            <Badge swatch={ESTAT.obert} label={ESTAT.obert.label} dot />
+            {item.direccio_obres && <span className="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">Direcció d&apos;obres</span>}
           </div>
-        )
-      }
+          <h3 className="text-base font-semibold">{item.projecte ?? "Sense projecte"}</h3>
+        </div>
+      )}
     >
-      {item && <ExpedientInfo key={item.id} item={item} onClose={onClose} />}
+      {item && <ExpedientInfo key={item.id} item={item} fites={fites} fitaTipus={fitaTipus} onClose={onClose} />}
     </Modal>
   );
 }
 
 function Badge({ swatch, label, dot }: { swatch: { bg: string; text: string; color: string }; label: string; dot?: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap" style={{ backgroundColor: swatch.bg, color: swatch.text }}>
-      {dot && <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: swatch.color }} />}
-      {label}
-    </span>
-  );
+  return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap" style={{ backgroundColor: swatch.bg, color: swatch.text }}>{dot && <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: swatch.color }} />}{label}</span>;
 }
 
-function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void }) {
+function ExpedientInfo({ item, fites, fitaTipus, onClose }: { item: PlanItem; fites: Fita[]; fitaTipus: FitaTipus[]; onClose: () => void }) {
   const [inici, setInici] = useState(item.data_inici ?? "");
   const [final, setFinal] = useState(item.data_final ?? "");
   const [pending, startTransition] = useTransition();
+
+  // Fita form
+  const [tipusSel, setTipusSel] = useState<string>("new");
+  const [novaNom, setNovaNom] = useState("");
+  const [forma, setForma] = useState("diamond");
+  const [fitaData, setFitaData] = useState("");
+  const [pendingFita, startFita] = useTransition();
 
   const planned = parseFloat(item.planned_hores) || 0;
   const actual = parseFloat(item.actual_hores) || 0;
   const pct = planned > 0 ? Math.round((actual / planned) * 100) : null;
   const cat = item.categoria ? CATEGORY_BY_CODE[item.categoria] : null;
 
-  function save() {
+  function saveDates() {
     startTransition(async () => {
       await updateExpedientDatesAction(item.id, inici, final);
       onClose();
+    });
+  }
+  function addFita() {
+    if (!fitaData) return;
+    const isNew = tipusSel === "new";
+    if (isNew && !novaNom.trim()) return;
+    startFita(async () => {
+      await addFitaAction({ expedientId: item.id, tipusId: isNew ? null : Number(tipusSel), novaNom, forma, data: fitaData });
+      setFitaData("");
+      setNovaNom("");
     });
   }
 
@@ -386,13 +459,8 @@ function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void 
 
       {planned > 0 && (
         <div className="rounded-xl border border-[var(--color-line)] p-4">
-          <div className="mb-2 flex items-baseline justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Hores: fetes vs planificades</span>
-            <span className="text-sm font-semibold">{pct}%</span>
-          </div>
-          <div className="h-3 w-full rounded-full bg-[var(--color-line)]">
-            <div className="h-3 rounded-full bg-[var(--color-accent)]" style={{ width: `${Math.min(100, pct ?? 0)}%` }} />
-          </div>
+          <div className="mb-2 flex items-baseline justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Hores: fetes vs planificades</span><span className="text-sm font-semibold">{pct}%</span></div>
+          <div className="h-3 w-full rounded-full bg-[var(--color-line)]"><div className="h-3 rounded-full bg-[var(--color-accent)]" style={{ width: `${Math.min(100, pct ?? 0)}%` }} /></div>
           <div className="mt-2 text-sm text-[var(--color-muted)]">{fmtHores(actual)} fetes de {fmtHores(planned)} planificades</div>
         </div>
       )}
@@ -400,29 +468,63 @@ function ExpedientInfo({ item, onClose }: { item: PlanItem; onClose: () => void 
       <div>
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Dates de planificació</div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Data inici</label>
-            <input type="date" className="input" value={inici} onChange={(e) => setInici(e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Data final (previsió)</label>
-            <input type="date" className="input" value={final} onChange={(e) => setFinal(e.target.value)} />
-          </div>
+          <div><label className="label">Data inici</label><input type="date" className="input" value={inici} onChange={(e) => setInici(e.target.value)} /></div>
+          <div><label className="label">Data final (previsió)</label><input type="date" className="input" value={final} onChange={(e) => setFinal(e.target.value)} /></div>
         </div>
+        <button type="button" className="btn-primary mt-3 w-full justify-center py-2.5" onClick={saveDates} disabled={pending}>{pending ? "Desant…" : "Desar dates"}</button>
       </div>
 
-      <button type="button" className="btn-primary w-full justify-center py-3 text-base" onClick={save} disabled={pending}>
-        {pending ? "Desant…" : "Desar dates"}
-      </button>
+      {/* Fites */}
+      <div className="rounded-xl border border-[var(--color-line)] p-4">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Fites</div>
+        {fites.length > 0 && (
+          <ul className="mb-3 space-y-1">
+            {fites.slice().sort((a, b) => a.data.localeCompare(b.data)).map((f) => (
+              <li key={f.id} className="flex items-center gap-2 text-sm">
+                <Shape forma={f.forma} color={FITA_COLOR} />
+                <span className="font-medium">{f.nom}</span>
+                <span className="text-[var(--color-muted)] tabular-nums">{fmtShort(f.data)}</span>
+                <button type="button" className="ml-auto text-red-700 hover:underline text-xs" onClick={() => startFita(() => deleteFitaAction(f.id))}>✕</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <label className="label">Fita</label>
+            <select className="input" value={tipusSel} onChange={(e) => setTipusSel(e.target.value)}>
+              <option value="new">Nova fita…</option>
+              {fitaTipus.map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Data</label>
+            <input type="date" className="input" value={fitaData} onChange={(e) => setFitaData(e.target.value)} />
+          </div>
+          {tipusSel === "new" && (
+            <>
+              <div>
+                <label className="label">Nom (ex: Classe)</label>
+                <input className="input" value={novaNom} onChange={(e) => setNovaNom(e.target.value)} placeholder="Nom de la fita" />
+              </div>
+              <div>
+                <label className="label">Forma</label>
+                <div className="flex items-center gap-2">
+                  <select className="input" value={forma} onChange={(e) => setForma(e.target.value)}>
+                    {FORMES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                  <Shape forma={forma} color={FITA_COLOR} size={18} />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <button type="button" className="btn-ghost mt-3" onClick={addFita} disabled={pendingFita}>+ Afegir fita</button>
+      </div>
     </div>
   );
 }
 
 function Info({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-[var(--color-muted)]">{label}</dt>
-      <dd className="mt-0.5">{children ?? value}</dd>
-    </div>
-  );
+  return <div><dt className="text-xs uppercase tracking-wide text-[var(--color-muted)]">{label}</dt><dd className="mt-0.5">{children ?? value}</dd></div>;
 }

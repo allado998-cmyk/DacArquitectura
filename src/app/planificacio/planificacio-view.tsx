@@ -332,9 +332,9 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
       >
         {planned > 0 ? (
           <>
-            <div className="flex items-baseline justify-between gap-1">
-              <span className="text-sm font-bold tabular-nums" style={{ color: pctColor }}>{pct}%</span>
-              <span className="text-[10px] tabular-nums text-[var(--color-muted)]">{hc(actual)}/{hc(planned)}</span>
+            <div className="flex items-baseline justify-between gap-1 text-xs font-bold tabular-nums" style={{ color: pctColor }}>
+              <span>{pct}%</span>
+              <span>{hc(actual)}/{hc(planned)}</span>
             </div>
             <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--color-line)]">
               <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, pct ?? 0)}%`, backgroundColor: pctColor }} />
@@ -342,7 +342,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
           </>
         ) : (
           <div className="text-center leading-tight">
-            <div className="text-sm font-bold tabular-nums text-[var(--color-accent)]">{hc(actual)}</div>
+            <div className="text-xs font-bold tabular-nums text-[var(--color-accent)]">{hc(actual)}</div>
             <div className="text-[10px] text-[var(--color-muted)]">fetes</div>
           </div>
         )}

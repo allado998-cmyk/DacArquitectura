@@ -53,7 +53,9 @@ const MONTHS = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 const COLOR_DO = "#14b8a6"; // docència — turquoise
 const COLOR_DIR = "#dc2626"; // direcció d'obres — vermell
 const COLOR_REST = "#2563eb"; // resta — blau
-const FITA_COLOR = "#7c3aed";
+const FITA_COLOR = "#facc15"; // yellow — high contrast on the bars
+const FITA_GLOW = "drop-shadow(0 0 1px rgba(0,0,0,0.75)) drop-shadow(0 0 4px rgba(250,204,21,0.95))";
+const VISITA_GLOW = "0 0 0 2px #fff, 0 0 7px 2px rgba(31,77,63,0.85)";
 const FORMES: { value: string; label: string }[] = [
   { value: "diamond", label: "Diamant" },
   { value: "circle", label: "Cercle" },
@@ -303,7 +305,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
         {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
         <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
       </button>
-      <div className="relative flex flex-1" style={{ minHeight: 36 }}>
+      <div className="relative flex flex-1" style={{ minHeight: 32 }}>
         {days.map((iso, i) => {
           const wd = parts(iso).dt.getDay();
           const weekend = wd === 0 || wd === 6;
@@ -312,10 +314,10 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
 
         {bar && (
           <>
-            <button type="button" onClick={onOpen} className="absolute top-1/2 h-3 -translate-y-1/2 rounded" style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }} aria-label="Període" />
+            <button type="button" onClick={onOpen} className="absolute top-1/2 h-5 -translate-y-1/2 rounded" style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }} aria-label="Període" />
             {bar.showStart && (
               <div
-                className="absolute top-1/2 z-10 h-4 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
+                className="absolute top-1/2 z-10 h-6 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
                 style={{ left: `${bar.leftPct}%` }}
                 onMouseEnter={() => setTip({ pct: bar!.leftPct, title: "Inici", lines: [fmtLong(it.data_inici!)] })}
                 onMouseLeave={() => setTip(null)}
@@ -326,7 +328,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
             )}
             {bar.showEnd && (
               <div
-                className="absolute top-1/2 z-10 h-4 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
+                className="absolute top-1/2 z-10 h-6 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-default"
                 style={{ left: `${bar.leftPct + bar.widthPct}%` }}
                 onMouseEnter={() => setTip({ pct: bar!.leftPct + bar!.widthPct, title: "Final (previsió)", lines: [fmtLong(it.data_final!)] })}
                 onMouseLeave={() => setTip(null)}
@@ -338,25 +340,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
           </>
         )}
 
-        {/* Fites (top lane) */}
-        {fites.map((f) => {
-          const idx = dayIndex(f.data, start);
-          if (idx < 0 || idx > TOTAL - 1) return null;
-          const pct = ((idx + 0.5) / TOTAL) * 100;
-          return (
-            <span
-              key={f.id}
-              className="absolute top-0.5 z-20 -translate-x-1/2 cursor-default transition hover:scale-125"
-              style={{ left: `${pct}%` }}
-              onMouseEnter={() => setTip({ pct, title: f.nom, lines: [fmtLong(f.data)] })}
-              onMouseLeave={() => setTip(null)}
-            >
-              <Shape forma={f.forma} color={FITA_COLOR} />
-            </span>
-          );
-        })}
-
-        {/* Visites (bottom lane) */}
+        {/* Visites — on the line */}
         {vis.map((v, k) => {
           const idx = dayIndex(v.data, start);
           if (idx < 0 || idx > TOTAL - 1) return null;
@@ -367,10 +351,28 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
               type="button"
               onMouseEnter={() => setTip({ pct, title: "Visita d'obra", lines: [fmtLong(v.data), `${fmtHores(v.hores)}${v.ciutat ? ` · ${v.ciutat}` : ""}`, ...(v.comentari ? [v.comentari] : [])] })}
               onMouseLeave={() => setTip(null)}
-              className="absolute bottom-0.5 z-20 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-[var(--color-accent)] shadow transition hover:scale-150"
-              style={{ left: `${pct}%` }}
+              className="absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-accent)] transition hover:scale-150"
+              style={{ left: `${pct}%`, boxShadow: VISITA_GLOW }}
               aria-label="Visita d'obra"
             />
+          );
+        })}
+
+        {/* Fites — on the line */}
+        {fites.map((f) => {
+          const idx = dayIndex(f.data, start);
+          if (idx < 0 || idx > TOTAL - 1) return null;
+          const pct = ((idx + 0.5) / TOTAL) * 100;
+          return (
+            <span
+              key={f.id}
+              className="absolute top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 cursor-default transition hover:scale-125"
+              style={{ left: `${pct}%`, filter: FITA_GLOW }}
+              onMouseEnter={() => setTip({ pct, title: f.nom, lines: [fmtLong(f.data)] })}
+              onMouseLeave={() => setTip(null)}
+            >
+              <Shape forma={f.forma} color={FITA_COLOR} />
+            </span>
           );
         })}
 

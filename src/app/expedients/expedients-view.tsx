@@ -281,7 +281,7 @@ function ExpedientsList({
       </div>
 
       <div className="table-wrap">
-        <table className="w-full">
+        <table className="table-compact w-full">
           <thead>
             <tr>
               <th className="th w-28">Núm.</th>
@@ -432,7 +432,7 @@ function ExpedientForm({
 
   const calculOpts: ComboOption[] = calculs.map((c) => ({
     id: c.id,
-    label: c.num_proposta ? `${c.num_proposta}${c.projecte ? ` · ${c.projecte}` : ""}` : `#${c.id}`,
+    label: c.num_proposta ? `CH ${c.num_proposta}${c.projecte ? ` · ${c.projecte}` : ""}` : `#${c.id}`,
     sub: formatEur(c.total),
   }));
   const propostaOpts: ComboOption[] = propostes.map((p) => ({

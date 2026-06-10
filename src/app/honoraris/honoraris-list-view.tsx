@@ -94,7 +94,7 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id}>
-                <td className="td text-center font-mono">{r.num_proposta ?? r.id}</td>
+                <td className="td text-center font-mono">CH {r.num_proposta ?? r.id}</td>
                 <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
                 <td className="td text-left">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td text-left">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>

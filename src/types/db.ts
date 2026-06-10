@@ -94,6 +94,10 @@ export interface Expedient {
   tipologia_nom: string | null; // joined
   tipus: ExpedientTipus;
   pressupost: string; // numeric arrives as string from neon
+  pressupost_origen: "manual" | "calcul" | "proposta";
+  calcul_id: number | null;
+  proposta_doc_id: number | null;
+  planned_hores?: string | null; // joined: planned hours from the linked càlcul
   data_inici: string | null; // ISO date, planning start
   data_final: string | null; // ISO date, forecast end (not the close date)
   data_tancament: string | null; // ISO date, set when closed

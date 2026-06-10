@@ -16,6 +16,19 @@ import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, VBarChart } f
 
 type Tab = "llista" | "estadistiques";
 
+export interface CalculOpt {
+  id: number;
+  num_proposta: string | null;
+  projecte: string | null;
+  total: string;
+}
+export interface PropostaOpt {
+  id: number;
+  num: string;
+  descripcio: string | null;
+  total: string;
+}
+
 function todayLocal() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -34,11 +47,15 @@ export function ExpedientsView({
   clients,
   dedicacions,
   tipologies,
+  calculs,
+  propostes,
 }: {
   expedients: Expedient[];
   clients: Client[];
   dedicacions: Dedicacio[];
   tipologies: Tipologia[];
+  calculs: CalculOpt[];
+  propostes: PropostaOpt[];
 }) {
   const [tab, setTab] = useState<Tab>("llista");
   const [, startTransition] = useTransition();
@@ -81,7 +98,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} tipologies={tipologies} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} />}
     </div>
   );
@@ -151,11 +168,15 @@ function ExpedientsList({
   clientOpts,
   dedicByExp,
   tipologies,
+  calculs,
+  propostes,
 }: {
   rows: Expedient[];
   clientOpts: ComboOption[];
   dedicByExp: Map<number, Dedicacio[]>;
   tipologies: Tipologia[];
+  calculs: CalculOpt[];
+  propostes: PropostaOpt[];
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
   const [editing, setEditing] = useState<Expedient | null>(null);
@@ -283,7 +304,7 @@ function ExpedientsList({
         onClose={() => setDetail(null)}
       />
 
-      <ExpedientEditModal row={editing} clientOpts={clientOpts} tipologies={tipologies} onClose={() => setEditing(null)} />
+      <ExpedientEditModal row={editing} clientOpts={clientOpts} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={() => setEditing(null)} />
     </>
   );
 }
@@ -334,11 +355,15 @@ function ExpedientEditModal({
   row,
   clientOpts,
   tipologies,
+  calculs,
+  propostes,
   onClose,
 }: {
   row: Expedient | null;
   clientOpts: ComboOption[];
   tipologies: Tipologia[];
+  calculs: CalculOpt[];
+  propostes: PropostaOpt[];
   onClose: () => void;
 }) {
   return (
@@ -348,7 +373,7 @@ function ExpedientEditModal({
       wide
       title={row && <h3 className="text-base font-semibold">Editar expedient <span className="font-mono">{row.num_expedient}</span></h3>}
     >
-      {row && <ExpedientForm key={row.id} row={row} clientOpts={clientOpts} tipologies={tipologies} onClose={onClose} />}
+      {row && <ExpedientForm key={row.id} row={row} clientOpts={clientOpts} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={onClose} />}
     </Modal>
   );
 }
@@ -357,11 +382,15 @@ function ExpedientForm({
   row,
   clientOpts,
   tipologies,
+  calculs,
+  propostes,
   onClose,
 }: {
   row: Expedient;
   clientOpts: ComboOption[];
   tipologies: Tipologia[];
+  calculs: CalculOpt[];
+  propostes: PropostaOpt[];
   onClose: () => void;
 }) {
   const [num, setNum] = useState(row.num_expedient);
@@ -373,10 +402,29 @@ function ExpedientForm({
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
+  const [origen, setOrigen] = useState(row.pressupost_origen);
+  const [calculId, setCalculId] = useState<number | null>(row.calcul_id);
+  const [propostaDocId, setPropostaDocId] = useState<number | null>(row.proposta_doc_id);
   const [dataInici, setDataInici] = useState(row.data_inici ?? "");
   const [dataFinal, setDataFinal] = useState(row.data_final ?? "");
   const [dataTancament, setDataTancament] = useState(row.data_tancament ?? "");
   const [pending, startTransition] = useTransition();
+
+  const calculOpts: ComboOption[] = calculs.map((c) => ({
+    id: c.id,
+    label: c.num_proposta ? `${c.num_proposta}${c.projecte ? ` · ${c.projecte}` : ""}` : `#${c.id}`,
+    sub: formatEur(c.total),
+  }));
+  const propostaOpts: ComboOption[] = propostes.map((p) => ({
+    id: p.id,
+    label: `${p.num}${p.descripcio ? ` · ${p.descripcio}` : ""}`,
+    sub: formatEur(p.total),
+  }));
+
+  const linkedCalcul = calculs.find((c) => c.id === calculId);
+  const linkedProposta = propostes.find((p) => p.id === propostaDocId);
+  const effectivePressupost =
+    origen === "calcul" ? linkedCalcul?.total ?? "0" : origen === "proposta" ? linkedProposta?.total ?? "0" : pressupost;
 
   function save() {
     if (!num.trim()) return;
@@ -390,6 +438,9 @@ function ExpedientForm({
       estat,
       tipus,
       pressupost: parseFloat(pressupost) || 0,
+      pressupost_origen: origen,
+      calcul_id: calculId,
+      proposta_doc_id: propostaDocId,
       data_inici: dataInici,
       data_final: dataFinal,
       data_tancament: dataTancament,
@@ -444,9 +495,35 @@ function ExpedientForm({
             <option value="public">Públic</option>
           </select>
         </div>
-        <div>
-          <label className="label">Pressupost (€)</label>
-          <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
+        <div className="sm:col-span-2 rounded-lg border border-[var(--color-line)] p-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Origen del pressupost</label>
+              <select className="input" value={origen} onChange={(e) => setOrigen(e.target.value as typeof origen)}>
+                <option value="manual">Manual</option>
+                <option value="calcul">Del càlcul d&apos;honoraris</option>
+                <option value="proposta">De la proposta</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Pressupost (€)</label>
+              {origen === "manual" ? (
+                <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
+              ) : (
+                <div className="input bg-[var(--color-paper)] text-right tabular-nums">{formatEur(effectivePressupost)}</div>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Càlcul d&apos;honoraris</label>
+              <Combobox options={calculOpts} value={calculId} onChange={setCalculId} placeholder="Cerca…" emptyLabel="Cap" overlay />
+            </div>
+            <div>
+              <label className="label">Proposta</label>
+              <Combobox options={propostaOpts} value={propostaDocId} onChange={setPropostaDocId} placeholder="Cerca…" emptyLabel="Cap" overlay />
+            </div>
+          </div>
         </div>
         <div>
           <label className="label">Data inici</label>
@@ -541,11 +618,24 @@ function DedicacioModal({
     >
       {expedient && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <KpiCard label="Hores dedicades" value={fmtHores(total)} accent="#1f4d3f" />
-            <KpiCard label="Dies" value={String(new Set(dedicacions.map((d) => d.data)).size)} accent="#3b82f6" />
-            <KpiCard label="Pressupost" value={formatEur(expedient.pressupost)} accent="#7c3aed" />
-          </div>
+          {(() => {
+            const planned = parseFloat(expedient.planned_hores ?? "0") || 0;
+            const pct = planned > 0 ? Math.round((total / planned) * 100) : null;
+            return (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <KpiCard label="Hores fetes" value={fmtHores(total)} accent="#1f4d3f" />
+                {planned > 0 ? (
+                  <>
+                    <KpiCard label="Hores planificades" value={fmtHores(planned)} accent="#0ea5e9" />
+                    <KpiCard label="% realitzat" value={`${pct}%`} accent="#f59e0b" hint={`${fmtHores(total)} / ${fmtHores(planned)}`} />
+                  </>
+                ) : (
+                  <KpiCard label="Dies" value={String(new Set(dedicacions.map((d) => d.data)).size)} accent="#3b82f6" />
+                )}
+                <KpiCard label="Pressupost" value={formatEur(expedient.pressupost)} accent="#7c3aed" />
+              </div>
+            );
+          })()}
 
           <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
             Dedicació vinculada

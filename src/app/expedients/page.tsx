@@ -3,13 +3,14 @@ import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ExpedientsView } from "./expedients-view";
 import type { Expedient, Client, Dedicacio, Tipologia } from "@/types/db";
+import type { CalculOpt, PropostaOpt } from "./expedients-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExpedientsPage() {
   await requireUser();
 
-  const [expedients, clients, dedicacions, tipologies] = await Promise.all([
+  const [expedients, clients, dedicacions, tipologies, calculs, propostes] = await Promise.all([
     sql`
       select e.id, e.num_expedient, e.projecte, e.client_id,
              c.nom as client_nom,
@@ -17,6 +18,8 @@ export default async function ExpedientsPage() {
              e.tipologia_id, t.nom as tipologia_nom,
              e.tipus,
              e.pressupost::text as pressupost,
+             e.pressupost_origen, e.calcul_id, e.proposta_doc_id,
+             coalesce((select sum(hores) from public.proposta_despesa_directa_line where proposta_id = e.calcul_id), 0)::text as planned_hores,
              to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
              to_char(e.data_final, 'YYYY-MM-DD') as data_final,
              to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,
@@ -35,6 +38,28 @@ export default async function ExpedientsPage() {
       order by data desc, id desc
     ` as unknown as Promise<Dedicacio[]>,
     sql`select id, nom, ordre, created_at from public.tipologies order by ordre, nom` as unknown as Promise<Tipologia[]>,
+    sql`
+      select p.id, p.num_proposta, p.projecte,
+        coalesce(p.total_honoraris_override,
+          case when (100 - coalesce(p.despeses_indirectes_pct,0) - coalesce(p.benefici_pct,0)) > 0
+            then (b.base * 100.0) / (100 - coalesce(p.despeses_indirectes_pct,0) - coalesce(p.benefici_pct,0))
+            else b.base end)::text as total
+      from public.propostes p
+      cross join lateral (
+        select
+          coalesce((select sum(hores*preu_hora) from public.proposta_despesa_directa_line where proposta_id = p.id),0)
+          + coalesce((select sum(adl.unitats*adl.preu_unitat) from public.proposta_altra_despesa_line adl
+              join public.concepte_altra_despesa ca on ca.id = adl.concepte_id
+              where adl.proposta_id = p.id and ca.nom not ilike 'Responsabilitat Civil'),0) as base
+      ) b
+      order by p.num_proposta desc nulls last, p.id desc
+    ` as unknown as Promise<CalculOpt[]>,
+    sql`
+      select d.id, d.num, d.descripcio,
+        coalesce((select sum(preu) from public.proposta_doc_servei where doc_id = d.id),0)::text as total
+      from public.proposta_doc d
+      order by d.num desc nulls last, d.id desc
+    ` as unknown as Promise<PropostaOpt[]>,
   ]);
 
   return (
@@ -45,7 +70,14 @@ export default async function ExpedientsPage() {
         <p className="text-sm text-[var(--color-muted)] mb-6">
           Registre d&apos;expedients del despatx.
         </p>
-        <ExpedientsView expedients={expedients} clients={clients} dedicacions={dedicacions} tipologies={tipologies} />
+        <ExpedientsView
+          expedients={expedients}
+          clients={clients}
+          dedicacions={dedicacions}
+          tipologies={tipologies}
+          calculs={calculs}
+          propostes={propostes}
+        />
       </main>
     </>
   );

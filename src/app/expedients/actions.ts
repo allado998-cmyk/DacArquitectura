@@ -47,7 +47,10 @@ export interface ExpedientPatch {
   categoria: string; // "" means none
   tipologia_id: number | null;
   tipus: string;
-  pressupost: number;
+  pressupost: number; // manual value
+  pressupost_origen: string; // manual | calcul | proposta
+  calcul_id: number | null;
+  proposta_doc_id: number | null;
   data_inici: string; // "" means none
   data_final: string; // "" means none
   data_tancament: string; // "" means none
@@ -55,6 +58,35 @@ export interface ExpedientPatch {
 
 function dateOrNull(v: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+
+// Honoraris càlcul total (excluding Responsabilitat Civil from the base).
+async function calculTotal(calculId: number): Promise<number> {
+  const rows = (await sql`
+    select coalesce(
+      p.total_honoraris_override,
+      case when (100 - coalesce(p.despeses_indirectes_pct,0) - coalesce(p.benefici_pct,0)) > 0
+        then (b.base * 100.0) / (100 - coalesce(p.despeses_indirectes_pct,0) - coalesce(p.benefici_pct,0))
+        else b.base end
+    )::float8 as total
+    from public.propostes p
+    cross join lateral (
+      select
+        coalesce((select sum(hores*preu_hora) from public.proposta_despesa_directa_line where proposta_id = p.id),0)
+        + coalesce((select sum(adl.unitats*adl.preu_unitat) from public.proposta_altra_despesa_line adl
+            join public.concepte_altra_despesa ca on ca.id = adl.concepte_id
+            where adl.proposta_id = p.id and ca.nom not ilike 'Responsabilitat Civil'),0) as base
+    ) b
+    where p.id = ${calculId}
+  `) as { total: number }[];
+  return rows[0]?.total ?? 0;
+}
+
+async function propostaSubtotal(docId: number): Promise<number> {
+  const rows = (await sql`
+    select coalesce(sum(preu),0)::float8 as total from public.proposta_doc_servei where doc_id = ${docId}
+  `) as { total: number }[];
+  return rows[0]?.total ?? 0;
 }
 
 export async function updateExpedientAction(id: number, data: ExpedientPatch) {
@@ -69,6 +101,14 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
   const pressupost = Number.isFinite(data.pressupost) ? data.pressupost : 0;
   const clientId = data.client_id && Number.isFinite(data.client_id) ? data.client_id : null;
   const tipologiaId = data.tipologia_id && Number.isFinite(data.tipologia_id) ? data.tipologia_id : null;
+  const origen = ["manual", "calcul", "proposta"].includes(data.pressupost_origen) ? data.pressupost_origen : "manual";
+  const calculId = data.calcul_id && Number.isFinite(data.calcul_id) ? data.calcul_id : null;
+  const propostaDocId = data.proposta_doc_id && Number.isFinite(data.proposta_doc_id) ? data.proposta_doc_id : null;
+
+  // Effective pressupost: manual value, or derived from the linked càlcul/proposta.
+  let effective = pressupost;
+  if (origen === "calcul" && calculId) effective = await calculTotal(calculId);
+  else if (origen === "proposta" && propostaDocId) effective = await propostaSubtotal(propostaDocId);
 
   await sql`
     update public.expedients set
@@ -80,7 +120,10 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       categoria = ${categoria},
       tipologia_id = ${tipologiaId},
       tipus = ${tipus},
-      pressupost = ${pressupost},
+      pressupost = ${effective},
+      pressupost_origen = ${origen},
+      calcul_id = ${calculId},
+      proposta_doc_id = ${propostaDocId},
       data_inici = ${dateOrNull(data.data_inici)}::date,
       data_final = ${dateOrNull(data.data_final)}::date,
       data_tancament = ${dateOrNull(data.data_tancament)}::date

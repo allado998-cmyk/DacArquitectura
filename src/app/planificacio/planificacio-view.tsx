@@ -46,7 +46,7 @@ export interface FitaTipus {
 }
 
 const LABEL_W = 220;
-const HOURS_W = 78;
+const HOURS_W = 108;
 const BACK_DAYS = 14;
 const FWD_DAYS = 42;
 const TOTAL = BACK_DAYS + FWD_DAYS;
@@ -222,9 +222,8 @@ export function PlanificacioView({
         </div>
         <div className="flex border-b border-[var(--color-line)]">
           <div className="shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" style={{ width: LABEL_W }}>Expedient</div>
-          <div className="shrink-0 border-l border-[var(--color-line)] px-1 py-1 text-center text-[9px] uppercase leading-tight text-[var(--color-muted)]" style={{ width: HOURS_W }}>
-            <div>Fetes</div>
-            <div>Plan.</div>
+          <div className="shrink-0 border-l border-[var(--color-line)] px-2 py-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-muted)]" style={{ width: HOURS_W }}>
+            Hores fet/plan
           </div>
           <div className="flex flex-1">
             {days.map((iso, i) => {
@@ -264,6 +263,8 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string; visites: number; onOpen: () => void }) {
   const color = itemColor(it);
+  const pH = parseFloat(it.planned_hores) || 0;
+  const hPct = pH > 0 ? Math.round(((parseFloat(it.actual_hores) || 0) / pH) * 100) : null;
   const hasDates = !!(it.data_inici && it.data_final);
   let pct = 0;
   if (hasDates) {
@@ -282,8 +283,10 @@ function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string
         {visites > 0 && ` · ${visites} visita${visites === 1 ? "" : "s"} d'obra`}
       </div>
       <div className="mt-1 text-xs">
-        <span className="font-semibold text-[var(--color-accent)]">{hc(it.actual_hores)}</span>
-        <span className="text-[var(--color-muted)]"> fetes / {(parseFloat(it.planned_hores) || 0) > 0 ? hc(it.planned_hores) : "—"} plan.</span>
+        <span className="font-semibold text-[var(--color-accent)]">{hc(it.actual_hores)} fetes</span>
+        {pH > 0 && (
+          <span className="text-[var(--color-muted)]"> / {hc(pH)} plan. · <span className="font-semibold" style={{ color: hPct! > 100 ? "#dc2626" : "var(--color-accent)" }}>{hPct}%</span></span>
+        )}
       </div>
       {hasDates && <div className="mt-2 h-2 w-full rounded-full bg-[var(--color-line)]"><div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} /></div>}
     </button>
@@ -301,6 +304,9 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
   const missing = !it.data_inici || !it.data_final;
   const color = itemColor(it);
   const planned = parseFloat(it.planned_hores) || 0;
+  const actual = parseFloat(it.actual_hores) || 0;
+  const pct = planned > 0 ? Math.round((actual / planned) * 100) : null;
+  const pctColor = pct != null && pct > 100 ? "#dc2626" : "var(--color-accent)";
 
   let bar: { leftPct: number; widthPct: number; showStart: boolean; showEnd: boolean } | null = null;
   if (it.data_inici && it.data_final) {
@@ -320,12 +326,26 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
         <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
       </button>
       <div
-        className="flex shrink-0 flex-col justify-center border-l border-[var(--color-line)] px-1 text-right text-[11px] leading-tight"
+        className="flex shrink-0 flex-col justify-center border-l border-[var(--color-line)] px-2"
         style={{ width: HOURS_W }}
-        title={`Fetes ${fmtHores(it.actual_hores)} / Planificades ${planned > 0 ? fmtHores(planned) : "—"}`}
+        title={`Fetes ${fmtHores(actual)} / Planificades ${planned > 0 ? fmtHores(planned) : "—"}`}
       >
-        <span className="font-semibold tabular-nums text-[var(--color-accent)]">{hc(it.actual_hores)}</span>
-        <span className="tabular-nums text-[var(--color-muted)]">{planned > 0 ? hc(planned) : "—"}</span>
+        {planned > 0 ? (
+          <>
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="text-sm font-bold tabular-nums" style={{ color: pctColor }}>{pct}%</span>
+              <span className="text-[10px] tabular-nums text-[var(--color-muted)]">{hc(actual)}/{hc(planned)}</span>
+            </div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--color-line)]">
+              <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, pct ?? 0)}%`, backgroundColor: pctColor }} />
+            </div>
+          </>
+        ) : (
+          <div className="text-center leading-tight">
+            <div className="text-sm font-bold tabular-nums text-[var(--color-accent)]">{hc(actual)}</div>
+            <div className="text-[10px] text-[var(--color-muted)]">fetes</div>
+          </div>
+        )}
       </div>
       <div className="relative flex flex-1" style={{ minHeight: 32 }}>
         {days.map((iso, i) => {

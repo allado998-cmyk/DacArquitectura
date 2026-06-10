@@ -97,7 +97,7 @@ function fmtHores(v: string | number | null | undefined) {
 }
 function hc(v: string | number | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
-  return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 1 }).format(Math.round((n || 0) * 10) / 10) + "h";
+  return new Intl.NumberFormat("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0) + "h";
 }
 function itemColor(it: PlanItem) {
   if (it.categoria === "do") return COLOR_DO;

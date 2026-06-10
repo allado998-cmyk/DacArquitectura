@@ -79,6 +79,27 @@ export async function deleteClientContacteAction(id: number) {
   revalidatePath("/parameters");
 }
 
+// Standalone contact (no client required).
+export async function createContacteAction(data: { nom: string; telefon: string; mail: string }) {
+  await requireUser();
+  const nom = data.nom.trim();
+  const telefon = data.telefon.trim();
+  const mail = data.mail.trim();
+  if (!nom && !telefon && !mail) return;
+  await sql`
+    insert into public.client_contactes (client_id, nom, telefon, mail)
+    values (null, ${nom || null}, ${telefon || null}, ${mail || null})
+  `;
+  revalidatePath("/parameters");
+}
+
+export async function setContacteClientAction(id: number, clientId: number | null) {
+  await requireUser();
+  const cid = clientId && Number.isFinite(clientId) ? clientId : null;
+  await sql`update public.client_contactes set client_id = ${cid} where id = ${id}`;
+  revalidatePath("/parameters");
+}
+
 // Tipologies ----------------------------------------------------------------
 
 export async function createTipologiaAction(nom: string) {

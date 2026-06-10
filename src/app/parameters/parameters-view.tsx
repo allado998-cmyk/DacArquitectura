@@ -6,12 +6,14 @@ import {
   createClientAction,
   createConcepteAltraAction,
   createConcepteDirectaAction,
+  createContacteAction,
   createTipologiaAction,
   deleteClientAction,
   deleteClientContacteAction,
   deleteConcepteAltraAction,
   deleteConcepteDirectaAction,
   deleteTipologiaAction,
+  setContacteClientAction,
   updateClientAction,
   updateClientContacteAction,
   updateConcepteAltraAction,
@@ -28,9 +30,10 @@ import type {
 } from "@/types/db";
 import { formatEur, formatEurPrecise } from "@/lib/format";
 import { Modal } from "@/components/modal";
+import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
 
-type Tab = "clients" | "directes" | "altres" | "tipologies";
+type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
 
@@ -40,12 +43,14 @@ export function ParametersView({
   conceptesDirectes,
   conceptesAltres,
   tipologies,
+  contactes,
 }: {
   clients: Client[];
   clientStats: ClientStats[];
   conceptesDirectes: ConcepteDespesaDirecta[];
   conceptesAltres: ConcepteAltraDespesa[];
   tipologies: Tipologia[];
+  contactes: ClientContacte[];
 }) {
   const [tab, setTab] = useState<Tab>("clients");
 
@@ -59,16 +64,112 @@ export function ParametersView({
     <div>
       <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
         <TabBtn current={tab} value="clients" onClick={setTab}>Clients ({clients.length})</TabBtn>
+        <TabBtn current={tab} value="contactes" onClick={setTab}>Contactes ({contactes.length})</TabBtn>
         <TabBtn current={tab} value="tipologies" onClick={setTab}>Tipologies ({tipologies.length})</TabBtn>
         <TabBtn current={tab} value="directes" onClick={setTab}>Despeses Directes ({conceptesDirectes.length})</TabBtn>
         <TabBtn current={tab} value="altres" onClick={setTab}>Altres Despeses ({conceptesAltres.length})</TabBtn>
       </div>
 
       {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} />}
+      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} />}
       {tab === "tipologies" && <TipologiesPanel rows={tipologies} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} />}
     </div>
+  );
+}
+
+// ============================================================================
+// Contactes (flat list across all clients + standalone)
+// ============================================================================
+
+function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Client[] }) {
+  const [nom, setNom] = useState("");
+  const [telefon, setTelefon] = useState("");
+  const [mail, setMail] = useState("");
+  const [query, setQuery] = useState("");
+  const [, startTransition] = useTransition();
+
+  const clientOpts: ComboOption[] = clients.map((c) => ({ id: c.id, label: c.nom }));
+
+  const q = query.trim().toLowerCase();
+  const filtered = (q
+    ? rows.filter((r) => `${r.nom ?? ""} ${r.telefon ?? ""} ${r.mail ?? ""} ${r.client_nom ?? ""}`.toLowerCase().includes(q))
+    : rows
+  ).slice().sort((a, b) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca"));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <input className="input max-w-xs" placeholder="Cercar contacte…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!nom.trim() && !telefon.trim() && !mail.trim()) return;
+            startTransition(() => createContacteAction({ nom, telefon, mail }));
+            setNom("");
+            setTelefon("");
+            setMail("");
+          }}
+          className="ml-auto grid grid-cols-2 gap-2 sm:flex"
+        >
+          <input className="input" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} />
+          <input className="input" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+          <input className="input" placeholder="Mail" value={mail} onChange={(e) => setMail(e.target.value)} />
+          <button className="btn-primary" type="submit">+ Afegir</button>
+        </form>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap contacte encara." : "Cap resultat."}</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="th">Nom</th>
+                <th className="th w-40">Telèfon</th>
+                <th className="th">Mail</th>
+                <th className="th w-56">Client</th>
+                <th className="th w-12"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <ContacteFlatRow key={c.id} row={c} clientOpts={clientOpts} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContacteFlatRow({ row, clientOpts }: { row: ClientContacte; clientOpts: ComboOption[] }) {
+  const [nom, setNom] = useState(row.nom ?? "");
+  const [telefon, setTelefon] = useState(row.telefon ?? "");
+  const [mail, setMail] = useState(row.mail ?? "");
+  const [, startTransition] = useTransition();
+
+  function persist() {
+    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "")) {
+      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail }));
+    }
+  }
+
+  return (
+    <tr>
+      <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
+      <td className="td"><input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} /></td>
+      <td className="td"><input className="input" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} /></td>
+      <td className="td">
+        <Combobox options={clientOpts} value={row.client_id} onChange={(v) => startTransition(() => setContacteClientAction(row.id, v))} placeholder="Cerca client…" emptyLabel="Sense client" overlay />
+      </td>
+      <td className="td text-right">
+        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => startTransition(() => deleteClientContacteAction(row.id))}>✕</button>
+      </td>
+    </tr>
   );
 }
 

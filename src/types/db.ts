@@ -19,11 +19,12 @@ export interface Client {
 
 export interface ClientContacte {
   id: number;
-  client_id: number;
+  client_id: number | null;
   nom: string | null;
   telefon: string | null;
   mail: string | null;
   ordre: number;
+  client_nom?: string | null; // joined (Contactes tab)
 }
 
 export interface ConcepteDespesaDirecta {

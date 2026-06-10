@@ -164,6 +164,31 @@ export interface PropostaDocPagament {
   ordre: number;
 }
 
+export interface Factura {
+  id: number;
+  num: string; // YY-XXX
+  client_id: number | null;
+  client_nom?: string | null;
+  nif?: string | null; // from client
+  data: string | null; // ISO date
+  expedient_id: number | null;
+  expedient_num?: string | null;
+  expedient_projecte?: string | null;
+  preu: string;
+  pagada: boolean;
+  suplits_total?: string; // joined sum
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FacturaSuplit {
+  id: number;
+  factura_id: number;
+  descripcio: string | null;
+  import: string;
+  ordre: number;
+}
+
 export interface ClientStats {
   client_id: number;
   n: number;

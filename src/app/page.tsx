@@ -37,6 +37,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Propostes</h2>
             <p className="text-sm text-[var(--color-muted)]">Propostes d'honoraris (document) per al client.</p>
           </Link>
+          <Link href="/facturacio" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Facturació</h2>
+            <p className="text-sm text-[var(--color-muted)]">Factures i seguiment de cobraments.</p>
+          </Link>
           <Link href="/parameters" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Base de Dades</h2>
             <p className="text-sm text-[var(--color-muted)]">Clients i catàlegs de despeses.</p>

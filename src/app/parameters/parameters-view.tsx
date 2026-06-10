@@ -167,7 +167,7 @@ function ContacteFlatRow({ row, clientOpts }: { row: ClientContacte; clientOpts:
         <Combobox options={clientOpts} value={row.client_id} onChange={(v) => startTransition(() => setContacteClientAction(row.id, v))} placeholder="Cerca client…" emptyLabel="Sense client" overlay />
       </td>
       <td className="td text-right">
-        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => startTransition(() => deleteClientContacteAction(row.id))}>✕</button>
+        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }}>✕</button>
       </td>
     </tr>
   );
@@ -485,7 +485,7 @@ function ContacteRow({ row }: { row: ClientContacte }) {
       <input className="input sm:col-span-3" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
       <input className="input sm:col-span-4" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
       <div className="sm:col-span-1 text-right">
-        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => startTransition(() => deleteClientContacteAction(row.id))}>
+        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }}>
           ✕
         </button>
       </div>

@@ -82,7 +82,7 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
                   </td>
                   <td className="td text-center whitespace-nowrap">
                     <Link href={`/propostes/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>
-                    <form action={deletePropostaDocAction} className="inline">
+                    <form action={deletePropostaDocAction} className="inline" onSubmit={(e) => { if (!confirm("Eliminar aquesta proposta?")) e.preventDefault(); }}>
                       <input type="hidden" name="id" value={r.id} />
                       <button type="submit" className="text-red-700 hover:underline text-sm">Eliminar</button>
                     </form>

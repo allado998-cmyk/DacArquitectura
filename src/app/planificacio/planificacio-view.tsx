@@ -528,7 +528,7 @@ function ExpedientInfo({ item, fites, fitaTipus, onClose }: { item: PlanItem; fi
                 <Shape forma={f.forma} color={FITA_COLOR} />
                 <span className="font-medium">{f.nom}</span>
                 <span className="text-[var(--color-muted)] tabular-nums">{fmtShort(f.data)}</span>
-                <button type="button" className="ml-auto text-red-700 hover:underline text-xs" onClick={() => startFita(() => deleteFitaAction(f.id))}>✕</button>
+                <button type="button" className="ml-auto text-red-700 hover:underline text-xs" onClick={() => { if (confirm("Eliminar aquesta fita?")) startFita(() => deleteFitaAction(f.id)); }}>✕</button>
               </li>
             ))}
           </ul>

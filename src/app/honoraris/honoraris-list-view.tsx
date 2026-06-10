@@ -101,7 +101,7 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
                 <td className="td text-center tabular-nums">{formatEur(r.total)}</td>
                 <td className="td text-center whitespace-nowrap">
                   <Link href={`/honoraris/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>
-                  <form action={deletePropostaAction} className="inline">
+                  <form action={deletePropostaAction} className="inline" onSubmit={(e) => { if (!confirm("Eliminar aquest càlcul?")) e.preventDefault(); }}>
                     <input type="hidden" name="id" value={r.id} />
                     <button type="submit" className="text-red-700 hover:underline text-sm">Eliminar</button>
                   </form>

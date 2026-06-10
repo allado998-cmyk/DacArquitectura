@@ -48,6 +48,7 @@ export interface ExpedientPatch {
   tipologia_id: number | null;
   tipus: string;
   direccio_obres: boolean;
+  web: boolean;
   pressupost: number; // manual value
   pressupost_origen: string; // manual | calcul | proposta
   calcul_id: number | null;
@@ -122,6 +123,7 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       tipologia_id = ${tipologiaId},
       tipus = ${tipus},
       direccio_obres = ${!!data.direccio_obres},
+      web = ${!!data.web},
       pressupost = ${effective},
       pressupost_origen = ${origen},
       calcul_id = ${calculId},

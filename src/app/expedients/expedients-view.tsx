@@ -281,6 +281,7 @@ function ExpedientsList({
               <th className="th w-44">Categoria</th>
               <th className="th w-44">Tipologia</th>
               <th className="th w-28">Tipus</th>
+              <th className="th w-16 text-center">Web</th>
               <th className="th w-36 text-right">Pressupost</th>
               <th className="th w-32">Tancat el</th>
               <th className="th w-28">Estat</th>
@@ -292,7 +293,7 @@ function ExpedientsList({
               <ExpedientRow key={r.id} row={r} onOpen={() => setDetail(r)} onEdit={() => setEditing(r)} />
             ))}
             {filtered.length === 0 && (
-              <tr><td className="td text-[var(--color-muted)]" colSpan={11}>Cap resultat.</td></tr>
+              <tr><td className="td text-[var(--color-muted)]" colSpan={12}>Cap resultat.</td></tr>
             )}
           </tbody>
         </table>
@@ -328,6 +329,13 @@ function ExpedientRow({
       <td className="td"><CategoriaBadge code={row.categoria} /></td>
       <td className="td"><TipologiaBadge nom={row.tipologia_nom} /></td>
       <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
+      <td className="td text-center">
+        {row.web ? (
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-green-700" title="Web: sí">✓</span>
+        ) : (
+          <span className="text-[var(--color-muted)]">—</span>
+        )}
+      </td>
       <td className="td text-right tabular-nums">{formatEur(row.pressupost)}</td>
       <td className="td tabular-nums">{fmtDate(row.data_tancament) ?? <span className="text-[var(--color-muted)]">—</span>}</td>
       <td className="td"><Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot /></td>
@@ -402,6 +410,7 @@ function ExpedientForm({
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
   const [direccioObres, setDireccioObres] = useState(row.direccio_obres);
+  const [web, setWeb] = useState(row.web);
   const [pressupost, setPressupost] = useState(row.pressupost);
   const [origen, setOrigen] = useState(row.pressupost_origen);
   const [calculId, setCalculId] = useState<number | null>(row.calcul_id);
@@ -439,6 +448,7 @@ function ExpedientForm({
       estat,
       tipus,
       direccio_obres: direccioObres,
+      web,
       pressupost: parseFloat(pressupost) || 0,
       pressupost_origen: origen,
       calcul_id: calculId,
@@ -504,6 +514,13 @@ function ExpedientForm({
             <option value="si">Sí</option>
           </select>
         </div>
+        <div>
+          <label className="label">Web?</label>
+          <select className="input" value={web ? "si" : "no"} onChange={(e) => setWeb(e.target.value === "si")}>
+            <option value="no">No</option>
+            <option value="si">Sí</option>
+          </select>
+        </div>
         <div className="sm:col-span-2 rounded-lg border border-[var(--color-line)] p-3 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -511,7 +528,7 @@ function ExpedientForm({
               <select className="input" value={origen} onChange={(e) => setOrigen(e.target.value as typeof origen)}>
                 <option value="manual">Manual</option>
                 <option value="calcul">Del càlcul d&apos;honoraris</option>
-                <option value="proposta">De la proposta</option>
+                <option value="proposta">De la proposta d&apos;honoraris</option>
               </select>
             </div>
             <div>
@@ -529,7 +546,7 @@ function ExpedientForm({
               <Combobox options={calculOpts} value={calculId} onChange={setCalculId} placeholder="Cerca…" emptyLabel="Cap" overlay />
             </div>
             <div>
-              <label className="label">Proposta</label>
+              <label className="label">Proposta d&apos;honoraris</label>
               <Combobox options={propostaOpts} value={propostaDocId} onChange={setPropostaDocId} placeholder="Cerca…" emptyLabel="Cap" overlay />
             </div>
           </div>

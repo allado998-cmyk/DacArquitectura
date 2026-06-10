@@ -30,7 +30,7 @@ export default async function PlanificacioPage() {
              d.hores::text as hores, d.comentari, e.ciutat
       from public.dedicacions d
       join public.expedients e on e.id = d.expedient_id
-      where e.estat = 'obert' and e.num_expedient not like '00-%' and d.tasca ilike '%visita%obr%'
+      where e.estat = 'obert' and e.num_expedient not like '00-%' and d.tasca ilike 'Visita direcció d''obres'
     ` as unknown as Promise<Visita[]>,
   ]);
 

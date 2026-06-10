@@ -97,6 +97,12 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
     return map;
   }, [visites, start]);
 
+  const visitCountByExp = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const v of visites) m.set(v.expedient_id, (m.get(v.expedient_id) ?? 0) + 1);
+    return m;
+  }, [visites]);
+
   const doItems = items.filter((it) => it.direccio_obres);
   const restaItems = items.filter((it) => !it.direccio_obres);
   const shown = tab === "do" ? doItems : restaItems;
@@ -118,14 +124,14 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
           <TabBtn active={tab === "resta"} onClick={() => setTab("resta")}>Projectes ({restaItems.length})</TabBtn>
           <TabBtn active={tab === "do"} onClick={() => setTab("do")}>Direcció d&apos;obres ({doItems.length})</TabBtn>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="hidden items-center gap-1 sm:flex">
           <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w - 1)} title="Setmana anterior">‹</button>
           <button type="button" className="btn-ghost px-3 py-1.5 disabled:opacity-50" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>Avui</button>
           <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w + 1)} title="Setmana següent">›</button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--color-muted)]">
+      <div className="hidden flex-wrap items-center gap-4 text-xs text-[var(--color-muted)] sm:flex">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-full border-2 border-white bg-[var(--color-accent)] shadow" /> Visita d&apos;obra
         </span>
@@ -133,7 +139,19 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
         <span className="text-amber-700">⚠ sense dates de planificació</span>
       </div>
 
-      <div className="rounded-2xl border border-[var(--color-line)] bg-white shadow-sm">
+      {/* Mobile: compact list */}
+      <div className="space-y-2 sm:hidden">
+        {shown.length === 0 ? (
+          <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
+        ) : (
+          shown.map((it) => (
+            <MobileRow key={it.id} it={it} today={today} visites={visitCountByExp.get(it.id) ?? 0} onOpen={() => setEditing(it)} />
+          ))
+        )}
+      </div>
+
+      {/* Desktop: gantt */}
+      <div className="hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-sm sm:block">
         {/* Month header */}
         <div className="flex border-b border-[var(--color-line)]">
           <div className="shrink-0" style={{ width: LABEL_W }} />
@@ -177,6 +195,38 @@ export function PlanificacioView({ items, visites, today }: { items: PlanItem[];
 
       <ExpedientInfoModal item={editing} onClose={() => setEditing(null)} />
     </div>
+  );
+}
+
+function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string; visites: number; onOpen: () => void }) {
+  const cat = it.categoria ? CATEGORY_BY_CODE[it.categoria] : null;
+  const color = cat?.color ?? "#1f4d3f";
+  const hasDates = !!(it.data_inici && it.data_final);
+  let pct = 0;
+  if (hasDates) {
+    const span = dayIndex(it.data_final!, it.data_inici!);
+    const elapsed = dayIndex(today, it.data_inici!);
+    pct = span <= 0 ? (elapsed >= 0 ? 100 : 0) : Math.max(0, Math.min(100, (elapsed / span) * 100));
+  }
+  return (
+    <button type="button" onClick={onOpen} className="block w-full rounded-xl border border-[var(--color-line)] bg-white p-3 text-left shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-sm">
+          <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>{" "}
+          {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}
+        </span>
+        {!hasDates && <span className="shrink-0 text-amber-600" title="Sense dates">⚠</span>}
+      </div>
+      <div className="mt-1 text-xs text-[var(--color-muted)]">
+        {hasDates ? `${fmtShort(it.data_inici)} → ${fmtShort(it.data_final)}` : "Sense dates de planificació"}
+        {visites > 0 && ` · ${visites} visita${visites === 1 ? "" : "s"} d'obra`}
+      </div>
+      {hasDates && (
+        <div className="mt-2 h-2 w-full rounded-full bg-[var(--color-line)]">
+          <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+        </div>
+      )}
+    </button>
   );
 }
 

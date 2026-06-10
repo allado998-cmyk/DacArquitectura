@@ -16,7 +16,7 @@ export default async function ExpedientsPage() {
              c.nom as client_nom,
              e.ciutat, e.estat, e.categoria,
              e.tipologia_id, t.nom as tipologia_nom,
-             e.tipus, e.direccio_obres,
+             e.tipus, e.direccio_obres, e.web,
              e.pressupost::text as pressupost,
              e.pressupost_origen, e.calcul_id, e.proposta_doc_id,
              coalesce((select sum(hores) from public.proposta_despesa_directa_line where proposta_id = e.calcul_id), 0)::text as planned_hores,

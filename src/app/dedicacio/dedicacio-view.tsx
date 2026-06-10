@@ -272,7 +272,7 @@ function Last7Days({
   today: string;
   expedientOpts: ComboOption[];
 }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
+  const days = Array.from({ length: 4 }, (_, i) => addDays(today, -i));
   const [editing, setEditing] = useState<Dedicacio | null>(null);
   const [, startTransition] = useTransition();
 
@@ -288,7 +288,7 @@ function Last7Days({
 
   return (
     <div className="card">
-      <h2 className="text-lg font-semibold tracking-tight mb-4">Últims 7 dies</h2>
+      <h2 className="text-lg font-semibold tracking-tight mb-4">Avui i últims dies</h2>
       <div className="space-y-4">
         {days.map((iso) => {
           const items = byDate.get(iso) ?? [];

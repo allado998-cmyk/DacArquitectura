@@ -94,6 +94,8 @@ export interface Expedient {
   tipologia_nom: string | null; // joined
   tipus: ExpedientTipus;
   pressupost: string; // numeric arrives as string from neon
+  data_inici: string | null; // ISO date, planning start
+  data_final: string | null; // ISO date, forecast end (not the close date)
   data_tancament: string | null; // ISO date, set when closed
   created_at: string;
   updated_at: string;

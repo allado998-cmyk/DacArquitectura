@@ -48,7 +48,13 @@ export interface ExpedientPatch {
   tipologia_id: number | null;
   tipus: string;
   pressupost: number;
+  data_inici: string; // "" means none
+  data_final: string; // "" means none
   data_tancament: string; // "" means none
+}
+
+function dateOrNull(v: string): string | null {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 }
 
 export async function updateExpedientAction(id: number, data: ExpedientPatch) {
@@ -63,7 +69,6 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
   const pressupost = Number.isFinite(data.pressupost) ? data.pressupost : 0;
   const clientId = data.client_id && Number.isFinite(data.client_id) ? data.client_id : null;
   const tipologiaId = data.tipologia_id && Number.isFinite(data.tipologia_id) ? data.tipologia_id : null;
-  const dataTancament = /^\d{4}-\d{2}-\d{2}$/.test(data.data_tancament) ? data.data_tancament : null;
 
   await sql`
     update public.expedients set
@@ -76,9 +81,25 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       tipologia_id = ${tipologiaId},
       tipus = ${tipus},
       pressupost = ${pressupost},
-      data_tancament = ${dataTancament}::date
+      data_inici = ${dateOrNull(data.data_inici)}::date,
+      data_final = ${dateOrNull(data.data_final)}::date,
+      data_tancament = ${dateOrNull(data.data_tancament)}::date
     where id = ${id}
   `;
+  revalidatePath("/expedients");
+  revalidatePath("/planificacio");
+}
+
+// Focused update for the Planificació planner (only the planning dates).
+export async function updateExpedientDatesAction(id: number, dataInici: string, dataFinal: string) {
+  await requireUser();
+  await sql`
+    update public.expedients set
+      data_inici = ${dateOrNull(dataInici)}::date,
+      data_final = ${dateOrNull(dataFinal)}::date
+    where id = ${id}
+  `;
+  revalidatePath("/planificacio");
   revalidatePath("/expedients");
 }
 

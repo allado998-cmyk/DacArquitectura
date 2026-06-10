@@ -373,6 +373,8 @@ function ExpedientForm({
   const [estat, setEstat] = useState(row.estat);
   const [tipus, setTipus] = useState(row.tipus);
   const [pressupost, setPressupost] = useState(row.pressupost);
+  const [dataInici, setDataInici] = useState(row.data_inici ?? "");
+  const [dataFinal, setDataFinal] = useState(row.data_final ?? "");
   const [dataTancament, setDataTancament] = useState(row.data_tancament ?? "");
   const [pending, startTransition] = useTransition();
 
@@ -388,6 +390,8 @@ function ExpedientForm({
       estat,
       tipus,
       pressupost: parseFloat(pressupost) || 0,
+      data_inici: dataInici,
+      data_final: dataFinal,
       data_tancament: dataTancament,
     };
     startTransition(async () => {
@@ -443,6 +447,14 @@ function ExpedientForm({
         <div>
           <label className="label">Pressupost (€)</label>
           <input type="number" step="0.01" className="input text-right" value={pressupost} onChange={(e) => setPressupost(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Data inici</label>
+          <input type="date" className="input" value={dataInici} onChange={(e) => setDataInici(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Data final (previsió)</label>
+          <input type="date" className="input" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)} />
         </div>
         <div>
           <label className="label">Estat</label>

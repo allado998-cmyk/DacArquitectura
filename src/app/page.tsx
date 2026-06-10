@@ -21,6 +21,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Expedients</h2>
             <p className="text-sm text-[var(--color-muted)]">Registre d'expedients i estadístiques.</p>
           </Link>
+          <Link href="/planificacio" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Planificació</h2>
+            <p className="text-sm text-[var(--color-muted)]">Planificador temporal dels expedients oberts.</p>
+          </Link>
           <Link href="/dedicacio" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Dedicació</h2>
             <p className="text-sm text-[var(--color-muted)]">Registre d'hores dedicades per expedient.</p>

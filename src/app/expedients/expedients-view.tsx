@@ -186,6 +186,7 @@ function ExpedientsList({
   const [fCategoria, setFCategoria] = useState("");
   const [fTipus, setFTipus] = useState("");
   const [fTipologia, setFTipologia] = useState("");
+  const [fWeb, setFWeb] = useState("");
   const [fEstat, setFEstat] = useState("");
 
   const anys = useMemo(() => Array.from(new Set(rows.map((r) => anyOf(r.num_expedient)))).sort().reverse(), [rows]);
@@ -201,6 +202,7 @@ function ExpedientsList({
     if (fCategoria && (r.categoria ?? "") !== fCategoria) return false;
     if (fTipus && r.tipus !== fTipus) return false;
     if (fTipologia && String(r.tipologia_id ?? "") !== fTipologia) return false;
+    if (fWeb && (fWeb === "si") !== r.web) return false;
     if (fEstat && r.estat !== fEstat) return false;
     if (q) {
       const hay = `${r.num_expedient} ${r.projecte ?? ""} ${r.client_nom ?? ""} ${r.ciutat ?? ""} ${r.tipologia_nom ?? ""} ${r.categoria ?? ""}`.toLowerCase();
@@ -246,6 +248,13 @@ function ExpedientsList({
           </select>
         </div>
         <div>
+          <label className="label">Tipologia</label>
+          <select className="input" value={fTipologia} onChange={(e) => setFTipologia(e.target.value)}>
+            <option value="">Totes</option>
+            {[...tipologies].sort((a, b) => a.nom.localeCompare(b.nom, "ca")).map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="label">Tipus</label>
           <select className="input" value={fTipus} onChange={(e) => setFTipus(e.target.value)}>
             <option value="">Tots</option>
@@ -254,10 +263,11 @@ function ExpedientsList({
           </select>
         </div>
         <div>
-          <label className="label">Tipologia</label>
-          <select className="input" value={fTipologia} onChange={(e) => setFTipologia(e.target.value)}>
-            <option value="">Totes</option>
-            {[...tipologies].sort((a, b) => a.nom.localeCompare(b.nom, "ca")).map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
+          <label className="label">Web</label>
+          <select className="input" value={fWeb} onChange={(e) => setFWeb(e.target.value)}>
+            <option value="">Tots</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
           </select>
         </div>
         <div>

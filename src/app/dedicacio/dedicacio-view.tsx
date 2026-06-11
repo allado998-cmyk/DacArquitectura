@@ -555,6 +555,7 @@ function StatsTab({
   const [fCategoria, setFCategoria] = useState("");
   const [dStart, setDStart] = useState("");
   const [dEnd, setDEnd] = useState("");
+  const [showDetall, setShowDetall] = useState(false);
 
   function quickRange(kind: "dia" | "setmana" | "mes") {
     if (kind === "dia") setDStart(today);
@@ -646,7 +647,7 @@ function StatsTab({
     weekdayAgg[wd].dates.add(d.data);
   }
   const weekdayRows = weekdayAgg.map((w) => ({ label: w.label, total: w.total, avg: w.dates.size ? w.total / w.dates.size : 0 }));
-  const weekdayMax = Math.max(1, ...weekdayRows.map((w) => w.total));
+  const weekdayMaxAvg = Math.max(1, ...weekdayRows.map((w) => w.avg));
 
   return (
     <div className="space-y-6">
@@ -732,7 +733,7 @@ function StatsTab({
       </ChartCard>
 
       {/* Per dia de la setmana */}
-      <ChartCard title="Per dia de la setmana" meta="total i mitjana">
+      <ChartCard title="Per dia de la setmana" meta="mitjana · total">
         <div className="space-y-3">
           {weekdayRows.map((w) => (
             <div key={w.label} className="flex items-center gap-3">
@@ -741,31 +742,35 @@ function StatsTab({
                 <div
                   className="flex h-7 items-center justify-end rounded-full pr-2"
                   style={{
-                    width: `${Math.max((w.total / weekdayMax) * 100, w.total > 0 ? 8 : 0)}%`,
+                    width: `${Math.max((w.avg / weekdayMaxAvg) * 100, w.avg > 0 ? 8 : 0)}%`,
                     background: "linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 100%)",
                   }}
                 >
-                  {w.total > 0 && (
+                  {w.avg > 0 && (
                     <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--color-ink)]">
-                      {fmtHores(w.total)}
+                      {fmtHores(w.avg)}
                     </span>
                   )}
                 </div>
               </div>
               <span className="w-28 shrink-0 text-right text-xs text-[var(--color-muted)] tabular-nums">
-                mitjana {fmtHores(w.avg)}
+                total {fmtHores(w.total)}
               </span>
             </div>
           ))}
         </div>
       </ChartCard>
 
-      {/* Detall */}
-      <ChartCard title="Detall" meta={`${filtered.length} registres`}>
-        {filtered.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
+      {/* Detall (collapsible) */}
+      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-5 shadow-sm">
+        <button type="button" className="flex w-full items-center justify-between" onClick={() => setShowDetall((s) => !s)}>
+          <span className="text-sm font-semibold tracking-tight">Detall <span className="font-normal text-[var(--color-muted)]">({filtered.length} registres)</span></span>
+          <span className="text-sm text-[var(--color-accent)]">{showDetall ? "Amaga ▴" : "Mostra ▾"}</span>
+        </button>
+        {showDetall && (filtered.length === 0 ? (
+          <p className="mt-4 text-sm text-[var(--color-muted)]">Sense dades.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap mt-4">
             <table className="w-full">
               <thead>
                 <tr>
@@ -804,8 +809,8 @@ function StatsTab({
               </tbody>
             </table>
           </div>
-        )}
-      </ChartCard>
+        ))}
+      </div>
     </div>
   );
 }

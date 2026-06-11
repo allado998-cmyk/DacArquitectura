@@ -673,6 +673,13 @@ function DedicacioModal({
             );
           })()}
 
+          {(() => {
+            const visites = dedicacions.filter((d) => (d.tasca ?? "").trim().toLowerCase() === "visita direcció d'obres").length;
+            return visites > 0 ? (
+              <p className="text-sm text-[var(--color-muted)]">Visites d&apos;obra: <span className="font-semibold text-[var(--color-ink)]">{visites}</span></p>
+            ) : null;
+          })()}
+
           <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
             Dedicació vinculada
           </h4>

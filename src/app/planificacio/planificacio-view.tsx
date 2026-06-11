@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Modal } from "@/components/modal";
-import { CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
 import { formatEur } from "@/lib/format";
 import { updateExpedientDatesAction } from "@/app/expedients/actions";
 import { addFitaAction, deleteFitaAction } from "./actions";
@@ -249,7 +248,7 @@ export function PlanificacioView({
         )}
       </div>
 
-      <ExpedientInfoModal item={editing} fites={editing ? fitesByExp.get(editing.id) ?? [] : []} fitaTipus={fitaTipus} onClose={() => setEditing(null)} />
+      <ExpedientInfoModal item={editing} fites={editing ? fitesByExp.get(editing.id) ?? [] : []} fitaTipus={fitaTipus} visites={editing ? visitCountByExp.get(editing.id) ?? 0 : 0} onClose={() => setEditing(null)} />
     </div>
   );
 }
@@ -321,10 +320,19 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
 
   return (
     <div className="flex items-stretch border-b border-[var(--color-line)] last:border-b-0">
-      <button type="button" onClick={onOpen} className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-left hover:bg-[var(--color-paper)]" style={{ width: LABEL_W }}>
-        {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
-        <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
-      </button>
+      <div className="group relative shrink-0" style={{ width: LABEL_W }}>
+        <button type="button" onClick={onOpen} className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left hover:bg-[var(--color-paper)]">
+          {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
+          <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
+        </button>
+        <div className="pointer-events-none absolute left-2 top-full z-40 hidden w-64 origin-top scale-95 rounded-lg border border-[var(--color-line)] bg-white p-3 shadow-xl transition group-hover:block group-hover:scale-100">
+          <div className="text-sm font-semibold leading-snug">{it.projecte ?? "Sense projecte"}</div>
+          <div className="mt-0.5 text-xs text-[var(--color-muted)]">
+            <span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span>
+            {it.client_nom ? <> · {it.client_nom}</> : null}
+          </div>
+        </div>
+      </div>
       <div
         className="flex shrink-0 flex-col justify-center border-l border-[var(--color-line)] px-2"
         style={{ width: HOURS_W }}
@@ -429,7 +437,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
   );
 }
 
-function ExpedientInfoModal({ item, fites, fitaTipus, onClose }: { item: PlanItem | null; fites: Fita[]; fitaTipus: FitaTipus[]; onClose: () => void }) {
+function ExpedientInfoModal({ item, fites, fitaTipus, visites, onClose }: { item: PlanItem | null; fites: Fita[]; fitaTipus: FitaTipus[]; visites: number; onClose: () => void }) {
   return (
     <Modal
       open={item != null}
@@ -439,15 +447,13 @@ function ExpedientInfoModal({ item, fites, fitaTipus, onClose }: { item: PlanIte
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm text-[var(--color-accent)]">{item.num_expedient}</span>
-            <Badge swatch={TIPUS[item.tipus]} label={TIPUS[item.tipus].label} />
-            <Badge swatch={ESTAT.obert} label={ESTAT.obert.label} dot />
             {item.direccio_obres && <span className="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">Direcció d&apos;obres</span>}
           </div>
           <h3 className="text-base font-semibold">{item.projecte ?? "Sense projecte"}</h3>
         </div>
       )}
     >
-      {item && <ExpedientInfo key={item.id} item={item} fites={fites} fitaTipus={fitaTipus} onClose={onClose} />}
+      {item && <ExpedientInfo key={item.id} item={item} fites={fites} fitaTipus={fitaTipus} visites={visites} onClose={onClose} />}
     </Modal>
   );
 }
@@ -456,7 +462,7 @@ function Badge({ swatch, label, dot }: { swatch: { bg: string; text: string; col
   return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap" style={{ backgroundColor: swatch.bg, color: swatch.text }}>{dot && <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: swatch.color }} />}{label}</span>;
 }
 
-function ExpedientInfo({ item, fites, fitaTipus, onClose }: { item: PlanItem; fites: Fita[]; fitaTipus: FitaTipus[]; onClose: () => void }) {
+function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: PlanItem; fites: Fita[]; fitaTipus: FitaTipus[]; visites: number; onClose: () => void }) {
   const [inici, setInici] = useState(item.data_inici ?? "");
   const [final, setFinal] = useState(item.data_final ?? "");
   const [pending, startTransition] = useTransition();
@@ -471,7 +477,6 @@ function ExpedientInfo({ item, fites, fitaTipus, onClose }: { item: PlanItem; fi
   const planned = parseFloat(item.planned_hores) || 0;
   const actual = parseFloat(item.actual_hores) || 0;
   const pct = planned > 0 ? Math.round((actual / planned) * 100) : null;
-  const cat = item.categoria ? CATEGORY_BY_CODE[item.categoria] : null;
 
   function saveDates() {
     startTransition(async () => {
@@ -495,9 +500,8 @@ function ExpedientInfo({ item, fites, fitaTipus, onClose }: { item: PlanItem; fi
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
         <Info label="Client" value={item.client_nom ?? "—"} />
         <Info label="Ciutat" value={item.ciutat ?? "—"} />
-        <Info label="Categoria">{cat ? <Badge swatch={cat} label={cat.label} /> : "—"}</Info>
-        <Info label="Tipologia">{item.tipologia_nom ? <Badge swatch={tipologiaSwatch(item.tipologia_nom)} label={item.tipologia_nom} /> : "—"}</Info>
         <Info label="Pressupost" value={formatEur(item.pressupost)} />
+        <Info label="Visites d'obra" value={String(visites)} />
         <Info label="Tancat el" value={fmtShort(item.data_tancament)} />
       </dl>
 

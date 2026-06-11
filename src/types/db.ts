@@ -166,7 +166,8 @@ export interface PropostaDocPagament {
 
 export interface Factura {
   id: number;
-  num: string; // YY-XXX
+  num: string | null; // YY-XXX (null while "propera")
+  estat: "propera" | "emesa";
   client_id: number | null;
   client_nom?: string | null;
   nif?: string | null; // from client

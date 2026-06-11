@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
-async function nextNum(): Promise<string> {
+export async function nextFacturaNum(): Promise<string> {
   const yy = String(new Date().getFullYear()).slice(-2);
   const rows = (await sql`
     select num from public.factura where num like ${yy + "-%"} order by num desc limit 1
@@ -17,8 +17,8 @@ async function nextNum(): Promise<string> {
 
 export async function createFacturaAction() {
   await requireUser();
-  const num = await nextNum();
-  await sql`insert into public.factura (num, data) values (${num}, current_date)`;
+  // New factures start as "Propera facturació": no number nor date yet.
+  await sql`insert into public.factura (estat) values ('propera')`;
   revalidatePath("/facturacio");
 }
 
@@ -35,6 +35,8 @@ export async function setPagadaAction(id: number, pagada: boolean) {
 }
 
 export interface FacturaPatch {
+  estat: string; // propera | emesa
+  num: string;
   client_id: number | null;
   data: string;
   expedient_id: number | null;
@@ -47,8 +49,13 @@ export async function updateFacturaAction(id: number, patch: FacturaPatch) {
   const expedientId = patch.expedient_id && Number.isFinite(patch.expedient_id) ? patch.expedient_id : null;
   const data = /^\d{4}-\d{2}-\d{2}$/.test(patch.data) ? patch.data : null;
   const preu = Number.isFinite(patch.preu) ? patch.preu : 0;
+  const num = patch.num.trim() || null;
+  // "emesa" requires both a number and a date; otherwise it stays "propera".
+  const estat = patch.estat === "emesa" && num && data ? "emesa" : "propera";
   await sql`
     update public.factura set
+      estat = ${estat},
+      num = ${num},
       client_id = ${clientId},
       data = ${data}::date,
       expedient_id = ${expedientId},

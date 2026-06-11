@@ -41,6 +41,8 @@ export function FacturacioView({
   expedients,
   invoiced,
   suplitSuggestions,
+  suggestedNum,
+  today,
 }: {
   factures: Factura[];
   suplits: FacturaSuplit[];
@@ -48,6 +50,8 @@ export function FacturacioView({
   expedients: ExpedientOpt[];
   invoiced: Invoiced[];
   suplitSuggestions: string[];
+  suggestedNum: string;
+  today: string;
 }) {
   const [tab, setTab] = useState<Tab>("factures");
   const [editing, setEditing] = useState<Factura | null>(null);
@@ -91,6 +95,8 @@ export function FacturacioView({
             expedients={expedients}
             invoicedByExp={invoicedByExp}
             suplitSuggestions={suplitSuggestions}
+            suggestedNum={suggestedNum}
+            today={today}
             onClose={() => setEditing(null)}
           />
         )}
@@ -133,12 +139,14 @@ function FacturesList({ factures, suplitsByFactura, onEdit }: { factures: Factur
             <th className="th w-24">Núm.</th>
             <th className="th w-28">Data</th>
             <th className="th">Client</th>
+            <th className="th w-32">NIF/CIF</th>
             <th className="th">Expedient</th>
-            <th className="th w-32 text-right">Preu</th>
+            <th className="th w-32 text-right">Base</th>
             <th className="th w-28 text-right">IVA</th>
-            <th className="th w-32 text-right">Suplits</th>
+            <th className="th w-32 text-right">Total</th>
+            <th className="th w-28 text-right">Suplits</th>
             <th className="th w-36 text-right">Total final</th>
-            <th className="th w-24 text-center">Estat</th>
+            <th className="th w-28 text-center">Estat</th>
             <th className="th w-24"></th>
           </tr>
         </thead>
@@ -148,18 +156,26 @@ function FacturesList({ factures, suplitsByFactura, onEdit }: { factures: Factur
             const t = totals(n(f.preu), sup);
             return (
               <tr key={f.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onEdit(f)}>
-                <td className="td font-mono text-[var(--color-accent)]">{f.num}</td>
+                <td className="td font-mono text-[var(--color-accent)]">{f.num ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td tabular-nums">{f.data ? formatDataCa(f.data) : "—"}</td>
                 <td className="td">{f.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td">{f.nif ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td">{f.expedient_num ? <span><span className="font-mono">{f.expedient_num}</span> {f.expedient_projecte ?? ""}</span> : <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td text-right tabular-nums">{formatEur(f.preu)}</td>
                 <td className="td text-right tabular-nums text-[var(--color-muted)]">{formatEur(t.iva)}</td>
+                <td className="td text-right tabular-nums">{formatEur(t.total)}</td>
                 <td className="td text-right tabular-nums">{sup ? formatEur(sup) : "—"}</td>
                 <td className="td text-right tabular-nums font-semibold">{formatEur(t.totalFinal)}</td>
-                <td className="td text-center"><PagadaToggle id={f.id} pagada={f.pagada} /></td>
+                <td className="td text-center">
+                  {f.estat === "propera" ? (
+                    <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: "#fef9c3", color: "#854d0e" }}>Propera</span>
+                  ) : (
+                    <PagadaToggle id={f.id} pagada={f.pagada} />
+                  )}
+                </td>
                 <td className="td text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => onEdit(f)}>Editar</button>
-                  <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm(`Eliminar la factura ${f.num}?`)) startTransition(() => deleteFacturaAction(f.id)); }}>Eliminar</button>
+                  <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm(`Eliminar la factura ${f.num ?? ""}?`)) startTransition(() => deleteFacturaAction(f.id)); }}>Eliminar</button>
                 </td>
               </tr>
             );
@@ -177,6 +193,8 @@ function FacturaForm({
   expedients,
   invoicedByExp,
   suplitSuggestions,
+  suggestedNum,
+  today,
   onClose,
 }: {
   factura: Factura;
@@ -185,14 +203,29 @@ function FacturaForm({
   expedients: ExpedientOpt[];
   invoicedByExp: Map<number, number>;
   suplitSuggestions: string[];
+  suggestedNum: string;
+  today: string;
   onClose: () => void;
 }) {
+  const [estat, setEstat] = useState(factura.estat);
+  const [num, setNum] = useState(factura.num ?? "");
   const [clientId, setClientId] = useState<number | null>(factura.client_id);
   const [data, setData] = useState(factura.data ?? "");
   const [expedientId, setExpedientId] = useState<number | null>(factura.expedient_id);
   const [preu, setPreu] = useState(factura.preu);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [pendingSup, startSup] = useTransition();
+
+  const emesa = estat === "emesa";
+
+  function changeEstat(next: string) {
+    setEstat(next as typeof estat);
+    if (next === "emesa") {
+      if (!num.trim()) setNum(suggestedNum);
+      if (!data) setData(today);
+    }
+  }
 
   const client = clients.find((c) => c.id === clientId) ?? null;
   const expedient = expedients.find((e) => e.id === expedientId) ?? null;
@@ -213,7 +246,12 @@ function FacturaForm({
   }
 
   function save() {
-    const patch: FacturaPatch = { client_id: clientId, data, expedient_id: expedientId, preu: parseFloat(preu) || 0 };
+    setError(null);
+    if (emesa && (!num.trim() || !data)) {
+      setError("Una factura emesa necessita un número i una data.");
+      return;
+    }
+    const patch: FacturaPatch = { estat, num, client_id: clientId, data, expedient_id: expedientId, preu: parseFloat(preu) || 0 };
     startTransition(async () => {
       await updateFacturaAction(factura.id, patch);
       onClose();
@@ -229,7 +267,7 @@ function FacturaForm({
       <div style="font-family:Arial,sans-serif;font-size:12px;color:#111;max-width:780px;margin:0 auto;">
         <div style="text-align:right;"><img src="${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg" width="150" style="width:150px;height:auto;"/></div>
         <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1f4d3f;padding-bottom:8px;margin-top:8px;">
-          <div><div style="font-size:18px;font-weight:bold;color:#1f4d3f;">FACTURA ${esc(factura.num)}</div><div style="color:#555;">${factura.data ? formatDataCa(factura.data) : ""}</div></div>
+          <div><div style="font-size:18px;font-weight:bold;color:#1f4d3f;">FACTURA ${esc(num)}</div><div style="color:#555;">${data ? formatDataCa(data) : ""}</div></div>
           <div style="text-align:right;font-size:11px;color:#555;"><strong>${PROFESSIONAL.societat}</strong><br>CIF: ${PROFESSIONAL.cif}<br>${PROFESSIONAL.adreca}<br>${PROFESSIONAL.ciutat}</div>
         </div>
         <div style="margin:14px 0;">
@@ -252,7 +290,7 @@ function FacturaForm({
       </div>`;
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factura ${factura.num}</title><style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factura ${num}</title><style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
@@ -260,6 +298,27 @@ function FacturaForm({
 
   return (
     <div className="space-y-5">
+      <div className="rounded-xl border border-[var(--color-line)] p-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="label">Estat</label>
+            <select className="input" value={estat} onChange={(e) => changeEstat(e.target.value)}>
+              <option value="propera">Propera facturació</option>
+              <option value="emesa">Facturada</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Número {emesa && <span className="text-red-700">*</span>}</label>
+            <input className="input font-mono" placeholder={emesa ? suggestedNum : "—"} value={num} onChange={(e) => setNum(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Data de factura {emesa && <span className="text-red-700">*</span>}</label>
+            <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
+          </div>
+        </div>
+        {!emesa && <p className="mt-2 text-xs text-[var(--color-muted)]">Una factura «Propera facturació» no té número ni data fins que la marques com a «Facturada».</p>}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Client</label>
@@ -270,14 +329,10 @@ function FacturaForm({
           <div className="input bg-[var(--color-paper)]">{client?.nif ?? "—"}</div>
         </div>
         <div>
-          <label className="label">Data de factura</label>
-          <input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} />
-        </div>
-        <div>
           <label className="label">Expedient</label>
           <Combobox options={expedientOpts} value={expedientId} onChange={pickExpedient} placeholder="Cerca expedient…" emptyLabel="Cap" overlay />
         </div>
-        <div className="sm:col-span-2">
+        <div>
           <label className="label">Expedient (nom)</label>
           <div className="input bg-[var(--color-paper)] truncate">{expedient ? `${expedient.num_expedient} · ${expedient.projecte ?? "—"}` : "—"}</div>
         </div>
@@ -318,10 +373,11 @@ function FacturaForm({
         <datalist id="suplit-sugg">{suplitSuggestions.map((d) => <option key={d} value={d} />)}</datalist>
       </div>
 
+      {error && <p className="text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
-        <button type="button" className="btn-ghost" onClick={generar} disabled={pendingSup}>Generar factura</button>
-        <span className="ml-auto"><PagadaToggle id={factura.id} pagada={factura.pagada} /></span>
+        <button type="button" className="btn-ghost disabled:opacity-50" onClick={generar} disabled={pendingSup || !emesa || !num.trim()} title={!emesa ? "Marca-la com a Facturada per generar-la" : undefined}>Generar factura</button>
+        {emesa && <span className="ml-auto"><PagadaToggle id={factura.id} pagada={factura.pagada} /></span>}
       </div>
     </div>
   );
@@ -350,7 +406,7 @@ function SuplitRow({ row }: { row: FacturaSuplit }) {
 // ============================================================================
 
 function StatsPanel({ factures, suplitsByFactura }: { factures: Factura[]; suplitsByFactura: Map<number, FacturaSuplit[]> }) {
-  const rows = factures.map((f) => {
+  const rows = factures.filter((f) => f.estat === "emesa").map((f) => {
     const sup = (suplitsByFactura.get(f.id) ?? []).reduce((s, x) => s + n(x.import), 0);
     const t = totals(n(f.preu), sup);
     return { f, base: n(f.preu), ...t, sup };
@@ -372,7 +428,7 @@ function StatsPanel({ factures, suplitsByFactura }: { factures: Factura[]; supli
   return (
     <div className="space-y-6">
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Factures" value={String(factures.length)} accent="#1f4d3f" hint={`${nPagades} pagades`} />
+        <KpiCard label="Factures emeses" value={String(rows.length)} accent="#1f4d3f" hint={`${nPagades} pagades`} />
         <KpiCard label="Total facturat" value={formatEur(finalTotal)} accent="#0ea5e9" hint="amb IVA i suplits" />
         <KpiCard label="Cobrat" value={formatEur(cobrat)} accent="#16a34a" />
         <KpiCard label="Pendent de cobrament" value={formatEur(pendent)} accent="#dc2626" />

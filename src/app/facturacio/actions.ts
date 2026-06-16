@@ -40,6 +40,8 @@ export interface FacturaPatch {
   client_id: number | null;
   data: string;
   expedient_id: number | null;
+  concepte: string;
+  lang: string; // ca | es
   preu: number;
 }
 
@@ -50,6 +52,8 @@ export async function updateFacturaAction(id: number, patch: FacturaPatch) {
   const data = /^\d{4}-\d{2}-\d{2}$/.test(patch.data) ? patch.data : null;
   const preu = Number.isFinite(patch.preu) ? patch.preu : 0;
   const num = patch.num.trim() || null;
+  const concepte = patch.concepte.trim() || null;
+  const lang = patch.lang === "ca" ? "ca" : "es";
   // "emesa" requires both a number and a date; otherwise it stays "propera".
   const estat = patch.estat === "emesa" && num && data ? "emesa" : "propera";
   await sql`
@@ -59,6 +63,8 @@ export async function updateFacturaAction(id: number, patch: FacturaPatch) {
       client_id = ${clientId},
       data = ${data}::date,
       expedient_id = ${expedientId},
+      concepte = ${concepte},
+      lang = ${lang},
       preu = ${preu}
     where id = ${id}
   `;

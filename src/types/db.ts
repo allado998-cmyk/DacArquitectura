@@ -171,10 +171,15 @@ export interface Factura {
   client_id: number | null;
   client_nom?: string | null;
   nif?: string | null; // from client
+  client_carrer?: string | null; // from client
+  client_ciutat?: string | null; // from client
+  client_codi_postal?: string | null; // from client
   data: string | null; // ISO date
   expedient_id: number | null;
   expedient_num?: string | null;
   expedient_projecte?: string | null;
+  concepte: string | null; // free-text invoice concept
+  lang: "ca" | "es"; // generated document language
   preu: string;
   pagada: boolean;
   suplits_total?: string; // joined sum

@@ -17,7 +17,7 @@ import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 
-export interface ClientOpt { id: number; nom: string; nif: string | null }
+export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
 export interface ExpedientOpt { id: number; num_expedient: string; projecte: string | null; pressupost: string }
 export interface Invoiced { expedient_id: number; total: string }
 
@@ -126,63 +126,137 @@ function PagadaToggle({ id, pagada }: { id: number; pagada: boolean }) {
   );
 }
 
+interface GroupSum { base: number; iva: number; total: number; sup: number; totalFinal: number }
+
+function rowSup(f: Factura, suplitsByFactura: Map<number, FacturaSuplit[]>) {
+  return (suplitsByFactura.get(f.id) ?? []).reduce((s, x) => s + n(x.import), 0);
+}
+function sumGroup(rows: Factura[], suplitsByFactura: Map<number, FacturaSuplit[]>): GroupSum {
+  return rows.reduce<GroupSum>((acc, f) => {
+    const sup = rowSup(f, suplitsByFactura);
+    const t = totals(n(f.preu), sup);
+    acc.base += n(f.preu);
+    acc.iva += t.iva;
+    acc.total += t.total;
+    acc.sup += sup;
+    acc.totalFinal += t.totalFinal;
+    return acc;
+  }, { base: 0, iva: 0, total: 0, sup: 0, totalFinal: 0 });
+}
+
 function FacturesList({ factures, suplitsByFactura, onEdit }: { factures: Factura[]; suplitsByFactura: Map<number, FacturaSuplit[]>; onEdit: (f: Factura) => void }) {
-  const [, startTransition] = useTransition();
+  const [hidePagades, setHidePagades] = useState(false);
   if (factures.length === 0) {
     return <div className="card text-sm text-[var(--color-muted)]">Encara no hi ha cap factura. Crea&apos;n una de nova per començar.</div>;
   }
+
+  const emeses = factures.filter((f) => f.estat === "emesa");
+  const properes = factures.filter((f) => f.estat === "propera");
+  const visibleEmeses = hidePagades ? emeses.filter((f) => !f.pagada) : emeses;
+
+  const emesesSum = sumGroup(visibleEmeses, suplitsByFactura);
+  const properesSum = sumGroup(properes, suplitsByFactura);
+  const nPagades = emeses.filter((f) => f.pagada).length;
+
   return (
-    <div className="table-wrap">
-      <table className="table-compact w-full">
-        <thead>
-          <tr>
-            <th className="th w-24">Núm.</th>
-            <th className="th w-28">Data</th>
-            <th className="th">Client</th>
-            <th className="th w-32">NIF/CIF</th>
-            <th className="th">Expedient</th>
-            <th className="th w-32 text-right">Base</th>
-            <th className="th w-28 text-right">IVA</th>
-            <th className="th w-32 text-right">Total</th>
-            <th className="th w-28 text-right">Suplits</th>
-            <th className="th w-36 text-right">Total final</th>
-            <th className="th w-28 text-center">Estat</th>
-            <th className="th w-24"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {factures.map((f) => {
-            const sup = (suplitsByFactura.get(f.id) ?? []).reduce((s, x) => s + n(x.import), 0);
-            const t = totals(n(f.preu), sup);
-            return (
-              <tr key={f.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onEdit(f)}>
-                <td className="td font-mono text-[var(--color-accent)]">{f.num ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td tabular-nums">{f.data ? formatDataCa(f.data) : "—"}</td>
-                <td className="td">{f.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td">{f.nif ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td">{f.expedient_num ? <span><span className="font-mono">{f.expedient_num}</span> {f.expedient_projecte ?? ""}</span> : <span className="text-[var(--color-muted)]">—</span>}</td>
-                <td className="td text-right tabular-nums">{formatEur(f.preu)}</td>
-                <td className="td text-right tabular-nums text-[var(--color-muted)]">{formatEur(t.iva)}</td>
-                <td className="td text-right tabular-nums">{formatEur(t.total)}</td>
-                <td className="td text-right tabular-nums">{sup ? formatEur(sup) : "—"}</td>
-                <td className="td text-right tabular-nums font-semibold">{formatEur(t.totalFinal)}</td>
-                <td className="td text-center">
-                  {f.estat === "propera" ? (
-                    <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: "#fef9c3", color: "#854d0e" }}>Propera</span>
-                  ) : (
-                    <PagadaToggle id={f.id} pagada={f.pagada} />
-                  )}
-                </td>
-                <td className="td text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                  <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => onEdit(f)}>Editar</button>
-                  <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm(`Eliminar la factura ${f.num ?? ""}?`)) startTransition(() => deleteFacturaAction(f.id)); }}>Eliminar</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {/* Aggregate total */}
+      <div className="card flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+          <span className="text-[var(--color-muted)]">Base: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.base)}</span></span>
+          <span className="text-[var(--color-muted)]">IVA: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.iva)}</span></span>
+          {emesesSum.sup > 0 && <span className="text-[var(--color-muted)]">Suplits: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.sup)}</span></span>}
+          <span className="text-base font-semibold">Total facturat: <span className="tabular-nums text-[var(--color-accent)]">{formatEur(emesesSum.totalFinal)}</span></span>
+          <span className="text-[var(--color-muted)]">({visibleEmeses.length} {visibleEmeses.length === 1 ? "factura" : "factures"})</span>
+        </div>
+        {nPagades > 0 && (
+          <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setHidePagades((v) => !v)}>
+            {hidePagades ? `Mostrar pagades (${nPagades})` : `Amagar pagades (${nPagades})`}
+          </button>
+        )}
+      </div>
+
+      <div className="table-wrap">
+        <table className="table-compact w-full">
+          <thead>
+            <tr>
+              <th className="th w-24">Núm.</th>
+              <th className="th w-28">Data</th>
+              <th className="th">Client</th>
+              <th className="th w-32">NIF/CIF</th>
+              <th className="th">Expedient</th>
+              <th className="th w-32 text-right">Base</th>
+              <th className="th w-28 text-right">IVA</th>
+              <th className="th w-32 text-right">Total</th>
+              <th className="th w-28 text-right">Suplits</th>
+              <th className="th w-36 text-right">Total final</th>
+              <th className="th w-28 text-center">Estat</th>
+              <th className="th w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleEmeses.map((f) => <FacturaRow key={f.id} f={f} suplitsByFactura={suplitsByFactura} onEdit={onEdit} />)}
+            {visibleEmeses.length > 0 && <SubtotalRow label="Total facturat" sum={emesesSum} emphasis />}
+            {visibleEmeses.length === 0 && (
+              <tr><td className="td text-[var(--color-muted)]" colSpan={12}>Cap factura facturada{hidePagades ? " pendent." : "."}</td></tr>
+            )}
+
+            {properes.length > 0 && (
+              <>
+                <tr><td className="td bg-[var(--color-paper)] text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" colSpan={12}>Propera facturació</td></tr>
+                {properes.map((f) => <FacturaRow key={f.id} f={f} suplitsByFactura={suplitsByFactura} onEdit={onEdit} />)}
+                <SubtotalRow label="Total propera facturació" sum={properesSum} />
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
+  );
+}
+
+function FacturaRow({ f, suplitsByFactura, onEdit }: { f: Factura; suplitsByFactura: Map<number, FacturaSuplit[]>; onEdit: (f: Factura) => void }) {
+  const [, startTransition] = useTransition();
+  const sup = rowSup(f, suplitsByFactura);
+  const t = totals(n(f.preu), sup);
+  return (
+    <tr className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onEdit(f)}>
+      <td className="td font-mono text-[var(--color-accent)]">{f.num ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td tabular-nums">{f.data ? formatDataCa(f.data) : "—"}</td>
+      <td className="td">{f.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">{f.nif ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">{f.expedient_num ? <span><span className="font-mono">{f.expedient_num}</span> {f.expedient_projecte ?? ""}</span> : <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td text-right tabular-nums">{formatEur(f.preu)}</td>
+      <td className="td text-right tabular-nums text-[var(--color-muted)]">{formatEur(t.iva)}</td>
+      <td className="td text-right tabular-nums">{formatEur(t.total)}</td>
+      <td className="td text-right tabular-nums">{sup ? formatEur(sup) : "—"}</td>
+      <td className="td text-right tabular-nums font-semibold">{formatEur(t.totalFinal)}</td>
+      <td className="td text-center">
+        {f.estat === "propera" ? (
+          <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: "#fef9c3", color: "#854d0e" }}>Propera</span>
+        ) : (
+          <PagadaToggle id={f.id} pagada={f.pagada} />
+        )}
+      </td>
+      <td className="td text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => onEdit(f)}>Editar</button>
+        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm(`Eliminar la factura ${f.num ?? ""}?`)) startTransition(() => deleteFacturaAction(f.id)); }}>Eliminar</button>
+      </td>
+    </tr>
+  );
+}
+
+function SubtotalRow({ label, sum, emphasis }: { label: string; sum: GroupSum; emphasis?: boolean }) {
+  return (
+    <tr className="bg-[var(--color-paper)] border-t-2 border-[var(--color-line)]">
+      <td className="td font-medium" colSpan={5}>{label}</td>
+      <td className="td text-right tabular-nums font-medium">{formatEur(sum.base)}</td>
+      <td className="td text-right tabular-nums text-[var(--color-muted)]">{formatEur(sum.iva)}</td>
+      <td className="td text-right tabular-nums">{formatEur(sum.total)}</td>
+      <td className="td text-right tabular-nums">{sum.sup ? formatEur(sum.sup) : "—"}</td>
+      <td className={`td text-right tabular-nums font-semibold ${emphasis ? "text-[var(--color-accent)]" : ""}`}>{formatEur(sum.totalFinal)}</td>
+      <td className="td" colSpan={2}></td>
+    </tr>
   );
 }
 
@@ -212,6 +286,8 @@ function FacturaForm({
   const [clientId, setClientId] = useState<number | null>(factura.client_id);
   const [data, setData] = useState(factura.data ?? "");
   const [expedientId, setExpedientId] = useState<number | null>(factura.expedient_id);
+  const [concepte, setConcepte] = useState(factura.concepte ?? "");
+  const [lang, setLang] = useState<"ca" | "es">(factura.lang ?? "es");
   const [preu, setPreu] = useState(factura.preu);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -251,7 +327,7 @@ function FacturaForm({
       setError("Una factura emesa necessita un número i una data.");
       return;
     }
-    const patch: FacturaPatch = { estat, num, client_id: clientId, data, expedient_id: expedientId, preu: parseFloat(preu) || 0 };
+    const patch: FacturaPatch = { estat, num, client_id: clientId, data, expedient_id: expedientId, concepte, lang, preu: parseFloat(preu) || 0 };
     startTransition(async () => {
       await updateFacturaAction(factura.id, patch);
       onClose();
@@ -259,38 +335,75 @@ function FacturaForm({
   }
 
   function generar() {
+    const L = FACT_LABELS[lang];
+    const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+    const fecha = data ? longDate(data, lang) : "";
+    const ciutatProf = PROFESSIONAL.ciutat.replace(/^\d+\s*/, ""); // "08028 Barcelona" → "Barcelona"
+
     const sup = suplits.filter((s) => (s.descripcio ?? "").trim() || n(s.import) > 0);
+    const hasSup = sup.length > 0;
+
+    const row = (label: string, value: string) =>
+      `<tr><td style="padding:3px 14px 3px 0;font-size:10px;font-style:italic;color:#888;white-space:nowrap;vertical-align:top;">${esc(label)}</td><td style="padding:3px 0;font-size:13px;color:#111;">${value}</td></tr>`;
+    const bar = (label: string) =>
+      `<div style="background:#ececec;color:#555;font-size:11px;letter-spacing:.04em;padding:4px 8px;margin:18px 0 8px;">${esc(label)}</div>`;
+
+    const clientCiutat = [client?.codi_postal, client?.ciutat].filter(Boolean).join(" ");
+    const concepteHtml = esc(concepte).replace(/\n/g, "<br>");
+    const expLine = expedient ? `<div style="margin-top:12px;">${esc(L.expedient)} ${esc(expedient.num_expedient)}</div>` : "";
+
     const supRows = sup
-      .map((s) => `<tr><td style="padding:5px 8px;border:1px solid #ddd;">${esc(s.descripcio)}</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(n(s.import))}</td></tr>`)
+      .map((s) => `<tr><td style="padding:4px 8px;font-size:12px;">${esc(s.descripcio) || "—"}</td><td style="padding:4px 8px;text-align:right;font-size:13px;white-space:nowrap;">+ ${eur(n(s.import))}</td></tr>`)
       .join("");
+
+    const econ = `
+      <table style="border-collapse:collapse;width:100%;max-width:430px;">
+        <tr style="border-bottom:1px solid #ccc;"><td style="padding:5px 10px 5px 0;font-size:12px;font-weight:bold;font-style:italic;">${esc(L.base)}</td><td style="padding:5px 0;text-align:right;font-size:15px;font-weight:bold;white-space:nowrap;">${eur(n(preu))}</td></tr>
+        <tr style="border-bottom:1px solid #ccc;"><td style="padding:5px 10px 5px 0;font-size:11px;color:#555;">${esc(L.iva)}</td><td style="padding:5px 0;text-align:right;font-size:13px;white-space:nowrap;">+ ${eur(t.iva)}</td></tr>
+        ${hasSup ? supRows : ""}
+        <tr><td style="padding:6px 10px 6px 0;font-size:12px;font-weight:bold;font-style:italic;">${esc(L.total)}</td><td style="padding:6px 0;text-align:right;font-size:15px;font-weight:bold;white-space:nowrap;">${eur(hasSup ? t.totalFinal : t.total)}</td></tr>
+      </table>`;
+
     const body = `
-      <div style="font-family:Arial,sans-serif;font-size:12px;color:#111;max-width:780px;margin:0 auto;">
-        <div style="text-align:right;"><img src="${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg" width="150" style="width:150px;height:auto;"/></div>
-        <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1f4d3f;padding-bottom:8px;margin-top:8px;">
-          <div><div style="font-size:18px;font-weight:bold;color:#1f4d3f;">FACTURA ${esc(num)}</div><div style="color:#555;">${data ? formatDataCa(data) : ""}</div></div>
-          <div style="text-align:right;font-size:11px;color:#555;"><strong>${PROFESSIONAL.societat}</strong><br>CIF: ${PROFESSIONAL.cif}<br>${PROFESSIONAL.adreca}<br>${PROFESSIONAL.ciutat}</div>
-        </div>
-        <div style="margin:14px 0;">
-          <strong>Client:</strong> ${esc(client?.nom)}${client?.nif ? ` — CIF/NIF: ${esc(client.nif)}` : ""}<br>
-          ${expedient ? `<strong>Expedient:</strong> ${esc(expedient.num_expedient)} ${esc(expedient.projecte)}` : ""}
-        </div>
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="background:#f2f4f2;"><th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Concepte</th><th style="padding:6px 8px;border:1px solid #ddd;text-align:right;width:140px;">Import</th></tr></thead>
-          <tbody>
-            <tr><td style="padding:6px 8px;border:1px solid #ddd;">Honoraris${expedient?.projecte ? ` — ${esc(expedient.projecte)}` : ""}</td><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;">${eur(n(preu))}</td></tr>
-          </tbody>
-          <tfoot>
-            <tr><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">Base imposable</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(n(preu))}</td></tr>
-            <tr><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">IVA (21%)</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(t.iva)}</td></tr>
-            <tr style="font-weight:bold;"><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">Total</td><td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">${eur(t.total)}</td></tr>
-          </tfoot>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;max-width:760px;margin:0 auto;">
+        <div style="text-align:right;margin-bottom:4px;"><img src="${logo}" style="width:170px;height:auto;"/></div>
+
+        ${bar(L.datosProf)}
+        <table style="border-collapse:collapse;">
+          ${row(L.numero, `<strong>${esc(num)}</strong>`)}
+          ${row(L.fecha, esc(fecha))}
+          ${row(L.sociedad, esc(PROFESSIONAL.societat))}
+          ${row("CIF", esc(PROFESSIONAL.cif))}
+          ${row(L.direccion, esc(PROFESSIONAL.adreca))}
+          ${row(L.ciudad, esc(PROFESSIONAL.ciutat))}
         </table>
-        ${supRows ? `<div style="font-weight:bold;margin:14px 0 4px;">Suplits</div><table style="width:100%;border-collapse:collapse;"><tbody>${supRows}</tbody></table>` : ""}
-        <div style="text-align:right;font-size:15px;font-weight:bold;color:#1f4d3f;margin-top:14px;">TOTAL FINAL: ${eur(t.totalFinal)}</div>
+
+        ${bar(L.datosCliente)}
+        <table style="border-collapse:collapse;">
+          ${row(L.cliente, `<strong>${esc(client?.nom) || "—"}</strong>`)}
+          ${client?.nif ? row("CIF", esc(client.nif)) : ""}
+          ${client?.carrer ? row(L.direccion, esc(client.carrer)) : ""}
+          ${clientCiutat ? row(L.ciudad, esc(clientCiutat)) : ""}
+        </table>
+
+        ${bar(L.concepto)}
+        <div style="font-size:13px;line-height:1.5;">${concepteHtml}</div>
+        ${expLine}
+
+        ${bar(L.datosEcon)}
+        ${econ}
+
+        <div style="margin-top:30px;">${esc(ciutatProf)}, ${esc(fecha)}</div>
+        <div style="margin-top:46px;"><strong>${esc(PROFESSIONAL.signatari)}</strong>, <span style="font-style:italic;">${esc(L.rol)}</span><br>${esc(PROFESSIONAL.societat)}</div>
+
+        ${bar(L.formaPago)}
+        <div style="font-size:12px;line-height:1.5;">${esc(L.pagoText)}</div>
+        <div style="margin-top:8px;margin-left:24px;font-size:12px;"><strong>${esc(BANK.nom)}</strong>&nbsp;&nbsp;&nbsp;&nbsp;${esc(BANK.iban)}</div>
       </div>`;
+
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factura ${num}</title><style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num)}</title><style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
@@ -338,6 +451,18 @@ function FacturaForm({
         </div>
       </div>
 
+      {/* Concepte */}
+      <div>
+        <label className="label">Concepte</label>
+        <textarea
+          className="input min-h-[88px] resize-y"
+          placeholder="Descripció del servei facturat… (apareix al cos de la factura generada)"
+          value={concepte}
+          onChange={(e) => setConcepte(e.target.value)}
+        />
+        {expedient && <p className="mt-1 text-xs text-[var(--color-muted)]">S&apos;hi afegirà automàticament: <span className="font-mono">{(lang === "ca" ? "EXPEDIENT DAC:" : "EXPEDIENTE DAC:")} {expedient.num_expedient}</span></p>}
+      </div>
+
       {/* Preu */}
       <div className="rounded-xl border border-[var(--color-line)] p-4 space-y-2">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -376,6 +501,18 @@ function FacturaForm({
       {error && <p className="text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
+        <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-line)] text-sm" title="Idioma de la factura generada">
+          {(["es", "ca"] as const).map((lng) => (
+            <button
+              key={lng}
+              type="button"
+              onClick={() => setLang(lng)}
+              className={`px-3 py-1.5 ${lang === lng ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}
+            >
+              {lng === "es" ? "Castellà" : "Català"}
+            </button>
+          ))}
+        </div>
         <button type="button" className="btn-ghost disabled:opacity-50" onClick={generar} disabled={pendingSup || !emesa || !num.trim()} title={!emesa ? "Marca-la com a Facturada per generar-la" : undefined}>Generar factura</button>
         {emesa && <span className="ml-auto"><PagadaToggle id={factura.id} pagada={factura.pagada} /></span>}
       </div>
@@ -464,4 +601,48 @@ function esc(s: string | null | undefined) {
 }
 function eur(v: number) {
   return new Intl.NumberFormat("ca-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v);
+}
+
+// Generated-invoice document constants ---------------------------------------
+const BANK = { nom: "CAJA DE ARQUITECTOS ARQUIA", iban: "ES66 3183 0801 2010 0250 2225" };
+
+const FACT_LABELS = {
+  es: {
+    datosProf: "DATOS FACTURA PROFESIONAL",
+    numero: "número", fecha: "fecha", sociedad: "sociedad", direccion: "dirección", ciudad: "ciudad",
+    datosCliente: "DATOS CLIENTE", cliente: "cliente",
+    concepto: "CONCEPTO", expedient: "EXPEDIENTE DAC:",
+    datosEcon: "DATOS ECONOMICOS",
+    base: "TOTAL Base Imponible", iva: "+21% IVA", total: "TOTAL",
+    rol: "arq. administrador",
+    formaPago: "FORMA DE PAGO",
+    pagoText: "Para mayor comodidad del cliente, transferencia bancaria, indicando el número de factura, en el siguiente número de cuenta corriente:",
+  },
+  ca: {
+    datosProf: "DADES FACTURA PROFESSIONAL",
+    numero: "número", fecha: "data", sociedad: "societat", direccion: "adreça", ciudad: "ciutat",
+    datosCliente: "DADES CLIENT", cliente: "client",
+    concepto: "CONCEPTE", expedient: "EXPEDIENT DAC:",
+    datosEcon: "DADES ECONÒMIQUES",
+    base: "TOTAL Base imposable", iva: "+21% IVA", total: "TOTAL",
+    rol: "arq. administrador",
+    formaPago: "FORMA DE PAGAMENT",
+    pagoText: "Per a major comoditat del client, transferència bancària, indicant el número de factura, en el següent número de compte corrent:",
+  },
+} as const;
+
+const MONTHS = {
+  es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+  ca: ["gener", "febrer", "març", "abril", "maig", "juny", "juliol", "agost", "setembre", "octubre", "novembre", "desembre"],
+} as const;
+
+function longDate(iso: string, lang: "ca" | "es") {
+  const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return "";
+  const name = MONTHS[lang][m - 1];
+  if (lang === "ca") {
+    const prep = /^[aeiouàèéíòóú]/i.test(name) ? "d'" : "de ";
+    return `${d} ${prep}${name} de ${y}`;
+  }
+  return `${d} de ${name} de ${y}`;
 }

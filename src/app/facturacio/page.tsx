@@ -14,7 +14,9 @@ export default async function FacturacioPage() {
   const [factures, suplits, clients, expedients, invoiced, suplitSugg, suggestedNum] = await Promise.all([
     sql`
       select f.id, f.num, f.estat, to_char(f.data, 'YYYY-MM-DD') as data, f.client_id, c.nom as client_nom, c.nif,
+             c.carrer as client_carrer, c.ciutat as client_ciutat, c.codi_postal as client_codi_postal,
              f.expedient_id, e.num_expedient as expedient_num, e.projecte as expedient_projecte,
+             f.concepte, f.lang,
              f.preu::text as preu, f.pagada,
              coalesce((select sum(import) from public.factura_suplit where factura_id = f.id), 0)::text as suplits_total
       from public.factura f
@@ -23,7 +25,7 @@ export default async function FacturacioPage() {
       order by (f.estat = 'propera') desc, f.num desc nulls last, f.id desc
     ` as unknown as Promise<Factura[]>,
     sql`select id, factura_id, descripcio, import::text as import, ordre from public.factura_suplit order by ordre, id` as unknown as Promise<FacturaSuplit[]>,
-    sql`select id, nom, nif from public.clients order by nom` as unknown as Promise<ClientOpt[]>,
+    sql`select id, nom, nif, carrer, ciutat, codi_postal from public.clients order by nom` as unknown as Promise<ClientOpt[]>,
     sql`select id, num_expedient, projecte, pressupost::text as pressupost from public.expedients order by num_expedient desc` as unknown as Promise<ExpedientOpt[]>,
     sql`select expedient_id, coalesce(sum(preu),0)::text as total from public.factura where expedient_id is not null group by expedient_id` as unknown as Promise<Invoiced[]>,
     sql`select distinct descripcio from public.factura_suplit where descripcio is not null and descripcio <> '' order by descripcio` as unknown as Promise<{ descripcio: string }[]>,

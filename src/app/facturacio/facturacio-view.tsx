@@ -14,7 +14,7 @@ import type { Factura, FacturaSuplit } from "@/types/db";
 import { formatEur, formatDataCa } from "@/lib/format";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
+import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, lighten } from "@/components/charts";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 
 export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
@@ -23,6 +23,12 @@ export interface Invoiced { expedient_id: number; total: string }
 
 const IVA = 0.21;
 type Tab = "factures" | "estadistiques";
+
+// Dashboard accent palette (kept consistent with the Estadístiques tab).
+const C_TOTAL = "#1f4d3f"; // brand green
+const C_BASE = "#0ea5e9"; // sky
+const C_IVA = "#f59e0b"; // amber
+const C_SUP = "#8b5cf6"; // violet
 
 function n(v: string | number | null | undefined) {
   const x = typeof v === "string" ? parseFloat(v) : v ?? 0;
@@ -144,10 +150,89 @@ function sumGroup(rows: Factura[], suplitsByFactura: Map<number, FacturaSuplit[]
   }, { base: 0, iva: 0, total: 0, sup: 0, totalFinal: 0 });
 }
 
+function EyeIcon({ off }: { off?: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  );
+}
+
+function FacturesSummary({
+  sum,
+  count,
+  nPagades,
+  hidePagades,
+  onToggle,
+}: {
+  sum: GroupSum;
+  count: number;
+  nPagades: number;
+  hidePagades: boolean;
+  onToggle: () => void;
+}) {
+  const compTotal = sum.base + sum.iva + sum.sup;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Resum de facturació</h2>
+        {nPagades > 0 && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={hidePagades}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-white px-3 py-1.5 text-sm text-[var(--color-muted)] transition-colors hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-ink)]"
+          >
+            <EyeIcon off={hidePagades} />
+            {hidePagades ? `Mostrar pagades (${nPagades})` : `Amagar pagades (${nPagades})`}
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm" style={{ background: `linear-gradient(135deg, ${lighten(C_TOTAL, 0.18)}, ${C_TOTAL})` }}>
+          <div className="text-xs font-medium uppercase tracking-wide text-white/75">Total facturat</div>
+          <div className="mt-2 text-3xl font-semibold tabular-nums">{formatEur(sum.totalFinal)}</div>
+          <div className="mt-1 text-xs text-white/75">
+            {count} {count === 1 ? "factura" : "factures"}{nPagades > 0 ? ` · ${nPagades} pagades` : ""}
+          </div>
+        </div>
+        <KpiCard label="Base imposable" value={formatEur(sum.base)} accent={C_BASE} />
+        <KpiCard label="IVA (21%)" value={formatEur(sum.iva)} accent={C_IVA} />
+        <KpiCard label="Suplits" value={sum.sup ? formatEur(sum.sup) : "—"} accent={C_SUP} />
+      </div>
+
+      {compTotal > 0 && (
+        <ChartCard title="Composició del total facturat" meta="base · IVA · suplits">
+          <StackedBar
+            total={compTotal}
+            fmt={formatEur}
+            segments={[
+              { label: "Base imposable", value: sum.base, color: C_BASE },
+              { label: "IVA (21%)", value: sum.iva, color: C_IVA },
+              ...(sum.sup > 0 ? [{ label: "Suplits", value: sum.sup, color: C_SUP }] : []),
+            ]}
+          />
+        </ChartCard>
+      )}
+    </div>
+  );
+}
+
 function FacturesList({ factures, suplitsByFactura, onEdit }: { factures: Factura[]; suplitsByFactura: Map<number, FacturaSuplit[]>; onEdit: (f: Factura) => void }) {
   const [hidePagades, setHidePagades] = useState(false);
   if (factures.length === 0) {
-    return <div className="card text-sm text-[var(--color-muted)]">Encara no hi ha cap factura. Crea&apos;n una de nova per començar.</div>;
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--color-line)] bg-white px-6 py-14 text-center">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M8 13h8M8 17h5" /></svg>
+        </div>
+        <p className="text-sm font-medium text-[var(--color-ink)]">Encara no hi ha cap factura</p>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">Crea&apos;n una de nova per començar.</p>
+      </div>
+    );
   }
 
   const emeses = factures.filter((f) => f.estat === "emesa");
@@ -159,22 +244,14 @@ function FacturesList({ factures, suplitsByFactura, onEdit }: { factures: Factur
   const nPagades = emeses.filter((f) => f.pagada).length;
 
   return (
-    <div className="space-y-3">
-      {/* Aggregate total */}
-      <div className="card flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-          <span className="text-[var(--color-muted)]">Base: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.base)}</span></span>
-          <span className="text-[var(--color-muted)]">IVA: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.iva)}</span></span>
-          {emesesSum.sup > 0 && <span className="text-[var(--color-muted)]">Suplits: <span className="tabular-nums text-[var(--color-ink)]">{formatEur(emesesSum.sup)}</span></span>}
-          <span className="text-base font-semibold">Total facturat: <span className="tabular-nums text-[var(--color-accent)]">{formatEur(emesesSum.totalFinal)}</span></span>
-          <span className="text-[var(--color-muted)]">({visibleEmeses.length} {visibleEmeses.length === 1 ? "factura" : "factures"})</span>
-        </div>
-        {nPagades > 0 && (
-          <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setHidePagades((v) => !v)}>
-            {hidePagades ? `Mostrar pagades (${nPagades})` : `Amagar pagades (${nPagades})`}
-          </button>
-        )}
-      </div>
+    <div className="space-y-5">
+      <FacturesSummary
+        sum={emesesSum}
+        count={visibleEmeses.length}
+        nPagades={nPagades}
+        hidePagades={hidePagades}
+        onToggle={() => setHidePagades((v) => !v)}
+      />
 
       <div className="table-wrap">
         <table className="table-compact w-full">

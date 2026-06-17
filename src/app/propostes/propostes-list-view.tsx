@@ -14,11 +14,14 @@ const ESTAT_META: Record<PropostaDocEstat, { label: string; bg: string; text: st
   rebutjada: { label: "Rebutjada", bg: "#fee2e2", text: "#b91c1c" },
 };
 
+const trimOf = (d: string | null | undefined) => (d ? String(Math.ceil(Number(d.slice(5, 7)) / 3)) : "");
+
 export function PropostesListView({ rows }: { rows: Row[] }) {
   const [query, setQuery] = useState("");
-  const [fEstat, setFEstat] = useState("");
-  const [fAny, setFAny] = useState("");
+  const [fAny, setFAny] = useState(String(new Date().getFullYear()));
+  const [fTrim, setFTrim] = useState("");
   const [fClient, setFClient] = useState("");
+  const [fEstat, setFEstat] = useState("");
 
   const anys = useMemo(
     () => Array.from(new Set(rows.map((r) => (r.data ?? "").slice(0, 4)).filter(Boolean))).sort().reverse(),
@@ -31,9 +34,10 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
 
   const q = query.trim().toLowerCase();
   const filtered = rows.filter((r) => {
-    if (fEstat && r.estat !== fEstat) return false;
     if (fAny && (r.data ?? "").slice(0, 4) !== fAny) return false;
+    if (fTrim && trimOf(r.data) !== fTrim) return false;
     if (fClient && (r.client_nom ?? "") !== fClient) return false;
+    if (fEstat && r.estat !== fEstat) return false;
     if (q) {
       const hay = `${r.num} ${r.descripcio ?? ""} ${r.client_nom ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -52,16 +56,26 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-56">
-          <label className="label">Cercar</label>
-          <input className="input" placeholder="Núm., descripció, ciutat…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
         <div>
           <label className="label">Any</label>
           <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
             <option value="">Tots</option>
             {anys.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="label">Trimestre</label>
+          <select className="input" value={fTrim} onChange={(e) => setFTrim(e.target.value)}>
+            <option value="">Tots</option>
+            <option value="1">T1 (gen–mar)</option>
+            <option value="2">T2 (abr–jun)</option>
+            <option value="3">T3 (jul–set)</option>
+            <option value="4">T4 (oct–des)</option>
+          </select>
+        </div>
+        <div className="flex-1 min-w-56">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Núm., descripció, ciutat…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div>
           <label className="label">Client</label>

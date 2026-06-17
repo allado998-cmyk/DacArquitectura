@@ -87,6 +87,7 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
   const [nom, setNom] = useState("");
   const [telefon, setTelefon] = useState("");
   const [mail, setMail] = useState("");
+  const [comentari, setComentari] = useState("");
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
 
@@ -94,7 +95,7 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
 
   const q = query.trim().toLowerCase();
   const filtered = (q
-    ? rows.filter((r) => `${r.nom ?? ""} ${r.telefon ?? ""} ${r.mail ?? ""} ${r.client_nom ?? ""}`.toLowerCase().includes(q))
+    ? rows.filter((r) => `${r.nom ?? ""} ${r.telefon ?? ""} ${r.mail ?? ""} ${r.comentari ?? ""} ${r.client_nom ?? ""}`.toLowerCase().includes(q))
     : rows
   ).slice().sort((a, b) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca"));
 
@@ -105,17 +106,19 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!nom.trim() && !telefon.trim() && !mail.trim()) return;
-            startTransition(() => createContacteAction({ nom, telefon, mail }));
+            if (!nom.trim() && !telefon.trim() && !mail.trim() && !comentari.trim()) return;
+            startTransition(() => createContacteAction({ nom, telefon, mail, comentari }));
             setNom("");
             setTelefon("");
             setMail("");
+            setComentari("");
           }}
           className="ml-auto grid grid-cols-2 gap-2 sm:flex"
         >
           <input className="input" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} />
           <input className="input" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
           <input className="input" placeholder="Mail" value={mail} onChange={(e) => setMail(e.target.value)} />
+          <input className="input" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} />
           <button className="btn-primary" type="submit">+ Afegir</button>
         </form>
       </div>
@@ -130,6 +133,7 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
                 <th className="th">Nom</th>
                 <th className="th w-40">Telèfon</th>
                 <th className="th">Mail</th>
+                <th className="th">Comentari</th>
                 <th className="th w-56">Client</th>
                 <th className="th w-12"></th>
               </tr>
@@ -150,11 +154,12 @@ function ContacteFlatRow({ row, clientOpts }: { row: ClientContacte; clientOpts:
   const [nom, setNom] = useState(row.nom ?? "");
   const [telefon, setTelefon] = useState(row.telefon ?? "");
   const [mail, setMail] = useState(row.mail ?? "");
+  const [comentari, setComentari] = useState(row.comentari ?? "");
   const [, startTransition] = useTransition();
 
   function persist() {
-    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "")) {
-      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail }));
+    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "") || comentari !== (row.comentari ?? "")) {
+      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail, comentari }));
     }
   }
 
@@ -163,6 +168,7 @@ function ContacteFlatRow({ row, clientOpts }: { row: ClientContacte; clientOpts:
       <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
       <td className="td"><input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} /></td>
       <td className="td"><input className="input" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} /></td>
+      <td className="td"><input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} /></td>
       <td className="td">
         <Combobox options={clientOpts} value={row.client_id} onChange={(v) => startTransition(() => setContacteClientAction(row.id, v))} placeholder="Cerca client…" emptyLabel="Sense client" overlay />
       </td>
@@ -285,6 +291,10 @@ function ClientsPanel({
     : rows;
 
   const openClient = rows.find((c) => c.id === openId) ?? null;
+  const ciutats = useMemo(
+    () => Array.from(new Set(rows.map((c) => (c.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [rows],
+  );
 
   return (
     <div className="space-y-4">
@@ -334,7 +344,7 @@ function ClientsPanel({
         </div>
       )}
 
-      <ClientModal client={openClient} stats={openClient ? statsByClient.get(openClient.id) : undefined} onClose={() => setOpenId(null)} />
+      <ClientModal client={openClient} stats={openClient ? statsByClient.get(openClient.id) : undefined} ciutats={ciutats} onClose={() => setOpenId(null)} />
     </div>
   );
 }
@@ -342,10 +352,12 @@ function ClientsPanel({
 function ClientModal({
   client,
   stats,
+  ciutats,
   onClose,
 }: {
   client: Client | null;
   stats?: ClientStats;
+  ciutats: string[];
   onClose: () => void;
 }) {
   return (
@@ -355,7 +367,7 @@ function ClientModal({
       wide
       title={client && <h3 className="text-lg font-semibold tracking-tight">{client.nom}</h3>}
     >
-      {client && <ClientEditor key={client.id} client={client} stats={stats ?? { client_id: client.id, ...EMPTY_STATS }} onDeleted={onClose} />}
+      {client && <ClientEditor key={client.id} client={client} stats={stats ?? { client_id: client.id, ...EMPTY_STATS }} ciutats={ciutats} onDeleted={onClose} />}
     </Modal>
   );
 }
@@ -363,10 +375,12 @@ function ClientModal({
 function ClientEditor({
   client,
   stats,
+  ciutats,
   onDeleted,
 }: {
   client: Client;
   stats: ClientStats;
+  ciutats: string[];
   onDeleted: () => void;
 }) {
   const [nom, setNom] = useState(client.nom);
@@ -414,10 +428,22 @@ function ClientEditor({
           <input className="input" value={carrer} onChange={(e) => setCarrer(e.target.value)} onBlur={persist} />
         </Field>
         <Field label="Ciutat">
-          <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} onBlur={persist} />
+          <input className="input" list="client-ciutats" placeholder="Tria o escriu…" value={ciutat} onChange={(e) => setCiutat(e.target.value)} onBlur={persist} />
+          <datalist id="client-ciutats">
+            {ciutats.map((c) => <option key={c} value={c} />)}
+          </datalist>
         </Field>
         <Field label="Codi postal">
-          <input className="input" value={codiPostal} onChange={(e) => setCodiPostal(e.target.value)} onBlur={persist} />
+          <input
+            className="input"
+            inputMode="numeric"
+            pattern="\d*"
+            maxLength={5}
+            placeholder="08028"
+            value={codiPostal}
+            onChange={(e) => setCodiPostal(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            onBlur={persist}
+          />
         </Field>
       </div>
 
@@ -471,19 +497,21 @@ function ContacteRow({ row }: { row: ClientContacte }) {
   const [nom, setNom] = useState(row.nom ?? "");
   const [telefon, setTelefon] = useState(row.telefon ?? "");
   const [mail, setMail] = useState(row.mail ?? "");
+  const [comentari, setComentari] = useState(row.comentari ?? "");
   const [, startTransition] = useTransition();
 
   function persist() {
-    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "")) {
-      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail }));
+    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "") || comentari !== (row.comentari ?? "")) {
+      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail, comentari }));
     }
   }
 
   return (
     <div className="grid gap-2 sm:grid-cols-12 items-center">
-      <input className="input sm:col-span-4" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-3" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-4" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-3" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-2" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-3" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
+      <input className="input sm:col-span-3" placeholder="Comentari (opcional)" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} />
       <div className="sm:col-span-1 text-right">
         <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }}>
           ✕

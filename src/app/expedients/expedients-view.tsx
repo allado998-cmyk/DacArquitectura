@@ -12,7 +12,7 @@ import { formatEur } from "@/lib/format";
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, VBarChart } from "@/components/charts";
+import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
 
 type Tab = "llista" | "estadistiques";
 
@@ -66,6 +66,15 @@ export function ExpedientsView({
     sub: c.ciutat ?? undefined,
   }));
 
+  // Distinct ciutats already in use (from expedients + clients) — used to offer
+  // a quick-pick dropdown in the form while still allowing free text.
+  const ciutats = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of expedients) if (e.ciutat?.trim()) set.add(e.ciutat.trim());
+    for (const c of clients) if (c.ciutat?.trim()) set.add(c.ciutat.trim());
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ca"));
+  }, [expedients, clients]);
+
   const dedicByExp = useMemo(() => {
     const map = new Map<number, Dedicacio[]>();
     for (const d of dedicacions) {
@@ -98,7 +107,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} />}
     </div>
   );
@@ -166,6 +175,7 @@ function TipologiaBadge({ nom }: { nom: string | null }) {
 function ExpedientsList({
   rows,
   clientOpts,
+  ciutats,
   dedicByExp,
   tipologies,
   calculs,
@@ -173,6 +183,7 @@ function ExpedientsList({
 }: {
   rows: Expedient[];
   clientOpts: ComboOption[];
+  ciutats: string[];
   dedicByExp: Map<number, Dedicacio[]>;
   tipologies: Tipologia[];
   calculs: CalculOpt[];
@@ -315,7 +326,7 @@ function ExpedientsList({
         onClose={() => setDetail(null)}
       />
 
-      <ExpedientEditModal row={editing} clientOpts={clientOpts} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={() => setEditing(null)} />
+      <ExpedientEditModal row={editing} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={() => setEditing(null)} />
     </>
   );
 }
@@ -372,6 +383,7 @@ function ExpedientRow({
 function ExpedientEditModal({
   row,
   clientOpts,
+  ciutats,
   tipologies,
   calculs,
   propostes,
@@ -379,6 +391,7 @@ function ExpedientEditModal({
 }: {
   row: Expedient | null;
   clientOpts: ComboOption[];
+  ciutats: string[];
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
@@ -391,7 +404,7 @@ function ExpedientEditModal({
       wide
       title={row && <h3 className="text-base font-semibold">Editar expedient <span className="font-mono">{row.num_expedient}</span></h3>}
     >
-      {row && <ExpedientForm key={row.id} row={row} clientOpts={clientOpts} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={onClose} />}
+      {row && <ExpedientForm key={row.id} row={row} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={onClose} />}
     </Modal>
   );
 }
@@ -399,6 +412,7 @@ function ExpedientEditModal({
 function ExpedientForm({
   row,
   clientOpts,
+  ciutats,
   tipologies,
   calculs,
   propostes,
@@ -406,6 +420,7 @@ function ExpedientForm({
 }: {
   row: Expedient;
   clientOpts: ComboOption[];
+  ciutats: string[];
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
@@ -490,7 +505,10 @@ function ExpedientForm({
         </div>
         <div>
           <label className="label">Ciutat</label>
-          <input className="input" value={ciutat} onChange={(e) => setCiutat(e.target.value)} placeholder="Ciutat" />
+          <input className="input" list="ciutats-list" value={ciutat} onChange={(e) => setCiutat(e.target.value)} placeholder="Tria o escriu una ciutat…" />
+          <datalist id="ciutats-list">
+            {ciutats.map((c) => <option key={c} value={c} />)}
+          </datalist>
         </div>
         <div>
           <label className="label">Categoria</label>
@@ -725,7 +743,7 @@ function anyOf(num: string): string {
 }
 
 function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipologia[] }) {
-  const [fAny, setFAny] = useState("");
+  const [fAny, setFAny] = useState(String(new Date().getFullYear()));
   const [fEstat, setFEstat] = useState("");
   const [fCategoria, setFCategoria] = useState("");
   const [fTipologia, setFTipologia] = useState("");
@@ -770,14 +788,15 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
   const pressupostMitja = total ? pressupostTotal / total : 0;
 
   const byCiutat = groupBy(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
-  const byAny = groupBy(filtered, (r) => anyOf(r.num_expedient)).sort((a, b) => a.key.localeCompare(b.key));
-  const catGroups = CATEGORIES.map((c) => ({
-    code: c.code,
+  const byTipologia = groupBy(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
+  // Pressupost split by category — drives the category donut.
+  const catPressupost = CATEGORIES.map((c) => ({
     label: c.label,
     color: c.color,
-    count: filtered.filter((r) => r.categoria === c.code).length,
-  })).filter((g) => g.count > 0);
-  const byTipologia = groupBy(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
+    value: filtered.filter((r) => r.categoria === c.code).reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0),
+  })).filter((g) => g.value > 0);
+  const senseCatPress = filtered.filter((r) => !r.categoria).reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
+  if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", value: senseCatPress });
 
   return (
     <div className="space-y-6">
@@ -825,41 +844,44 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
         </ChartCard>
       </div>
 
-      {/* Pressupost per tipus */}
-      <ChartCard title="Pressupost per tipus" meta="% del total">
-        {pressupostTotal === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
-        ) : (
-          <StackedBar
-            segments={[
-              { label: "Privat", value: pressupostPrivat, color: TIPUS.privat.color },
-              { label: "Públic", value: pressupostPublic, color: TIPUS.public.color },
-            ]}
-            total={pressupostTotal}
-            fmt={formatEur}
-          />
-        )}
-      </ChartCard>
-
-      {/* Categoria */}
-      <ChartCard title="Expedients per categoria" meta="nombre">
-        <VBarChart bars={catGroups.map((g) => ({ label: g.label, value: g.count, color: g.color, display: String(g.count) }))} />
-      </ChartCard>
+      {/* Pressupost per tipus + per categoria (donuts) */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ChartCard title="Pressupost per tipus" meta="privat / públic">
+          {pressupostTotal === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
+          ) : (
+            <GradientDonut
+              segments={[
+                { label: "Privat", value: Math.round(pressupostPrivat), color: TIPUS.privat.color, note: formatEur(pressupostPrivat) },
+                { label: "Públic", value: Math.round(pressupostPublic), color: TIPUS.public.color, note: formatEur(pressupostPublic) },
+              ]}
+              centerValue={formatEur(pressupostTotal)}
+              centerLabel="pressupost"
+            />
+          )}
+        </ChartCard>
+        <ChartCard title="Pressupost per categoria" meta="import · % del total">
+          {catPressupost.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
+          ) : (
+            <GradientDonut
+              segments={catPressupost.map((g) => ({ label: g.label, value: Math.round(g.value), color: g.color, note: formatEur(g.value) }))}
+              centerValue={formatEur(pressupostTotal)}
+              centerLabel="pressupost"
+            />
+          )}
+        </ChartCard>
+      </div>
 
       {/* Tipologia */}
       <ChartCard title="Expedients per tipologia" meta="nombre">
         <HBarChart bars={byTipologia.map((g) => ({ label: g.key, value: g.count, color: tipologiaSwatch(g.key).color, display: String(g.count) }))} />
       </ChartCard>
 
-      {/* Ciutat + Any */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Expedients per ciutat" meta="nombre">
-          <HBarChart bars={byCiutat.map((g) => ({ label: g.key, value: g.count, color: "#6366f1", display: String(g.count) }))} />
-        </ChartCard>
-        <ChartCard title="Expedients per any" meta="nombre">
-          <VBarChart bars={byAny.map((g) => ({ label: g.key, value: g.count, color: "#1f4d3f", display: String(g.count) }))} />
-        </ChartCard>
-      </div>
+      {/* Ciutat */}
+      <ChartCard title="Expedients per ciutat" meta="nombre">
+        <HBarChart bars={byCiutat.map((g) => ({ label: g.key, value: g.count, color: "#6366f1", display: String(g.count) }))} />
+      </ChartCard>
     </div>
   );
 }

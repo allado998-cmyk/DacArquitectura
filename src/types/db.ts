@@ -23,6 +23,7 @@ export interface ClientContacte {
   nom: string | null;
   telefon: string | null;
   mail: string | null;
+  comentari: string | null;
   ordre: number;
   client_nom?: string | null; // joined (Contactes tab)
 }
@@ -178,9 +179,13 @@ export interface Factura {
   expedient_id: number | null;
   expedient_num?: string | null;
   expedient_projecte?: string | null;
+  expedient_categoria?: string | null; // from linked expedient
+  expedient_tipus?: "privat" | "public" | null; // from linked expedient
+  expedient_tipologia?: string | null; // tipologia nom, from linked expedient
   concepte: string | null; // free-text invoice concept
   lang: "ca" | "es"; // generated document language
   preu: string;
+  iva_pct: string; // VAT rate, default 21
   pagada: boolean;
   suplits_total?: string; // joined sum
   created_at: string;
@@ -188,6 +193,14 @@ export interface Factura {
 }
 
 export interface FacturaSuplit {
+  id: number;
+  factura_id: number;
+  descripcio: string | null;
+  import: string;
+  ordre: number;
+}
+
+export interface FacturaConcepte {
   id: number;
   factura_id: number;
   descripcio: string | null;

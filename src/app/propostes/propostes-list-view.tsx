@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { deletePropostaDocAction } from "./actions";
 import { formatDataCa } from "@/lib/format";
 import type { PropostaDoc, PropostaDocEstat } from "@/types/db";
@@ -17,10 +17,23 @@ const ESTAT_META: Record<PropostaDocEstat, { label: string; bg: string; text: st
 export function PropostesListView({ rows }: { rows: Row[] }) {
   const [query, setQuery] = useState("");
   const [fEstat, setFEstat] = useState("");
+  const [fAny, setFAny] = useState("");
+  const [fClient, setFClient] = useState("");
+
+  const anys = useMemo(
+    () => Array.from(new Set(rows.map((r) => (r.data ?? "").slice(0, 4)).filter(Boolean))).sort().reverse(),
+    [rows],
+  );
+  const clients = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.client_nom ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [rows],
+  );
 
   const q = query.trim().toLowerCase();
   const filtered = rows.filter((r) => {
     if (fEstat && r.estat !== fEstat) return false;
+    if (fAny && (r.data ?? "").slice(0, 4) !== fAny) return false;
+    if (fClient && (r.client_nom ?? "") !== fClient) return false;
     if (q) {
       const hay = `${r.num} ${r.descripcio ?? ""} ${r.client_nom ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -42,6 +55,20 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
         <div className="flex-1 min-w-56">
           <label className="label">Cercar</label>
           <input className="input" placeholder="Núm., descripció, ciutat…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Any</label>
+          <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
+            <option value="">Tots</option>
+            {anys.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Client</label>
+          <select className="input" value={fClient} onChange={(e) => setFClient(e.target.value)}>
+            <option value="">Tots</option>
+            {clients.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
         <div>
           <label className="label">Estat</label>

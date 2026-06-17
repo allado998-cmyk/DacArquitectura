@@ -209,9 +209,6 @@ export function HonorarisView({
           <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Tots els càlculs</Link>
           <h1 className="text-2xl font-semibold tracking-tight mt-1">Càlcul {proposta.num_proposta}</h1>
         </div>
-        <Link href="/parameters" className="text-sm text-[var(--color-accent)] hover:underline">
-          Base de Dades →
-        </Link>
       </div>
 
       {/* ============ Header ============ */}

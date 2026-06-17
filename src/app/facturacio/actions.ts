@@ -15,11 +15,13 @@ export async function nextFacturaNum(): Promise<string> {
   return `${yy}-${String(next).padStart(3, "0")}`;
 }
 
-export async function createFacturaAction() {
+export async function createFacturaAction(): Promise<number> {
   await requireUser();
-  // New factures start as "Propera facturació": no number nor date yet.
-  await sql`insert into public.factura (estat) values ('propera')`;
+  // New factures start as "Propera facturació": no number nor date yet. The
+  // caller opens the edit popup straight away so it can be filled in.
+  const rows = (await sql`insert into public.factura (estat) values ('propera') returning id`) as { id: number }[];
   revalidatePath("/facturacio");
+  return rows[0]?.id ?? 0;
 }
 
 export async function deleteFacturaAction(id: number) {
@@ -43,6 +45,7 @@ export interface FacturaPatch {
   concepte: string;
   lang: string; // ca | es
   preu: number;
+  iva_pct: number;
 }
 
 export async function updateFacturaAction(id: number, patch: FacturaPatch) {
@@ -51,11 +54,16 @@ export async function updateFacturaAction(id: number, patch: FacturaPatch) {
   const expedientId = patch.expedient_id && Number.isFinite(patch.expedient_id) ? patch.expedient_id : null;
   const data = /^\d{4}-\d{2}-\d{2}$/.test(patch.data) ? patch.data : null;
   const preu = Number.isFinite(patch.preu) ? patch.preu : 0;
+  const ivaPct = Number.isFinite(patch.iva_pct) && patch.iva_pct >= 0 ? patch.iva_pct : 21;
   const num = patch.num.trim() || null;
   const concepte = patch.concepte.trim() || null;
   const lang = patch.lang === "ca" ? "ca" : "es";
   // "emesa" requires both a number and a date; otherwise it stays "propera".
   const estat = patch.estat === "emesa" && num && data ? "emesa" : "propera";
+  // If the factura is broken down into concept lines, its base is their sum;
+  // otherwise the manual preu from the form wins.
+  const concRows = (await sql`select coalesce(sum(import), 0)::float8 as s, count(*)::int as n from public.factura_concepte where factura_id = ${id}`) as { s: number; n: number }[];
+  const effectivePreu = concRows[0]?.n > 0 ? concRows[0].s : preu;
   await sql`
     update public.factura set
       estat = ${estat},
@@ -65,9 +73,51 @@ export async function updateFacturaAction(id: number, patch: FacturaPatch) {
       expedient_id = ${expedientId},
       concepte = ${concepte},
       lang = ${lang},
-      preu = ${preu}
+      preu = ${effectivePreu},
+      iva_pct = ${ivaPct}
     where id = ${id}
   `;
+  revalidatePath("/facturacio");
+}
+
+// Base concepte breakdown -----------------------------------------------------
+// When a factura has concept lines, its base `preu` is the sum of them.
+
+async function recomputePreuFromConceptes(facturaId: number) {
+  await sql`
+    update public.factura f
+    set preu = coalesce((select sum(import) from public.factura_concepte where factura_id = ${facturaId}), f.preu)
+    where f.id = ${facturaId}
+      and exists (select 1 from public.factura_concepte where factura_id = ${facturaId})
+  `;
+}
+
+export async function addConcepteAction(facturaId: number) {
+  await requireUser();
+  await sql`
+    insert into public.factura_concepte (factura_id, ordre)
+    values (${facturaId}, coalesce((select max(ordre) + 10 from public.factura_concepte where factura_id = ${facturaId}), 10))
+  `;
+  await recomputePreuFromConceptes(facturaId);
+  revalidatePath("/facturacio");
+}
+
+export async function updateConcepteAction(id: number, descripcio: string, importe: number) {
+  await requireUser();
+  const rows = (await sql`
+    update public.factura_concepte
+    set descripcio = ${descripcio.trim() || null}, import = ${Number.isFinite(importe) ? importe : 0}
+    where id = ${id}
+    returning factura_id
+  `) as { factura_id: number }[];
+  if (rows[0]) await recomputePreuFromConceptes(rows[0].factura_id);
+  revalidatePath("/facturacio");
+}
+
+export async function deleteConcepteAction(id: number) {
+  await requireUser();
+  const rows = (await sql`delete from public.factura_concepte where id = ${id} returning factura_id`) as { factura_id: number }[];
+  if (rows[0]) await recomputePreuFromConceptes(rows[0].factura_id);
   revalidatePath("/facturacio");
 }
 

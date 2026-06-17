@@ -232,7 +232,7 @@ export function PropostaEditView({
           </dl>
         )}
         <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Les dades es prenen del client a <a href="/parameters" className="underline">Base de Dades</a>.
+          Les dades es prenen del client seleccionat.
         </p>
       </section>
 

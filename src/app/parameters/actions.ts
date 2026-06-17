@@ -60,14 +60,15 @@ export async function addClientContacteAction(clientId: number) {
 
 export async function updateClientContacteAction(
   id: number,
-  data: { nom: string; telefon: string; mail: string },
+  data: { nom: string; telefon: string; mail: string; comentari?: string },
 ) {
   await requireUser();
   await sql`
     update public.client_contactes set
       nom = ${data.nom.trim() || null},
       telefon = ${data.telefon.trim() || null},
-      mail = ${data.mail.trim() || null}
+      mail = ${data.mail.trim() || null},
+      comentari = ${(data.comentari ?? "").trim() || null}
     where id = ${id}
   `;
   revalidatePath("/parameters");
@@ -80,15 +81,16 @@ export async function deleteClientContacteAction(id: number) {
 }
 
 // Standalone contact (no client required).
-export async function createContacteAction(data: { nom: string; telefon: string; mail: string }) {
+export async function createContacteAction(data: { nom: string; telefon: string; mail: string; comentari?: string }) {
   await requireUser();
   const nom = data.nom.trim();
   const telefon = data.telefon.trim();
   const mail = data.mail.trim();
-  if (!nom && !telefon && !mail) return;
+  const comentari = (data.comentari ?? "").trim();
+  if (!nom && !telefon && !mail && !comentari) return;
   await sql`
-    insert into public.client_contactes (client_id, nom, telefon, mail)
-    values (null, ${nom || null}, ${telefon || null}, ${mail || null})
+    insert into public.client_contactes (client_id, nom, telefon, mail, comentari)
+    values (null, ${nom || null}, ${telefon || null}, ${mail || null}, ${comentari || null})
   `;
   revalidatePath("/parameters");
 }

@@ -5,7 +5,7 @@ import { createDedicacioAction, deleteDedicacioAction, updateDedicacioAction } f
 import type { Dedicacio, Expedient } from "@/types/db";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { CATEGORIES, CATEGORY_BY_CODE } from "@/lib/expedients";
+import { CATEGORIES } from "@/lib/expedients";
 import { ChartCard, HBarChart, KpiCard, VBarChart } from "@/components/charts";
 
 const ACCENT_RGB = "31, 77, 63";
@@ -300,7 +300,7 @@ function Last7Days({
                   {formatDataMig(iso)}
                   {iso === today && <span className="ml-1 text-xs">(avui)</span>}
                 </div>
-                <div className="text-xs text-[var(--color-muted)] tabular-nums">{sum ? fmtHores(sum) : "—"}</div>
+                <div className={`text-base font-semibold tabular-nums ${sum ? "text-[var(--color-accent)]" : "text-[var(--color-muted)]"}`}>{sum ? fmtHores(sum) : "—"}</div>
               </div>
               <div>
                 {items.length === 0 ? (
@@ -549,13 +549,12 @@ function StatsTab({
   expedients: Expedient[];
   today: string;
 }) {
-  const [fAny, setFAny] = useState("");
+  const [fAny, setFAny] = useState(today.slice(0, 4));
   const [fExpedient, setFExpedient] = useState<number | null>(null);
   const [fClient, setFClient] = useState("");
   const [fCategoria, setFCategoria] = useState("");
   const [dStart, setDStart] = useState("");
   const [dEnd, setDEnd] = useState("");
-  const [showDetall, setShowDetall] = useState(false);
 
   function quickRange(kind: "dia" | "setmana" | "mes") {
     if (kind === "dia") setDStart(today);
@@ -761,56 +760,6 @@ function StatsTab({
         </div>
       </ChartCard>
 
-      {/* Detall (collapsible) */}
-      <div className="rounded-2xl border border-[var(--color-line)] bg-white p-5 shadow-sm">
-        <button type="button" className="flex w-full items-center justify-between" onClick={() => setShowDetall((s) => !s)}>
-          <span className="text-sm font-semibold tracking-tight">Detall <span className="font-normal text-[var(--color-muted)]">({filtered.length} registres)</span></span>
-          <span className="text-sm text-[var(--color-accent)]">{showDetall ? "Amaga ▴" : "Mostra ▾"}</span>
-        </button>
-        {showDetall && (filtered.length === 0 ? (
-          <p className="mt-4 text-sm text-[var(--color-muted)]">Sense dades.</p>
-        ) : (
-          <div className="table-wrap mt-4">
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="th w-28">Data</th>
-                  <th className="th w-28">Expedient</th>
-                  <th className="th">Projecte / activitat</th>
-                  <th className="th w-36">Categoria</th>
-                  <th className="th">Client</th>
-                  <th className="th">Tasca</th>
-                  <th className="th w-20 text-right">Hores</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => {
-                  const cat = d.categoria ? CATEGORY_BY_CODE[d.categoria] : null;
-                  return (
-                    <tr key={d.id}>
-                      <td className="td tabular-nums">{formatDataShort(d.data)}</td>
-                      <td className="td font-mono">{d.num_expedient ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                      <td className="td">{d.projecte ?? d.activitat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                      <td className="td">
-                        {cat ? (
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: cat.bg, color: cat.text }}>
-                            {cat.label}
-                          </span>
-                        ) : (
-                          <span className="text-[var(--color-muted)]">—</span>
-                        )}
-                      </td>
-                      <td className="td">{d.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                      <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                      <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Modal } from "@/components/modal";
 import { formatEur } from "@/lib/format";
 import { updateExpedientDatesAction } from "@/app/expedients/actions";
-import { addFitaAction, deleteFitaAction } from "./actions";
+import { addFitaAction, deleteFitaAction, updateFitaTipusColorAction } from "./actions";
 
 export interface PlanItem {
   id: number;
@@ -37,11 +37,13 @@ export interface Fita {
   tipus_id: number;
   nom: string;
   forma: string;
+  color: string;
 }
 export interface FitaTipus {
   id: number;
   nom: string;
   forma: string;
+  color: string;
 }
 
 const LABEL_W = 220;
@@ -53,8 +55,10 @@ const MONTHS = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 const COLOR_DO = "#14b8a6"; // docència — turquoise
 const COLOR_DIR = "#dc2626"; // direcció d'obres — vermell
 const COLOR_REST = "#2563eb"; // resta — blau
-const FITA_COLOR = "#facc15"; // yellow — high contrast on the bars
-const FITA_GLOW = "drop-shadow(0 0 1px rgba(0,0,0,0.75)) drop-shadow(0 0 4px rgba(250,204,21,0.95))";
+const FITA_COLOR = "#facc15"; // default yellow — high contrast on the bars
+// Neutral dark halo so any fill colour stays legible both on the coloured bars
+// and on the white gaps between them.
+const FITA_GLOW = "drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 0 3px rgba(0,0,0,0.55))";
 const VISITA_GLOW = "0 0 0 2px #fff, 0 0 7px 2px rgba(31,77,63,0.85)";
 const FORMES: { value: string; label: string }[] = [
   { value: "diamond", label: "Diamant" },
@@ -62,6 +66,16 @@ const FORMES: { value: string; label: string }[] = [
   { value: "square", label: "Quadrat" },
   { value: "triangle", label: "Triangle" },
   { value: "star", label: "Estrella" },
+];
+// Saturated colours that read clearly over the teal / red / blue bars and over
+// the white gaps between them. (Avoids pale tones that vanish on the bars.)
+const FITA_COLORS: { value: string; label: string }[] = [
+  { value: "#facc15", label: "Groc" },
+  { value: "#f97316", label: "Taronja" },
+  { value: "#ec4899", label: "Rosa" },
+  { value: "#a855f7", label: "Lila" },
+  { value: "#84cc16", label: "Llima" },
+  { value: "#ffffff", label: "Blanc" },
 ];
 
 type TabKey = "resta" | "do" | "docencia" | "tots";
@@ -421,7 +435,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
               onMouseEnter={() => setTip({ pct, title: f.nom, lines: [fmtLong(f.data)] })}
               onMouseLeave={() => setTip(null)}
             >
-              <Shape forma={f.forma} color={FITA_COLOR} />
+              <Shape forma={f.forma} color={f.color || FITA_COLOR} />
             </span>
           );
         })}
@@ -471,8 +485,16 @@ function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: Pla
   const [tipusSel, setTipusSel] = useState<string>("new");
   const [novaNom, setNovaNom] = useState("");
   const [forma, setForma] = useState("diamond");
+  const [color, setColor] = useState(FITA_COLOR);
   const [fitaData, setFitaData] = useState("");
   const [pendingFita, startFita] = useTransition();
+
+  const selectedTipus = tipusSel === "new" ? null : fitaTipus.find((t) => String(t.id) === tipusSel) ?? null;
+  // When changing the colour of an existing fita type, persist it right away.
+  function pickColor(c: string) {
+    setColor(c);
+    if (selectedTipus) startFita(() => updateFitaTipusColorAction(selectedTipus.id, c));
+  }
 
   const planned = parseFloat(item.planned_hores) || 0;
   const actual = parseFloat(item.actual_hores) || 0;
@@ -489,7 +511,7 @@ function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: Pla
     const isNew = tipusSel === "new";
     if (isNew && !novaNom.trim()) return;
     startFita(async () => {
-      await addFitaAction({ expedientId: item.id, tipusId: isNew ? null : Number(tipusSel), novaNom, forma, data: fitaData });
+      await addFitaAction({ expedientId: item.id, tipusId: isNew ? null : Number(tipusSel), novaNom, forma, color, data: fitaData });
       setFitaData("");
       setNovaNom("");
     });
@@ -529,7 +551,7 @@ function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: Pla
           <ul className="mb-3 space-y-1">
             {fites.slice().sort((a, b) => a.data.localeCompare(b.data)).map((f) => (
               <li key={f.id} className="flex items-center gap-2 text-sm">
-                <Shape forma={f.forma} color={FITA_COLOR} />
+                <Shape forma={f.forma} color={f.color || FITA_COLOR} />
                 <span className="font-medium">{f.nom}</span>
                 <span className="text-[var(--color-muted)] tabular-nums">{fmtShort(f.data)}</span>
                 <button type="button" className="ml-auto text-red-700 hover:underline text-xs" onClick={() => { if (confirm("Eliminar aquesta fita?")) startFita(() => deleteFitaAction(f.id)); }}>✕</button>
@@ -540,7 +562,15 @@ function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: Pla
         <div className="grid gap-2 sm:grid-cols-2">
           <div>
             <label className="label">Fita</label>
-            <select className="input" value={tipusSel} onChange={(e) => setTipusSel(e.target.value)}>
+            <select
+              className="input"
+              value={tipusSel}
+              onChange={(e) => {
+                setTipusSel(e.target.value);
+                const t = fitaTipus.find((x) => String(x.id) === e.target.value);
+                setColor(t?.color || FITA_COLOR);
+              }}
+            >
               <option value="new">Nova fita…</option>
               {fitaTipus.map((t) => <option key={t.id} value={String(t.id)}>{t.nom}</option>)}
             </select>
@@ -561,11 +591,29 @@ function ExpedientInfo({ item, fites, fitaTipus, visites, onClose }: { item: Pla
                   <select className="input" value={forma} onChange={(e) => setForma(e.target.value)}>
                     {FORMES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                   </select>
-                  <Shape forma={forma} color={FITA_COLOR} size={18} />
+                  <Shape forma={forma} color={color} size={18} />
                 </div>
               </div>
             </>
           )}
+          <div className="sm:col-span-2">
+            <label className="label">Color{selectedTipus ? ` · ${selectedTipus.nom}` : ""}</label>
+            <div className="flex flex-wrap items-center gap-2">
+              {FITA_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  title={c.label}
+                  aria-label={c.label}
+                  onClick={() => pickColor(c.value)}
+                  className={`h-7 w-7 rounded-full border transition ${color === c.value ? "ring-2 ring-[var(--color-accent)] ring-offset-1" : "border-[var(--color-line)]"}`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+              <span className="ml-1 inline-flex items-center"><Shape forma={selectedTipus?.forma ?? forma} color={color} size={18} /></span>
+            </div>
+            {selectedTipus && <p className="mt-1 text-xs text-[var(--color-muted)]">El color s&apos;aplica a totes les fites «{selectedTipus.nom}».</p>}
+          </div>
         </div>
         <button type="button" className="btn-ghost mt-3" onClick={addFita} disabled={pendingFita}>+ Afegir fita</button>
       </div>

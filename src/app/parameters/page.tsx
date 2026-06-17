@@ -16,7 +16,7 @@ export default async function ParametersPage() {
           json_agg(
             json_build_object(
               'id', cc.id, 'client_id', cc.client_id, 'nom', cc.nom,
-              'telefon', cc.telefon, 'mail', cc.mail, 'ordre', cc.ordre
+              'telefon', cc.telefon, 'mail', cc.mail, 'comentari', cc.comentari, 'ordre', cc.ordre
             ) order by cc.ordre, cc.id
           ) filter (where cc.id is not null),
           '[]'
@@ -40,7 +40,7 @@ export default async function ParametersPage() {
     sql`select id, nom, preu_unitat_default::text as preu_unitat_default, actiu, ordre from public.concepte_altra_despesa order by ordre, nom` as unknown as Promise<ConcepteAltraDespesa[]>,
     sql`select id, nom, ordre, created_at from public.tipologies order by ordre, nom` as unknown as Promise<Tipologia[]>,
     sql`
-      select cc.id, cc.client_id, cc.nom, cc.telefon, cc.mail, cc.ordre, c.nom as client_nom
+      select cc.id, cc.client_id, cc.nom, cc.telefon, cc.mail, cc.comentari, cc.ordre, c.nom as client_nom
       from public.client_contactes cc
       left join public.clients c on c.id = cc.client_id
       order by lower(nullif(cc.nom, '')) asc nulls last, cc.id

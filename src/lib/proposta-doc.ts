@@ -73,13 +73,13 @@ const TXT: Record<Lang, Txt> = {
   ca: {
     docTitle: "PROPOSTA D'HONORARIS",
     dadesProposta: "Dades de la Proposta",
-    num: "Número",
-    data: "Data",
-    descripcio: "Descripció",
-    adreca: "Adreça",
-    ciutat: "Ciutat",
+    num: "número",
+    data: "data",
+    descripcio: "descripció",
+    adreca: "adreça",
+    ciutat: "ciutat",
     dadesProfessionals: "Dades Professionals",
-    societat: "Societat",
+    societat: "societat",
     cif: "CIF",
     serveiTitle: "SERVEI PRESSUPOSTAT PROPOSAT (euros)",
     concepte: "Concepte",
@@ -122,13 +122,13 @@ const TXT: Record<Lang, Txt> = {
   es: {
     docTitle: "PROPUESTA DE HONORARIOS",
     dadesProposta: "Datos de la Propuesta",
-    num: "Número",
-    data: "Fecha",
-    descripcio: "Descripción",
-    adreca: "Dirección",
-    ciutat: "Ciudad",
+    num: "número",
+    data: "fecha",
+    descripcio: "descripción",
+    adreca: "dirección",
+    ciutat: "ciudad",
     dadesProfessionals: "Datos Profesionales",
-    societat: "Sociedad",
+    societat: "sociedad",
     cif: "CIF",
     serveiTitle: "SERVICIO PRESUPUESTADO PROPUESTO (euros)",
     concepte: "Concepto",
@@ -238,11 +238,12 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
       <span>${esc(title)}</span>${right ? `<span style="font-style:italic;text-transform:none;">${esc(right)}</span>` : ""}
     </div>`;
 
+  // Table-based (not flex) so label + value stay on one line in Word too.
   const row = (label: string, value: string) =>
-    `<div style="display:flex;padding:2px 8px;font-size:11px;">
-      <div style="width:90px;font-style:italic;color:${grey};font-size:9.5px;padding-top:1px;">${esc(label)}</div>
-      <div style="flex:1;">${value}</div>
-    </div>`;
+    `<table style="border-collapse:collapse;width:100%;font-size:11px;margin:0;"><tr>
+      <td style="width:90px;font-style:italic;color:${grey};font-size:9.5px;vertical-align:top;padding:2px 8px;white-space:nowrap;">${esc(label)}</td>
+      <td style="vertical-align:top;padding:2px 8px;">${value}</td>
+    </tr></table>`;
 
   const serveiRows = doc.serveis
     .map(
@@ -312,7 +313,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
 
     ${signature}
 
-    <div style="page-break-before:always;"></div>
+    <div style="page-break-before:always;">
     ${bar(t.contingutTitle)}
     <div style="${sub}">${esc(t.especificacionsTitle)}</div>
     <p style="${p}">${esc(t.inclouIntro)}</p>
@@ -336,6 +337,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     ${t.tancament.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
 
     ${signature}
+    </div>
   </div>`;
 }
 

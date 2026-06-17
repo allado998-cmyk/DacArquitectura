@@ -723,7 +723,7 @@ function FacturaForm({
 
     const body = `
       <div style="font-family:${FACTURA_FONT};font-size:13px;color:#111;max-width:760px;margin:0 auto;">
-        <div style="text-align:right;margin-bottom:4px;"><img src="${logo}" style="width:170px;height:auto;"/></div>
+        <div style="text-align:right;margin-bottom:4px;"><img src="${logo}" alt="DAC arquitectura" width="170" height="67" style="width:170px;height:auto;display:inline-block;"/></div>
 
         ${bar(L.datosProf)}
         <table style="border-collapse:collapse;">

@@ -33,6 +33,10 @@ export const FIXED_EXCLUSIONS: Record<Lang, string[]> = {
 interface Txt {
   docTitle: string;
   dadesProposta: string;
+  barProposta: string;
+  barProfessionals: string;
+  barClient: string;
+  clientLabel: string;
   num: string;
   data: string;
   descripcio: string;
@@ -73,6 +77,10 @@ const TXT: Record<Lang, Txt> = {
   ca: {
     docTitle: "PROPOSTA D'HONORARIS",
     dadesProposta: "Dades de la Proposta",
+    barProposta: "DADES PROPOSTA",
+    barProfessionals: "DADES PROFESSIONALS",
+    barClient: "DADES CLIENT",
+    clientLabel: "client",
     num: "número",
     data: "data",
     descripcio: "descripció",
@@ -122,6 +130,10 @@ const TXT: Record<Lang, Txt> = {
   es: {
     docTitle: "PROPUESTA DE HONORARIOS",
     dadesProposta: "Datos de la Propuesta",
+    barProposta: "DATOS PROPUESTA",
+    barProfessionals: "DATOS PROFESIONALES",
+    barClient: "DATOS CLIENTE",
+    clientLabel: "cliente",
     num: "número",
     data: "fecha",
     descripcio: "descripción",
@@ -262,14 +274,17 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     )
     .join("");
 
-  const pagamentLines = doc.pagaments
-    .map(
-      (pg) => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 18px;font-size:11px;">
-        <span>- ${esc(pg.descripcio)}</span>
-        <span style="white-space:nowrap;">${pg.import != null ? `${eur(pg.import, lang)} ${t.mesIva}` : ""}</span>
-      </div>`,
-    )
-    .join("");
+  // Single table (not flex) so PDF and Word match; bullet list, price centered.
+  const pagamentLines = doc.pagaments.length
+    ? `<table style="border-collapse:collapse;width:100%;font-size:11px;margin:4px 0;">${doc.pagaments
+        .map(
+          (pg) => `<tr>
+            <td style="padding:2px 8px 2px 18px;vertical-align:top;">&bull;&nbsp;${esc(pg.descripcio)}</td>
+            <td style="padding:2px 8px;text-align:center;white-space:nowrap;vertical-align:top;width:220px;">${pg.import != null ? `${eur(pg.import, lang)} ${t.mesIva}` : ""}</td>
+          </tr>`,
+        )
+        .join("")}</table>`
+    : "";
 
   const signature = `
     <div style="margin-top:24px;line-height:1.5;font-size:11px;page-break-inside:avoid;">
@@ -280,12 +295,12 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     </div>`;
 
   const clientSection = doc.client
-    ? bar("DADES CLIENT") +
+    ? bar(t.barClient) +
       rowsWrap(
-        row("client", esc(doc.client.nom)) +
+        row(t.clientLabel, esc(doc.client.nom)) +
           row(t.cif, esc(doc.client.cif)) +
-          row("adreça", esc(doc.client.adreca)) +
-          row("ciutat", esc(doc.client.ciutat)),
+          row(t.adreca, esc(doc.client.adreca)) +
+          row(t.ciutat, esc(doc.client.ciutat)),
       )
     : "";
 
@@ -295,7 +310,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
       <img src="${logoUrl}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" />
     </div>
 
-    ${bar("DADES PROPOSTA")}
+    ${bar(t.barProposta)}
     ${rowsWrap(
       row(t.num, esc(doc.num)) +
         row(t.data, esc(formatLongDate(doc.data, lang))) +
@@ -304,12 +319,12 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
         row(t.ciutat, esc(ciutatLine)),
     )}
 
-    ${bar("DADES PROFESSIONALS")}
+    ${bar(t.barProfessionals)}
     ${rowsWrap(
       row(t.societat, PROFESSIONAL.societat) +
         row(t.cif, PROFESSIONAL.cif) +
-        row("adreça", PROFESSIONAL.adreca) +
-        row("ciutat", PROFESSIONAL.ciutat),
+        row(t.adreca, PROFESSIONAL.adreca) +
+        row(t.ciutat, PROFESSIONAL.ciutat),
     )}
 
     ${clientSection}

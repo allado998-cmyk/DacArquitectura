@@ -527,18 +527,21 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
             </tr>
           </thead>
           <tbody>
-            {visibleEmeses.map((f) => <FacturaRow key={f.id} f={f} suplitsByFactura={suplitsByFactura} onEdit={onEdit} />)}
-            {visibleEmeses.length > 0 && <SubtotalRow label="Total facturat" sum={emesesSum} emphasis />}
-            {visibleEmeses.length === 0 && (
-              <tr><td className="td text-[var(--color-muted)]" colSpan={12}>Cap factura facturada amb aquests filtres.</td></tr>
-            )}
-
             {visibleProperes.length > 0 && (
               <>
                 <tr><td className="td bg-[var(--color-paper)] text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" colSpan={12}>Propera facturació</td></tr>
                 {visibleProperes.map((f) => <FacturaRow key={f.id} f={f} suplitsByFactura={suplitsByFactura} onEdit={onEdit} />)}
                 <SubtotalRow label="Total propera facturació" sum={properesSum} />
               </>
+            )}
+
+            {visibleProperes.length > 0 && visibleEmeses.length > 0 && (
+              <tr><td className="td bg-[var(--color-paper)] text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]" colSpan={12}>Factures emeses</td></tr>
+            )}
+            {visibleEmeses.map((f) => <FacturaRow key={f.id} f={f} suplitsByFactura={suplitsByFactura} onEdit={onEdit} />)}
+            {visibleEmeses.length > 0 && <SubtotalRow label="Total facturat" sum={emesesSum} emphasis />}
+            {visibleEmeses.length === 0 && (
+              <tr><td className="td text-[var(--color-muted)]" colSpan={12}>Cap factura facturada amb aquests filtres.</td></tr>
             )}
           </tbody>
         </table>

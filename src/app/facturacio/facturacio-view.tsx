@@ -391,7 +391,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
     const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factures</title>
       <style>
         @page { size: A4 landscape; margin: 1.2cm; }
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; }
         .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
         .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
@@ -688,7 +688,7 @@ function FacturaForm({
     const row = (label: string, value: string) =>
       `<tr><td style="padding:3px 16px 3px 0;font-size:9px;font-style:italic;color:#999;white-space:nowrap;vertical-align:top;">${esc(label)}</td><td style="padding:3px 0;font-size:14px;color:#111;">${value}</td></tr>`;
     const bar = (label: string) =>
-      `<div style="background:#e9e9e9;color:#666;font-size:10.5px;letter-spacing:.05em;padding:4px 8px;border-bottom:1px solid #cfcfcf;margin:18px 0 10px;">${esc(label)}</div>`;
+      `<div style="display:block;background:#e6e6e6;color:#7a7a7a;font-size:11px;letter-spacing:.06em;padding:5px 9px;border-bottom:1px solid #bdbdbd;margin:20px 0 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${esc(label)}</div>`;
 
     const clientCiutat = [client?.codi_postal, client?.ciutat].filter(Boolean).join(" ");
     const concepteHtml = esc(concepte).replace(/\n/g, "<br>");
@@ -757,7 +757,9 @@ function FacturaForm({
 
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num)}</title><style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`);
+    // print-color-adjust keeps the grey section stripes (and any fills) when the
+    // user saves to PDF — browsers strip background colours otherwise.
+    w.document.write(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num)}</title><style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${body}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
@@ -1057,10 +1059,6 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
         <KpiCard label="Pendent de cobrament (base)" value={formatEur(pendent)} accent="#dc2626" />
       </div>
 
-      <ChartCard title="Per trimestre" meta="base imposable">
-        <HBarChart bars={byTrim.map((t) => ({ ...t, display: formatEur(t.value) }))} />
-      </ChartCard>
-
       {/* Circle graphs — sempre per base imposable */}
       <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard title="Cobraments" meta="base · pagat / pendent">
@@ -1088,6 +1086,10 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
           )}
         </ChartCard>
       </div>
+
+      <ChartCard title="Per trimestre" meta="base imposable">
+        <HBarChart bars={byTrim.map((t) => ({ ...t, display: formatEur(t.value) }))} />
+      </ChartCard>
 
       <ChartCard title="Per mes" meta="base · color per trimestre">
         <HBarChart bars={monthRows} />

@@ -221,8 +221,8 @@ export function GradientDonut({
             })}
           </g>
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-semibold tracking-tight tabular-nums">{centerValue}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+          <span className="text-xl font-semibold tracking-tight tabular-nums">{centerValue}</span>
           <span className="text-xs text-[var(--color-muted)]">{centerLabel}</span>
         </div>
       </div>

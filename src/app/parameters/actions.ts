@@ -22,6 +22,24 @@ export interface ClientPatch {
   codi_postal: string;
 }
 
+// Create a client with every field filled in (from the form popup).
+export async function createClientFullAction(data: ClientPatch) {
+  await requireUser();
+  const nom = data.nom.trim();
+  if (!nom) return;
+  await sql`
+    insert into public.clients (nom, nif, carrer, ciutat, codi_postal)
+    values (
+      ${nom},
+      ${data.nif.trim() || null},
+      ${data.carrer.trim() || null},
+      ${data.ciutat.trim() || null},
+      ${data.codi_postal.trim() || null}
+    )
+  `;
+  revalidatePath("/parameters");
+}
+
 export async function updateClientAction(id: number, data: ClientPatch) {
   await requireUser();
   const nom = data.nom.trim();
@@ -81,16 +99,17 @@ export async function deleteClientContacteAction(id: number) {
 }
 
 // Standalone contact (no client required).
-export async function createContacteAction(data: { nom: string; telefon: string; mail: string; comentari?: string }) {
+export async function createContacteAction(data: { nom: string; telefon: string; mail: string; comentari?: string; clientId?: number | null }) {
   await requireUser();
   const nom = data.nom.trim();
   const telefon = data.telefon.trim();
   const mail = data.mail.trim();
   const comentari = (data.comentari ?? "").trim();
   if (!nom && !telefon && !mail && !comentari) return;
+  const cid = data.clientId && Number.isFinite(data.clientId) ? data.clientId : null;
   await sql`
     insert into public.client_contactes (client_id, nom, telefon, mail, comentari)
-    values (null, ${nom || null}, ${telefon || null}, ${mail || null}, ${comentari || null})
+    values (${cid}, ${nom || null}, ${telefon || null}, ${mail || null}, ${comentari || null})
   `;
   revalidatePath("/parameters");
 }

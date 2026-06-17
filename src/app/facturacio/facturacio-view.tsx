@@ -18,8 +18,8 @@ import type { Factura, FacturaSuplit, FacturaConcepte } from "@/types/db";
 import { formatEur, formatDataCa } from "@/lib/format";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { ChartCard, GradientDonut, HBarChart, KpiCard, StackedBar, lighten } from "@/components/charts";
-import { CATEGORY_BY_CODE, TIPUS, tipologiaSwatch } from "@/lib/expedients";
+import { ChartCard, GradientDonut, HBarChart, KpiCard, lighten } from "@/components/charts";
+import { CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 
 export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
@@ -221,7 +221,6 @@ function FacturesSummary({
   hideProperes: boolean;
   onToggleProperes: () => void;
 }) {
-  const compTotal = sum.base + sum.iva + sum.sup;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -264,20 +263,6 @@ function FacturesSummary({
         <KpiCard label="Suplits" value={sum.sup ? formatEur(sum.sup) : "—"} accent={C_SUP} />
         <KpiCard label="Total facturat" value={formatEur(sum.totalFinal)} accent={C_BASE} hint="amb IVA i suplits" />
       </div>
-
-      {compTotal > 0 && (
-        <ChartCard title="Composició del total facturat" meta="base · IVA · suplits">
-          <StackedBar
-            total={compTotal}
-            fmt={formatEur}
-            segments={[
-              { label: "Base imposable", value: sum.base, color: C_BASE },
-              { label: "IVA", value: sum.iva, color: C_IVA },
-              ...(sum.sup > 0 ? [{ label: "Suplits", value: sum.sup, color: C_SUP }] : []),
-            ]}
-          />
-        </ChartCard>
-      )}
     </div>
   );
 }
@@ -469,10 +454,6 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
       />
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-48">
-          <label className="label">Cercar</label>
-          <input className="input" placeholder="Núm., client, expedient, concepte…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
         <div>
           <label className="label">Any</label>
           <select className="input w-28" value={fAny} onChange={(e) => setFAny(e.target.value)}>
@@ -489,6 +470,10 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
             <option value="3">T3 (jul–set)</option>
             <option value="4">T4 (oct–des)</option>
           </select>
+        </div>
+        <div className="flex-1 min-w-48">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Núm., client, expedient, concepte…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div>
           <label className="label">Client</label>
@@ -1021,10 +1006,6 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
     (r) => r.f.expedient_tipus ?? "",
     (k) => (k === "privat" || k === "public" ? { label: TIPUS[k].label, color: TIPUS[k].color } : { label: "Sense tipus", color: "#9ca3af" }),
   );
-  const tipologiaSegments = donutSegments(
-    (r) => (r.f.expedient_tipologia ?? "").trim() || "(Sense tipologia)",
-    (k) => ({ label: k === "(Sense tipologia)" ? "Sense tipologia" : k, color: k === "(Sense tipologia)" ? "#9ca3af" : tipologiaSwatch(k).color }),
-  );
 
   return (
     <div className="space-y-6">
@@ -1076,7 +1057,12 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
         <KpiCard label="Pendent de cobrament (base)" value={formatEur(pendent)} accent="#dc2626" />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <ChartCard title="Per trimestre" meta="base imposable">
+        <HBarChart bars={byTrim.map((t) => ({ ...t, display: formatEur(t.value) }))} />
+      </ChartCard>
+
+      {/* Circle graphs — sempre per base imposable */}
+      <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard title="Cobraments" meta="base · pagat / pendent">
           <GradientDonut
             segments={[
@@ -1087,13 +1073,6 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
             centerLabel="base"
           />
         </ChartCard>
-        <ChartCard title="Per trimestre" meta="base imposable">
-          <HBarChart bars={byTrim.map((t) => ({ ...t, display: formatEur(t.value) }))} />
-        </ChartCard>
-      </div>
-
-      {/* Donuts per categoria / tipus / tipologia — sempre per base imposable */}
-      <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Base per categoria" meta="import · % del total">
           {catSegments.length === 0 ? (
             <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
@@ -1109,14 +1088,6 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
           )}
         </ChartCard>
       </div>
-
-      <ChartCard title="Base per tipologia" meta="import · % del total">
-        {tipologiaSegments.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
-        ) : (
-          <GradientDonut segments={tipologiaSegments} centerValue={formatEur(baseTotal)} centerLabel="base" />
-        )}
-      </ChartCard>
 
       <ChartCard title="Per mes" meta="base · color per trimestre">
         <HBarChart bars={monthRows} />

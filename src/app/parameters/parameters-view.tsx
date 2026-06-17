@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   addClientContacteAction,
-  createClientAction,
+  createClientFullAction,
   createConcepteAltraAction,
   createConcepteDirectaAction,
   createContacteAction,
@@ -84,11 +84,9 @@ export function ParametersView({
 // ============================================================================
 
 function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Client[] }) {
-  const [nom, setNom] = useState("");
-  const [telefon, setTelefon] = useState("");
-  const [mail, setMail] = useState("");
-  const [comentari, setComentari] = useState("");
   const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<ClientContacte | null>(null);
+  const [creating, setCreating] = useState(false);
   const [, startTransition] = useTransition();
 
   const clientOpts: ComboOption[] = clients.map((c) => ({ id: c.id, label: c.nom }));
@@ -101,26 +99,9 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <input className="input max-w-xs" placeholder="Cercar contacte…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!nom.trim() && !telefon.trim() && !mail.trim() && !comentari.trim()) return;
-            startTransition(() => createContacteAction({ nom, telefon, mail, comentari }));
-            setNom("");
-            setTelefon("");
-            setMail("");
-            setComentari("");
-          }}
-          className="ml-auto grid grid-cols-2 gap-2 sm:flex"
-        >
-          <input className="input" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} />
-          <input className="input" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
-          <input className="input" placeholder="Mail" value={mail} onChange={(e) => setMail(e.target.value)} />
-          <input className="input" placeholder="Comentari" value={comentari} onChange={(e) => setComentari(e.target.value)} />
-          <button className="btn-primary" type="submit">+ Afegir</button>
-        </form>
+        <button type="button" className="btn-primary ml-auto" onClick={() => setCreating(true)}>+ Nou contacte</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -135,47 +116,101 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
                 <th className="th">Mail</th>
                 <th className="th">Comentari</th>
                 <th className="th w-56">Client</th>
-                <th className="th w-12"></th>
+                <th className="th w-24"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <ContacteFlatRow key={c.id} row={c} clientOpts={clientOpts} />
+                <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setEditing(c)}>
+                  <td className="td font-medium">{c.nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td tabular-nums">{c.telefon ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td">{c.mail ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-[var(--color-muted)]">{c.comentari ?? ""}</td>
+                  <td className="td">{c.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => setEditing(c)}>Editar</button>
+                    <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(c.id)); }}>Eliminar</button>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <ContacteFormModal
+        open={creating || editing != null}
+        contacte={editing}
+        clientOpts={clientOpts}
+        onClose={() => { setCreating(false); setEditing(null); }}
+      />
     </div>
   );
 }
 
-function ContacteFlatRow({ row, clientOpts }: { row: ClientContacte; clientOpts: ComboOption[] }) {
-  const [nom, setNom] = useState(row.nom ?? "");
-  const [telefon, setTelefon] = useState(row.telefon ?? "");
-  const [mail, setMail] = useState(row.mail ?? "");
-  const [comentari, setComentari] = useState(row.comentari ?? "");
-  const [, startTransition] = useTransition();
+function ContacteFormModal({
+  open,
+  contacte,
+  clientOpts,
+  onClose,
+}: {
+  open: boolean;
+  contacte: ClientContacte | null;
+  clientOpts: ComboOption[];
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={<h3 className="text-base font-semibold">{contacte ? "Editar contacte" : "Nou contacte"}</h3>}>
+      {open && <ContacteForm key={contacte?.id ?? "new"} contacte={contacte} clientOpts={clientOpts} onClose={onClose} />}
+    </Modal>
+  );
+}
 
-  function persist() {
-    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "") || comentari !== (row.comentari ?? "")) {
-      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail, comentari }));
-    }
+function ContacteForm({
+  contacte,
+  clientOpts,
+  onClose,
+}: {
+  contacte: ClientContacte | null;
+  clientOpts: ComboOption[];
+  onClose: () => void;
+}) {
+  const [nom, setNom] = useState(contacte?.nom ?? "");
+  const [telefon, setTelefon] = useState(contacte?.telefon ?? "");
+  const [mail, setMail] = useState(contacte?.mail ?? "");
+  const [comentari, setComentari] = useState(contacte?.comentari ?? "");
+  const [clientId, setClientId] = useState<number | null>(contacte?.client_id ?? null);
+  const [pending, startTransition] = useTransition();
+
+  function save() {
+    if (!nom.trim() && !telefon.trim() && !mail.trim() && !comentari.trim()) return;
+    startTransition(async () => {
+      if (contacte) {
+        await updateClientContacteAction(contacte.id, { nom, telefon, mail, comentari });
+        if ((clientId ?? null) !== (contacte.client_id ?? null)) await setContacteClientAction(contacte.id, clientId);
+      } else {
+        await createContacteAction({ nom, telefon, mail, comentari, clientId });
+      }
+      onClose();
+    });
   }
 
   return (
-    <tr>
-      <td className="td"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} /></td>
-      <td className="td"><input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} /></td>
-      <td className="td"><input className="input" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} /></td>
-      <td className="td"><input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} /></td>
-      <td className="td">
-        <Combobox options={clientOpts} value={row.client_id} onChange={(v) => startTransition(() => setContacteClientAction(row.id, v))} placeholder="Cerca client…" emptyLabel="Sense client" overlay />
-      </td>
-      <td className="td text-right">
-        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }}>✕</button>
-      </td>
-    </tr>
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Nom"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom del contacte" /></Field>
+        <Field label="Telèfon"><input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="Telèfon" /></Field>
+        <Field label="Mail"><input className="input" type="email" value={mail} onChange={(e) => setMail(e.target.value)} placeholder="correu@exemple.cat" /></Field>
+        <Field label="Client"><Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Sense client" overlay /></Field>
+        <div className="sm:col-span-2">
+          <Field label="Comentari (opcional)"><input className="input" value={comentari} onChange={(e) => setComentari(e.target.value)} placeholder="Notes lliures…" /></Field>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
+      </div>
+    </div>
   );
 }
 
@@ -278,10 +313,9 @@ function ClientsPanel({
   rows: Client[];
   statsByClient: Map<number, ClientStats>;
 }) {
-  const [nom, setNom] = useState("");
   const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [, startTransition] = useTransition();
+  const [editing, setEditing] = useState<Client | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -290,7 +324,6 @@ function ClientsPanel({
       )
     : rows;
 
-  const openClient = rows.find((c) => c.id === openId) ?? null;
   const ciutats = useMemo(
     () => Array.from(new Set(rows.map((c) => (c.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
     [rows],
@@ -298,25 +331,14 @@ function ClientsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <input
           className="input max-w-xs"
           placeholder="Cercar client…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!nom.trim()) return;
-            startTransition(() => createClientAction(nom));
-            setNom("");
-          }}
-          className="flex gap-2 ml-auto"
-        >
-          <input className="input" placeholder="Nom del nou client" value={nom} onChange={(e) => setNom(e.target.value)} />
-          <button className="btn-primary" type="submit">+ Afegir</button>
-        </form>
+        <button type="button" className="btn-primary ml-auto" onClick={() => setCreating(true)}>+ Nou client</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -326,35 +348,47 @@ function ClientsPanel({
           {filtered.map((c) => {
             const s = statsByClient.get(c.id);
             return (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                onClick={() => setOpenId(c.id)}
-                className="rounded-xl border border-[var(--color-line)] bg-white p-4 text-left shadow-sm transition hover:border-[var(--color-accent)] hover:shadow"
+                onClick={() => setEditing(c)}
+                className="cursor-pointer rounded-xl border border-[var(--color-line)] bg-white p-4 text-left shadow-sm transition hover:border-[var(--color-accent)] hover:shadow"
               >
-                <div className="font-medium truncate">{c.nom}</div>
-                <div className="text-xs text-[var(--color-muted)] truncate">{c.ciutat ?? "—"}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{c.nom}</div>
+                    <div className="text-xs text-[var(--color-muted)] truncate">{c.ciutat ?? "—"}</div>
+                  </div>
+                  <button type="button" className="shrink-0 text-sm text-[var(--color-accent)] hover:underline" onClick={(e) => { e.stopPropagation(); setEditing(c); }}>Editar</button>
+                </div>
                 <div className="mt-3 flex gap-4 text-sm">
                   <span><span className="font-semibold tabular-nums">{s?.n ?? 0}</span> <span className="text-[var(--color-muted)]">exp.</span></span>
                   <span><span className="font-semibold tabular-nums text-[var(--color-accent)]">{s?.oberts ?? 0}</span> <span className="text-[var(--color-muted)]">oberts</span></span>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
 
-      <ClientModal client={openClient} stats={openClient ? statsByClient.get(openClient.id) : undefined} ciutats={ciutats} onClose={() => setOpenId(null)} />
+      <ClientFormModal
+        open={creating || editing != null}
+        client={editing}
+        stats={editing ? statsByClient.get(editing.id) : undefined}
+        ciutats={ciutats}
+        onClose={() => { setCreating(false); setEditing(null); }}
+      />
     </div>
   );
 }
 
-function ClientModal({
+function ClientFormModal({
+  open,
   client,
   stats,
   ciutats,
   onClose,
 }: {
+  open: boolean;
   client: Client | null;
   stats?: ClientStats;
   ciutats: string[];
@@ -362,73 +396,78 @@ function ClientModal({
 }) {
   return (
     <Modal
-      open={client != null}
+      open={open}
       onClose={onClose}
       wide
-      title={client && <h3 className="text-lg font-semibold tracking-tight">{client.nom}</h3>}
+      title={<h3 className="text-lg font-semibold tracking-tight">{client ? client.nom : "Nou client"}</h3>}
     >
-      {client && <ClientEditor key={client.id} client={client} stats={stats ?? { client_id: client.id, ...EMPTY_STATS }} ciutats={ciutats} onDeleted={onClose} />}
+      {open && (
+        <ClientForm
+          key={client?.id ?? "new"}
+          client={client}
+          stats={client ? stats ?? { client_id: client.id, ...EMPTY_STATS } : null}
+          ciutats={ciutats}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   );
 }
 
-function ClientEditor({
+function ClientForm({
   client,
   stats,
   ciutats,
-  onDeleted,
+  onClose,
 }: {
-  client: Client;
-  stats: ClientStats;
+  client: Client | null;
+  stats: ClientStats | null;
   ciutats: string[];
-  onDeleted: () => void;
+  onClose: () => void;
 }) {
-  const [nom, setNom] = useState(client.nom);
-  const [nif, setNif] = useState(client.nif ?? "");
-  const [carrer, setCarrer] = useState(client.carrer ?? "");
-  const [ciutat, setCiutat] = useState(client.ciutat ?? "");
-  const [codiPostal, setCodiPostal] = useState(client.codi_postal ?? "");
-  const [, startTransition] = useTransition();
+  const [nom, setNom] = useState(client?.nom ?? "");
+  const [nif, setNif] = useState(client?.nif ?? "");
+  const [carrer, setCarrer] = useState(client?.carrer ?? "");
+  const [ciutat, setCiutat] = useState(client?.ciutat ?? "");
+  const [codiPostal, setCodiPostal] = useState(client?.codi_postal ?? "");
+  const [pending, startTransition] = useTransition();
 
-  function persist() {
+  function save() {
     if (!nom.trim()) return;
     const patch: ClientPatch = { nom, nif, carrer, ciutat, codi_postal: codiPostal };
-    if (
-      nom !== client.nom ||
-      nif !== (client.nif ?? "") ||
-      carrer !== (client.carrer ?? "") ||
-      ciutat !== (client.ciutat ?? "") ||
-      codiPostal !== (client.codi_postal ?? "")
-    ) {
-      startTransition(() => updateClientAction(client.id, patch));
-    }
+    startTransition(async () => {
+      if (client) await updateClientAction(client.id, patch);
+      else await createClientFullAction(patch);
+      onClose();
+    });
   }
 
-  const contactes = client.contactes ?? [];
+  const contactes = client?.contactes ?? [];
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Expedients" value={String(stats.n)} accent="#1f4d3f" />
-        <KpiCard label="Oberts" value={String(stats.oberts)} accent="#ef4444" />
-        <KpiCard label="Pressupost total" value={formatEur(stats.pressupost_total)} accent="#0ea5e9" />
-        <KpiCard label="Pressupost en obert" value={formatEur(stats.pressupost_obert)} accent="#a855f7" />
-      </div>
+      {client && stats && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard label="Expedients" value={String(stats.n)} accent="#1f4d3f" />
+          <KpiCard label="Oberts" value={String(stats.oberts)} accent="#ef4444" />
+          <KpiCard label="Pressupost total" value={formatEur(stats.pressupost_total)} accent="#0ea5e9" />
+          <KpiCard label="Pressupost en obert" value={formatEur(stats.pressupost_obert)} accent="#a855f7" />
+        </div>
+      )}
 
       {/* Dades */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Nom">
-          <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
+          <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom del client" />
         </Field>
         <Field label="NIF / CIF">
-          <input className="input" value={nif} onChange={(e) => setNif(e.target.value)} onBlur={persist} />
+          <input className="input" value={nif} onChange={(e) => setNif(e.target.value)} />
         </Field>
         <Field label="Carrer">
-          <input className="input" value={carrer} onChange={(e) => setCarrer(e.target.value)} onBlur={persist} />
+          <input className="input" value={carrer} onChange={(e) => setCarrer(e.target.value)} />
         </Field>
         <Field label="Ciutat">
-          <input className="input" list="client-ciutats" placeholder="Tria o escriu…" value={ciutat} onChange={(e) => setCiutat(e.target.value)} onBlur={persist} />
+          <input className="input" list="client-ciutats" placeholder="Tria o escriu…" value={ciutat} onChange={(e) => setCiutat(e.target.value)} />
           <datalist id="client-ciutats">
             {ciutats.map((c) => <option key={c} value={c} />)}
           </datalist>
@@ -442,31 +481,41 @@ function ClientEditor({
             placeholder="08028"
             value={codiPostal}
             onChange={(e) => setCodiPostal(e.target.value.replace(/\D/g, "").slice(0, 5))}
-            onBlur={persist}
           />
         </Field>
       </div>
 
-      {/* Contactes */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
-          <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => startTransition(() => addClientContacteAction(client.id))}>
-            + Afegir contacte
-          </button>
-        </div>
-        {contactes.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">Cap contacte encara.</p>
-        ) : (
-          <div className="space-y-2">
-            {contactes.map((ct) => (
-              <ContacteRow key={ct.id} row={ct} />
-            ))}
-          </div>
-        )}
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
       </div>
 
-      <div className="border-t border-[var(--color-line)] pt-4">
+      {client && <ClientContactesSection client={client} contactes={contactes} onDeleted={onClose} />}
+    </div>
+  );
+}
+
+function ClientContactesSection({ client, contactes, onDeleted }: { client: Client; contactes: ClientContacte[]; onDeleted: () => void }) {
+  const [, startTransition] = useTransition();
+  return (
+    <div className="border-t border-[var(--color-line)] pt-5">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
+        <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => startTransition(() => addClientContacteAction(client.id))}>
+          + Afegir contacte
+        </button>
+      </div>
+      {contactes.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">Cap contacte encara.</p>
+      ) : (
+        <div className="space-y-2">
+          {contactes.map((ct) => (
+            <ContacteRow key={ct.id} row={ct} />
+          ))}
+        </div>
+      )}
+
+      <div className="mt-5">
         <button
           type="button"
           className="text-red-700 hover:underline text-sm"

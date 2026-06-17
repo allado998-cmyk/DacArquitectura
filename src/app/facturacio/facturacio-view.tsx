@@ -391,8 +391,8 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
     const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factures</title>
       <style>
         @page { size: A4 landscape; margin: 1.2cm; }
-        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: ${FACTURA_FONT}; }
+        body { margin: 0; color: #1a1a1a; }
         .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
         .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
         .head .sub { font-size: 12px; color: #666; }
@@ -676,7 +676,7 @@ function FacturaForm({
     });
   }
 
-  function generar() {
+  function generar(mode: "print" | "word" = "print") {
     const L = FACT_LABELS[lang];
     const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
     const fecha = data ? longDate(data, lang) : "";
@@ -722,7 +722,7 @@ function FacturaForm({
       ${ivaZero ? `<div style="margin-top:10px;font-size:11px;font-style:italic;color:#444;max-width:560px;line-height:1.5;">${esc(IVA_EXEMPT_NOTE)}</div>` : ""}`;
 
     const body = `
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;max-width:760px;margin:0 auto;">
+      <div style="font-family:${FACTURA_FONT};font-size:13px;color:#111;max-width:760px;margin:0 auto;">
         <div style="text-align:right;margin-bottom:4px;"><img src="${logo}" style="width:170px;height:auto;"/></div>
 
         ${bar(L.datosProf)}
@@ -758,11 +758,25 @@ function FacturaForm({
         <div style="margin-top:8px;margin-left:24px;font-size:12px;"><strong>${esc(BANK.nom)}</strong>&nbsp;&nbsp;&nbsp;&nbsp;${esc(BANK.iban)}</div>
       </div>`;
 
+    // Force Century Gothic everywhere; print-color-adjust keeps the grey section
+    // stripes (and any fills) when the user saves to PDF.
+    const headStyle = `<style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}body,table,td,th,tr,div,span,p,strong,em{font-family:${FACTURA_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
+    const doc = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num || String(factura.id))}</title>${headStyle}</head><body>${body}</body></html>`;
+
+    if (mode === "word") {
+      const blob = new Blob(["﻿", doc], { type: "application/msword" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Factura_${(num || String(factura.id)).replace(/[^\w-]/g, "")}_${lang}.doc`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
-    // print-color-adjust keeps the grey section stripes (and any fills) when the
-    // user saves to PDF — browsers strip background colours otherwise.
-    w.document.write(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num)}</title><style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${body}</body></html>`);
+    w.document.write(doc);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
@@ -897,7 +911,8 @@ function FacturaForm({
             </button>
           ))}
         </div>
-        <button type="button" className="btn-ghost disabled:opacity-50" onClick={generar} disabled={pendingSup || !emesa || !num.trim()} title={!emesa ? "Marca-la com a Facturada per generar-la" : undefined}>Generar factura</button>
+        <button type="button" className="btn-ghost disabled:opacity-50" onClick={() => generar("word")} disabled={pendingSup || !emesa || !num.trim()} title={!emesa ? "Marca-la com a Facturada per generar-la" : undefined}>Word</button>
+        <button type="button" className="btn-ghost disabled:opacity-50" onClick={() => generar("print")} disabled={pendingSup || !emesa || !num.trim()} title={!emesa ? "Marca-la com a Facturada per generar-la" : undefined}>PDF / Imprimir</button>
         {emesa && <span className="ml-auto"><PagadaToggle id={factura.id} pagada={factura.pagada} /></span>}
       </div>
     </div>
@@ -1119,6 +1134,8 @@ function fmtPct(v: number) {
 const BANK = { nom: "CAJA DE ARQUITECTOS ARQUIA", iban: "ES66 3183 0801 2010 0250 2225" };
 const IVA_EXEMPT_NOTE =
   "Aquesta factura no comporta IVA en ser un servei cultural. D'acord amb l'article 20.1.10 de la Llei 37/1992, de 28 de desembre, les classes a títol particular estan exemptes d'IVA.";
+// Century Gothic with graceful fallbacks for browsers/OSes that lack it.
+const FACTURA_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 
 const FACT_LABELS = {
   es: {

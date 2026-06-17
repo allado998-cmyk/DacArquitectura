@@ -24,7 +24,7 @@ import type {
 } from "@/types/db";
 import { formatEur } from "@/lib/format";
 import { Combobox, type ComboOption } from "@/components/combobox";
-import { buildPropostaHtml, buildWordDoc, FIXED_EXCLUSIONS, FIXED_INCLUSIONS, PROFESSIONAL, type DocData, type Lang } from "@/lib/proposta-doc";
+import { buildPropostaHtml, buildWordDoc, DOC_FONT, FIXED_EXCLUSIONS, FIXED_INCLUSIONS, PROFESSIONAL, type DocData, type Lang } from "@/lib/proposta-doc";
 
 export interface CalculOption {
   id: number;
@@ -111,7 +111,7 @@ export function PropostaEditView({
     if (!w) return;
     w.document.write(
       `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${doc.num}</title>` +
-        `<style>@page{size:A4;margin:1.6cm;}body{margin:0;}</style></head><body>${body}</body></html>`,
+        `<style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}body,table,td,th,tr,div,span,p,strong,em,ul,li{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${body}</body></html>`,
     );
     w.document.close();
     w.focus();

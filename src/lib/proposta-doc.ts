@@ -3,6 +3,9 @@
 
 export type Lang = "ca" | "es";
 
+// Century Gothic with graceful fallbacks — shared with the factura documents.
+export const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
+
 export const PROFESSIONAL = {
   societat: "DACARQUITECTURA, REHABILITACIÓ I URBANISME, S.L.P.",
   cif: "B64205545",
@@ -231,7 +234,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
   const ciutatLine = [doc.codiPostal, doc.ciutat].filter(Boolean).join(" ");
 
   const bar = (title: string, right?: string) =>
-    `<div style="background:#e9e9e4;border-bottom:1px solid #c9c9c0;padding:3px 8px;margin:16px 0 8px;font-size:10px;letter-spacing:.06em;color:#444;text-transform:uppercase;display:flex;justify-content:space-between;">
+    `<div style="background:#e6e6e6;border-bottom:1px solid #bdbdbd;padding:5px 9px;margin:20px 0 10px;font-size:11px;letter-spacing:.06em;color:#7a7a7a;text-transform:uppercase;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <span>${esc(title)}</span>${right ? `<span style="font-style:italic;text-transform:none;">${esc(right)}</span>` : ""}
     </div>`;
 
@@ -277,7 +280,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     : "";
 
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;max-width:820px;margin:0 auto;">
+  <div style="font-family:${DOC_FONT};font-size:11px;color:#111;max-width:820px;margin:0 auto;">
     <div style="text-align:right;margin-bottom:4px;">
       <img src="${logoUrl}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" />
     </div>
@@ -337,5 +340,6 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
 }
 
 export function buildWordDoc(doc: DocData, lang: Lang, logoUrl?: string): string {
-  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title></head><body>${buildPropostaHtml(doc, lang, logoUrl)}</body></html>`;
+  const head = `<style>body,table,td,th,tr,div,span,p,strong,em,ul,li{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title>${head}</head><body>${buildPropostaHtml(doc, lang, logoUrl)}</body></html>`;
 }

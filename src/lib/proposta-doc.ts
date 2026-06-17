@@ -84,7 +84,7 @@ const TXT: Record<Lang, Txt> = {
     serveiTitle: "SERVEI PRESSUPOSTAT PROPOSAT (euros)",
     concepte: "Concepte",
     import: "Import",
-    subtotal: "Subtotal",
+    subtotal: "TOTAL",
     iva: "IVA (21%)",
     totalIva: "TOTAL amb IVA",
     rolSignatari: "arquitecte col·legiat COAC 22289-5",
@@ -133,7 +133,7 @@ const TXT: Record<Lang, Txt> = {
     serveiTitle: "SERVICIO PRESUPUESTADO PROPUESTO (euros)",
     concepte: "Concepto",
     import: "Importe",
-    subtotal: "Subtotal",
+    subtotal: "TOTAL",
     iva: "IVA (21%)",
     totalIva: "TOTAL con IVA",
     rolSignatari: "arquitecto colegiado COAC 22289-5",
@@ -215,6 +215,8 @@ export interface DocData {
   serveis: { descripcio: string | null; preu: number }[];
   inclusions: string[];
   exclusions: string[];
+  hiddenInclusions?: number[]; // indices of FIXED_INCLUSIONS to omit
+  hiddenExclusions?: number[]; // indices of FIXED_EXCLUSIONS to omit
   pagaments: { descripcio: string | null; import: number | null }[];
 }
 
@@ -229,8 +231,10 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
   const p = "margin:0 0 9px;line-height:1.45;text-align:justify;font-size:11px;";
   const sub = "text-decoration:underline;font-weight:normal;margin:14px 0 8px;font-size:11.5px;";
 
-  const inclusions = [...doc.inclusions.filter((x) => x.trim()), ...FIXED_INCLUSIONS[lang]];
-  const exclusions = [...doc.exclusions.filter((x) => x.trim()), ...FIXED_EXCLUSIONS[lang]];
+  const hiddenInc = doc.hiddenInclusions ?? [];
+  const hiddenExc = doc.hiddenExclusions ?? [];
+  const inclusions = [...doc.inclusions.filter((x) => x.trim()), ...FIXED_INCLUSIONS[lang].filter((_, i) => !hiddenInc.includes(i))];
+  const exclusions = [...doc.exclusions.filter((x) => x.trim()), ...FIXED_EXCLUSIONS[lang].filter((_, i) => !hiddenExc.includes(i))];
   const ciutatLine = [doc.codiPostal, doc.ciutat].filter(Boolean).join(" ");
 
   const bar = (title: string, right?: string) =>

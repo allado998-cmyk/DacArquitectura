@@ -138,6 +138,8 @@ export interface PropostaDoc {
   client_id: number | null;
   calcul_id: number | null;
   estat: PropostaDocEstat;
+  hidden_inclusions: number[]; // indices into FIXED_INCLUSIONS that are hidden
+  hidden_exclusions: number[]; // indices into FIXED_EXCLUSIONS that are hidden
   created_at: string;
   updated_at: string;
 }

@@ -15,7 +15,10 @@ export default async function PropostaDetailPage({ params }: { params: Promise<{
 
   const docRows = (await sql`
     select id, num, to_char(data, 'YYYY-MM-DD') as data, descripcio, adreca, ciutat, codi_postal,
-           client_id, calcul_id, estat, created_at, updated_at
+           client_id, calcul_id, estat,
+           coalesce(hidden_inclusions, '{}') as hidden_inclusions,
+           coalesce(hidden_exclusions, '{}') as hidden_exclusions,
+           created_at, updated_at
     from public.proposta_doc where id = ${id}
   `) as unknown as PropostaDoc[];
   if (docRows.length === 0) notFound();

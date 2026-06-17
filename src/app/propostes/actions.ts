@@ -145,6 +145,26 @@ export async function deleteLiniaAction(docId: number, taula: Taula, id: number)
   void tableName; // (kept for clarity)
 }
 
+// Hide / restore a built-in (fixed) inclusion or exclusion, by its index.
+export async function toggleFixedLiniaAction(docId: number, taula: Taula, index: number, hidden: boolean) {
+  await requireUser();
+  if (!Number.isInteger(index) || index < 0) return;
+  if (taula === "inclusio") {
+    if (hidden) {
+      await sql`update public.proposta_doc set hidden_inclusions = array_append(coalesce(hidden_inclusions, '{}'), ${index}) where id = ${docId} and not (${index} = any(coalesce(hidden_inclusions, '{}')))`;
+    } else {
+      await sql`update public.proposta_doc set hidden_inclusions = array_remove(coalesce(hidden_inclusions, '{}'), ${index}) where id = ${docId}`;
+    }
+  } else {
+    if (hidden) {
+      await sql`update public.proposta_doc set hidden_exclusions = array_append(coalesce(hidden_exclusions, '{}'), ${index}) where id = ${docId} and not (${index} = any(coalesce(hidden_exclusions, '{}')))`;
+    } else {
+      await sql`update public.proposta_doc set hidden_exclusions = array_remove(coalesce(hidden_exclusions, '{}'), ${index}) where id = ${docId}`;
+    }
+  }
+  revalidatePath(`/propostes/${docId}`);
+}
+
 // Pagaments ------------------------------------------------------------------
 
 export async function addPagamentAction(docId: number) {

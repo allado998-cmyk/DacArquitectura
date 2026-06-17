@@ -10,6 +10,7 @@ import {
   deletePagamentAction,
   deleteServeiAction,
   setEstatAction,
+  toggleFixedLiniaAction,
   updateLiniaAction,
   updatePagamentAction,
   updatePropostaDocAction,
@@ -77,6 +78,8 @@ export function PropostaEditView({
     serveis: serveis.map((s) => ({ descripcio: s.descripcio, preu: parseFloat(s.preu) || 0 })),
     inclusions: inclusions.map((i) => i.text ?? ""),
     exclusions: exclusions.map((e) => e.text ?? ""),
+    hiddenInclusions: doc.hidden_inclusions ?? [],
+    hiddenExclusions: doc.hidden_exclusions ?? [],
     pagaments: pagaments.map((p) => ({ descripcio: p.descripcio, import: p.import != null ? parseFloat(p.import) : null })),
   };
 
@@ -258,7 +261,7 @@ export function PropostaEditView({
               {serveis.map((s) => <ServeiRow key={s.id} docId={doc.id} row={s} />)}
             </tbody>
             <tfoot>
-              <tr><td className="td text-right font-medium">Subtotal</td><td className="td text-right tabular-nums">{formatEur(subtotal)}</td><td className="td"></td></tr>
+              <tr><td className="td text-right font-medium">TOTAL</td><td className="td text-right tabular-nums">{formatEur(subtotal)}</td><td className="td"></td></tr>
               <tr><td className="td text-right font-medium">IVA (21%)</td><td className="td text-right tabular-nums">{formatEur(iva)}</td><td className="td"></td></tr>
               <tr className="bg-[var(--color-paper)]"><td className="td text-right font-semibold">TOTAL amb IVA</td><td className="td text-right font-semibold tabular-nums">{formatEur(subtotal + iva)}</td><td className="td"></td></tr>
             </tfoot>
@@ -273,6 +276,7 @@ export function PropostaEditView({
         taula="inclusio"
         rows={inclusions}
         fixed={FIXED_INCLUSIONS[lang]}
+        hidden={doc.hidden_inclusions ?? []}
       />
 
       {/* Exclusions */}
@@ -282,6 +286,7 @@ export function PropostaEditView({
         taula="exclusio"
         rows={exclusions}
         fixed={FIXED_EXCLUSIONS[lang]}
+        hidden={doc.hidden_exclusions ?? []}
       />
 
       {/* Pagaments */}
@@ -380,12 +385,14 @@ function LiniaSection({
   taula,
   rows,
   fixed,
+  hidden,
 }: {
   title: string;
   docId: number;
   taula: "inclusio" | "exclusio";
   rows: PropostaDocLinia[];
   fixed: string[];
+  hidden: number[];
 }) {
   const [, startTransition] = useTransition();
   return (
@@ -396,12 +403,20 @@ function LiniaSection({
       </div>
       <div className="space-y-2">
         {rows.map((r) => <LiniaRow key={r.id} docId={docId} taula={taula} row={r} />)}
-        {fixed.map((f, i) => (
-          <div key={`f${i}`} className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
-            <span className="flex-1 rounded-md border border-dashed border-[var(--color-line)] px-3 py-2">{f}</span>
-            <span className="text-xs">fix</span>
-          </div>
-        ))}
+        {fixed.map((f, i) => {
+          const isHidden = hidden.includes(i);
+          return (
+            <div key={`f${i}`} className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+              <span className={`flex-1 rounded-md border border-dashed border-[var(--color-line)] px-3 py-2 ${isHidden ? "line-through opacity-50" : ""}`}>{f}</span>
+              <span className="text-xs">fix</span>
+              {isHidden ? (
+                <button type="button" className="text-[var(--color-accent)] hover:underline text-xs" onClick={() => startTransition(() => toggleFixedLiniaAction(docId, taula, i, false))}>Restaurar</button>
+              ) : (
+                <button type="button" className="text-red-700 hover:underline text-sm" title="Excloure d'aquesta proposta" onClick={() => startTransition(() => toggleFixedLiniaAction(docId, taula, i, true))}>✕</button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

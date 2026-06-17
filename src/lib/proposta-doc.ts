@@ -237,17 +237,20 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
   const exclusions = [...doc.exclusions.filter((x) => x.trim()), ...FIXED_EXCLUSIONS[lang].filter((_, i) => !hiddenExc.includes(i))];
   const ciutatLine = [doc.codiPostal, doc.ciutat].filter(Boolean).join(" ");
 
-  const bar = (title: string, right?: string) =>
-    `<div style="background:#e6e6e6;border-bottom:1px solid #bdbdbd;padding:5px 9px;margin:20px 0 10px;font-size:11px;letter-spacing:.06em;color:#7a7a7a;text-transform:uppercase;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+  const bar = (title: string, right?: string, breakBefore?: boolean) =>
+    `<div style="${breakBefore ? "page-break-before:always;" : ""}background:#e6e6e6;border-bottom:1px solid #bdbdbd;padding:5px 9px;margin:20px 0 10px;font-size:11px;letter-spacing:.06em;color:#7a7a7a;text-transform:uppercase;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <span>${esc(title)}</span>${right ? `<span style="font-style:italic;text-transform:none;">${esc(right)}</span>` : ""}
     </div>`;
 
-  // Table-based (not flex) so label + value stay on one line in Word too.
+  // One <tr> per field; rows are grouped into a single <table> per section
+  // (rowsWrap) — Word paginates correctly this way, unlike many tiny tables.
   const row = (label: string, value: string) =>
-    `<table style="border-collapse:collapse;width:100%;font-size:11px;margin:0;"><tr>
+    `<tr>
       <td style="width:90px;font-style:italic;color:${grey};font-size:9.5px;vertical-align:top;padding:2px 8px;white-space:nowrap;">${esc(label)}</td>
       <td style="vertical-align:top;padding:2px 8px;">${value}</td>
-    </tr></table>`;
+    </tr>`;
+  const rowsWrap = (inner: string) =>
+    `<table style="border-collapse:collapse;width:100%;font-size:11px;margin:0;">${inner}</table>`;
 
   const serveiRows = doc.serveis
     .map(
@@ -278,10 +281,12 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
 
   const clientSection = doc.client
     ? bar("DADES CLIENT") +
-      row("client", esc(doc.client.nom)) +
-      row(t.cif, esc(doc.client.cif)) +
-      row("adreça", esc(doc.client.adreca)) +
-      row("ciutat", esc(doc.client.ciutat))
+      rowsWrap(
+        row("client", esc(doc.client.nom)) +
+          row(t.cif, esc(doc.client.cif)) +
+          row("adreça", esc(doc.client.adreca)) +
+          row("ciutat", esc(doc.client.ciutat)),
+      )
     : "";
 
   return `
@@ -291,17 +296,21 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     </div>
 
     ${bar("DADES PROPOSTA")}
-    ${row(t.num, `<span style="font-family:monospace;">${esc(doc.num)}</span>`)}
-    ${row(t.data, esc(formatLongDate(doc.data, lang)))}
-    ${row(t.descripcio, esc(doc.descripcio))}
-    ${row(t.adreca, esc(doc.adreca))}
-    ${row(t.ciutat, esc(ciutatLine))}
+    ${rowsWrap(
+      row(t.num, esc(doc.num)) +
+        row(t.data, esc(formatLongDate(doc.data, lang))) +
+        row(t.descripcio, esc(doc.descripcio)) +
+        row(t.adreca, esc(doc.adreca)) +
+        row(t.ciutat, esc(ciutatLine)),
+    )}
 
     ${bar("DADES PROFESSIONALS")}
-    ${row(t.societat, PROFESSIONAL.societat)}
-    ${row(t.cif, PROFESSIONAL.cif)}
-    ${row("adreça", PROFESSIONAL.adreca)}
-    ${row("ciutat", PROFESSIONAL.ciutat)}
+    ${rowsWrap(
+      row(t.societat, PROFESSIONAL.societat) +
+        row(t.cif, PROFESSIONAL.cif) +
+        row("adreça", PROFESSIONAL.adreca) +
+        row("ciutat", PROFESSIONAL.ciutat),
+    )}
 
     ${clientSection}
 
@@ -317,8 +326,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
 
     ${signature}
 
-    <div style="page-break-before:always;">
-    ${bar(t.contingutTitle)}
+    ${bar(t.contingutTitle, undefined, true)}
     <div style="${sub}">${esc(t.especificacionsTitle)}</div>
     <p style="${p}">${esc(t.inclouIntro)}</p>
     <ul style="margin:0 0 8px;padding-left:22px;line-height:1.5;font-size:11px;">${inclusions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
@@ -341,7 +349,6 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
     ${t.tancament.map((x) => `<p style="${p}">${esc(x)}</p>`).join("")}
 
     ${signature}
-    </div>
   </div>`;
 }
 

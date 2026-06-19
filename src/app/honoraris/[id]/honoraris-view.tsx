@@ -98,7 +98,9 @@ export function HonorarisView({
   // Responsabilitat Civil: its "unitats" mirror the final total → cost = total × rate.
   const rcLine = linesAltres.find(isRC);
   const rcTotal = rcLine ? totalHonorarisFinal * n(rcLine.preu_unitat) : 0;
-  const totalAltres = baseAltres + rcTotal;
+  // Responsabilitat Civil is "no inclòs al total", so the Altres Despeses total
+  // matches the base used in the Resum (otherwise the two numbers disagree).
+  const totalAltres = baseAltres;
 
   // Helpers ----------------------------------------------------------------
 
@@ -442,7 +444,10 @@ export function HonorarisView({
                         onBlur={() => persistAltra(l.id, { preu_unitat: n(l.preu_unitat) })}
                       />
                     </td>
-                    <td className="td text-right font-mono">{formatEur(total)}</td>
+                    <td className="td text-right font-mono">
+                      {formatEur(total)}
+                      {rc && <span className="block font-sans text-[10px] text-[var(--color-muted)]">no inclòs al total</span>}
+                    </td>
                     <td className="td text-right">
                       <button
                         type="button"

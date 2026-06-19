@@ -101,8 +101,8 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
             <tr>
               <th className="th text-center w-28">Núm.</th>
               <th className="th text-center w-32">Data</th>
-              <th className="th text-center">Descripció</th>
-              <th className="th text-center">Client</th>
+              <th className="th text-left">Descripció</th>
+              <th className="th text-left">Client</th>
               <th className="th text-center w-32">Estat</th>
               <th className="th text-center w-32"></th>
             </tr>
@@ -114,8 +114,8 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
                 <tr key={r.id}>
                   <td className="td text-center font-mono">{r.num}</td>
                   <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
-                  <td className="td text-center">{r.descripcio ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td text-center">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-left">{r.descripcio ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-left">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                   <td className="td text-center">
                     <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: m.bg, color: m.text }}>
                       {m.label}

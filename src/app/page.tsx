@@ -13,7 +13,7 @@ export default async function HomePage() {
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
         <div className="mb-10 flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpg" alt="DAC arquitectura" className="h-20 w-auto mb-6" />
+          <img src="/logo.svg" alt="Estudi Demo" className="h-16 w-auto mb-6" />
           <p className="text-[var(--color-muted)]">Eines internes per a la gestió del despatx.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

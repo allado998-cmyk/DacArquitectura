@@ -7,7 +7,7 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-6">
         <Link href="/" className="shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpg" alt="DAC arquitectura" className="h-7 sm:h-8 w-auto" />
+          <img src="/logo.svg" alt="Estudi Demo" className="h-7 sm:h-8 w-auto" />
         </Link>
         <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap text-sm [&>a]:shrink-0">
           <Link

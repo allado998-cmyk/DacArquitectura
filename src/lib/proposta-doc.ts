@@ -6,13 +6,15 @@ export type Lang = "ca" | "es";
 // Century Gothic with graceful fallbacks — shared with the factura documents.
 export const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 
+// DEMO data — fake company used for the sellable demo (no real client info).
 export const PROFESSIONAL = {
-  societat: "DACARQUITECTURA, REHABILITACIÓ I URBANISME, S.L.P.",
-  cif: "B64205545",
-  adreca: "Gran Via de Carles III, 46-48, escala O, local",
-  ciutat: "08028 Barcelona",
-  signatari: "David Lladó i Porta",
+  societat: "ESTUDI DEMO, ARQUITECTURA I URBANISME, S.L.P.",
+  cif: "B12345678",
+  adreca: "Carrer Exemple, 10, 2n 1a",
+  ciutat: "08001 Barcelona",
+  signatari: "Àlex Demo Garcia",
 };
+export const COMPANY_NAME = "Estudi Demo";
 
 export const FIXED_INCLUSIONS: Record<Lang, string[]> = {
   ca: [
@@ -95,8 +97,8 @@ const TXT: Record<Lang, Txt> = {
     subtotal: "TOTAL",
     iva: "IVA (21%)",
     totalIva: "TOTAL amb IVA",
-    rolSignatari: "arquitecte col·legiat COAC 22289-5",
-    adminSignatari: "Administrador de DACARQUITECTURA, REHABILITACIÓ I URBANISME, S.L.P.",
+    rolSignatari: "arquitecte col·legiat COAC 00000-0",
+    adminSignatari: "Administrador de ESTUDI DEMO, ARQUITECTURA I URBANISME, S.L.P.",
     contingutTitle: "CONTINGUT DE LA PROPOSTA",
     especificacionsTitle: "ESPECIFICACIONS DEL SERVEI:",
     inclouIntro: "La present Proposta d'Honoraris INCLOU en el següent llistat de serveis a desenvolupar:",
@@ -113,7 +115,7 @@ const TXT: Record<Lang, Txt> = {
       "Es pactarà amb el client el lliurament de la diferent documentació a partir d'un calendari pactat entre ambdues parts.",
     pagamentTitle: "PROPOSTA DE FORMA DE PAGAMENT",
     pagamentText:
-      "A partir de la data de lliurament de l'informe i la factura, es deixarà un termini de 5 dies com a màxim per a la revisió o possibles modificacions del mateix, però un cop complerts aquests, es procedirà al pagament per factura a DACARQUITECTURA, ja sigui MITJANÇANT TRANSFERÈNCIA BANCÀRIA o REBUT BANCARI DOMICILIAT, amb un venciment immediat:",
+      "A partir de la data de lliurament de l'informe i la factura, es deixarà un termini de 5 dies com a màxim per a la revisió o possibles modificacions del mateix, però un cop complerts aquests, es procedirà al pagament per factura a ESTUDI DEMO, ja sigui MITJANÇANT TRANSFERÈNCIA BANCÀRIA o REBUT BANCARI DOMICILIAT, amb un venciment immediat:",
     acceptacioTitle: "ACCEPTACIÓ",
     mesIva: "+ IVA",
     acceptacioText: [
@@ -148,8 +150,8 @@ const TXT: Record<Lang, Txt> = {
     subtotal: "TOTAL",
     iva: "IVA (21%)",
     totalIva: "TOTAL con IVA",
-    rolSignatari: "arquitecto colegiado COAC 22289-5",
-    adminSignatari: "Administrador de DACARQUITECTURA, REHABILITACIÓ I URBANISME, S.L.P.",
+    rolSignatari: "arquitecto colegiado COAC 00000-0",
+    adminSignatari: "Administrador de ESTUDI DEMO, ARQUITECTURA I URBANISME, S.L.P.",
     contingutTitle: "CONTENIDO DE LA PROPUESTA",
     especificacionsTitle: "ESPECIFICACIONES DEL SERVICIO:",
     inclouIntro: "La presente Propuesta de Honorarios INCLUYE el siguiente listado de servicios a desarrollar:",
@@ -166,7 +168,7 @@ const TXT: Record<Lang, Txt> = {
       "Se pactará con el cliente la entrega de la diferente documentación a partir de un calendario pactado entre ambas partes.",
     pagamentTitle: "PROPUESTA DE FORMA DE PAGO",
     pagamentText:
-      "A partir de la fecha de entrega del informe y la factura, se dejará un plazo de 5 días como máximo para la revisión o posibles modificaciones del mismo, pero una vez cumplidos éstos, se procederá al pago por factura a DACARQUITECTURA, ya sea MEDIANTE TRANSFERENCIA BANCARIA o RECIBO BANCARIO DOMICILIADO, con un vencimiento inmediato:",
+      "A partir de la fecha de entrega del informe y la factura, se dejará un plazo de 5 días como máximo para la revisión o posibles modificaciones del mismo, pero una vez cumplidos éstos, se procederá al pago por factura a ESTUDI DEMO, ya sea MEDIANTE TRANSFERENCIA BANCARIA o RECIBO BANCARIO DOMICILIADO, con un vencimiento inmediato:",
     acceptacioTitle: "ACEPTACIÓN",
     mesIva: "+ IVA",
     acceptacioText: [
@@ -233,7 +235,7 @@ export interface DocData {
 }
 
 // Returns the document body HTML (inline styles for Word/PDF portability).
-export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg"): string {
+export function buildPropostaHtml(doc: DocData, lang: Lang): string {
   const t = TXT[lang];
   const subtotal = doc.serveis.reduce((s, x) => s + (x.preu || 0), 0);
   const iva = subtotal * 0.21;
@@ -306,9 +308,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
 
   return `
   <div style="font-family:${DOC_FONT};font-size:11px;color:#111;max-width:820px;margin:0 auto;">
-    <div style="text-align:right;margin-bottom:4px;">
-      <img src="${logoUrl}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" />
-    </div>
+    <div style="text-align:right;margin-bottom:8px;font-size:22px;font-weight:bold;letter-spacing:.02em;color:#1f4d3f;">${esc(COMPANY_NAME)}</div>
 
     ${bar(t.barProposta)}
     ${rowsWrap(
@@ -367,7 +367,7 @@ export function buildPropostaHtml(doc: DocData, lang: Lang, logoUrl = "/logo.jpg
   </div>`;
 }
 
-export function buildWordDoc(doc: DocData, lang: Lang, logoUrl?: string): string {
+export function buildWordDoc(doc: DocData, lang: Lang): string {
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em,ul,li{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title>${head}</head><body>${buildPropostaHtml(doc, lang, logoUrl)}</body></html>`;
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(doc.num)}</title>${head}</head><body>${buildPropostaHtml(doc, lang)}</body></html>`;
 }

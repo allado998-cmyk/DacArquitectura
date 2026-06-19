@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="64" viewBox="0 0 300 64" role="img" aria-label="Estudi Demo">
+  <rect x="2" y="14" width="36" height="36" rx="7" fill="#1f4d3f"/>
+  <path d="M11 41 L20 23 L29 41 Z" fill="#ffffff"/>
+  <text x="50" y="42" font-family="'Century Gothic','Trebuchet MS',Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="0.5" fill="#1f4d3f">Estudi<tspan fill="#9ca3af"> Demo</tspan></text>
+</svg>

@@ -20,7 +20,7 @@ import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, lighten } from "@/components/charts";
 import { CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
-import { PROFESSIONAL } from "@/lib/proposta-doc";
+import { COMPANY_NAME, PROFESSIONAL } from "@/lib/proposta-doc";
 
 export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
 export interface ExpedientOpt { id: number; num_expedient: string; projecte: string | null; pressupost: string }
@@ -351,7 +351,6 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
   const properesSum = sumGroup(visibleProperes, suplitsByFactura);
 
   function exportPdf() {
-    const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
     const filterParts: string[] = [];
     if (fAny) filterParts.push(`Any ${fAny}`);
     if (fTrim) filterParts.push(`Trimestre T${fTrim}`);
@@ -396,7 +395,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
         .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
         .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
         .head .sub { font-size: 12px; color: #666; }
-        .head img { width: 150px; height: auto; }
+        .head .brand { font-size: 22px; font-weight: 700; letter-spacing: .02em; color: #1f4d3f; }
         table { border-collapse: collapse; width: 100%; font-size: 11px; }
         thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
         tbody td { padding: 6px 8px; border-bottom: 1px solid #e7e7e3; }
@@ -415,7 +414,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
             <h1>Factures</h1>
             <div class="sub">${esc(filterLine)}</div>
           </div>
-          <img src="${logo}" alt="DAC arquitectura" />
+          <div class="brand">${esc(COMPANY_NAME)}</div>
         </div>
         <table>
           <thead>
@@ -429,7 +428,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
             ${visibleEmeses.length ? totalRow : ""}
           </tbody>
         </table>
-        <div class="foot">Generat el ${esc(formatDataCa(new Date().toISOString().slice(0, 10)))} · DACARQUITECTURA</div>
+        <div class="foot">Generat el ${esc(formatDataCa(new Date().toISOString().slice(0, 10)))} · ${esc(COMPANY_NAME)}</div>
       </body></html>`;
 
     const w = window.open("", "_blank", "width=1100,height=800");
@@ -678,7 +677,6 @@ function FacturaForm({
 
   function generar(mode: "print" | "word" = "print") {
     const L = FACT_LABELS[lang];
-    const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
     const fecha = data ? longDate(data, lang) : "";
     const ciutatProf = PROFESSIONAL.ciutat.replace(/^\d+\s*/, ""); // "08028 Barcelona" → "Barcelona"
 
@@ -723,7 +721,7 @@ function FacturaForm({
 
     const body = `
       <div style="font-family:${FACTURA_FONT};font-size:13px;color:#111;max-width:760px;margin:0 auto;">
-        <div style="text-align:right;margin-bottom:4px;"><img src="${logo}" alt="DAC arquitectura" width="170" height="67" style="width:170px;height:auto;display:inline-block;"/></div>
+        <div style="text-align:right;margin-bottom:8px;font-size:22px;font-weight:bold;letter-spacing:.02em;color:#1f4d3f;">${esc(COMPANY_NAME)}</div>
 
         ${bar(L.datosProf)}
         <table style="border-collapse:collapse;">
@@ -1131,7 +1129,7 @@ function fmtPct(v: number) {
 }
 
 // Generated-invoice document constants ---------------------------------------
-const BANK = { nom: "CAJA DE ARQUITECTOS ARQUIA", iban: "ES66 3183 0801 2010 0250 2225" };
+const BANK = { nom: "BANC DEMO", iban: "ES00 0000 0000 0000 0000 0000" };
 const IVA_EXEMPT_NOTE =
   "Aquesta factura no comporta IVA en ser un servei cultural. D'acord amb l'article 20.1.10 de la Llei 37/1992, de 28 de desembre, les classes a títol particular estan exemptes d'IVA.";
 // Century Gothic with graceful fallbacks for browsers/OSes that lack it.

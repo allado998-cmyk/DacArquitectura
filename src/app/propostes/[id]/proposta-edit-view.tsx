@@ -93,12 +93,8 @@ export function PropostaEditView({
     sub: c.client_nom ?? undefined,
   }));
 
-  function logoUrl() {
-    return typeof window !== "undefined" ? `${window.location.origin}/logo.jpg` : "/logo.jpg";
-  }
-
   function downloadWord() {
-    const html = buildWordDoc(data, lang, logoUrl());
+    const html = buildWordDoc(data, lang);
     const blob = new Blob(["﻿", html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -109,7 +105,7 @@ export function PropostaEditView({
   }
 
   function printDoc() {
-    const body = buildPropostaHtml(data, lang, logoUrl());
+    const body = buildPropostaHtml(data, lang);
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
     w.document.write(

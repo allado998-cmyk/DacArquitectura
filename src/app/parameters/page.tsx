@@ -2,14 +2,14 @@ import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ParametersView } from "./parameters-view";
-import type { Client, ClientContacte, ClientStats, ConcepteDespesaDirecta, ConcepteAltraDespesa, Tipologia } from "@/types/db";
+import type { Client, ClientContacte, ClientStats, ConcepteDespesaDirecta, ConcepteAltraDespesa, Tipologia, Tasca } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function ParametersPage() {
   await requireUser();
 
-  const [clients, clientStats, conceptesDirectes, conceptesAltres, tipologies, contactes] = await Promise.all([
+  const [clients, clientStats, conceptesDirectes, conceptesAltres, tipologies, contactes, tasques] = await Promise.all([
     sql`
       select c.id, c.nom, c.nif, c.carrer, c.ciutat, c.codi_postal, c.contacte, c.created_at,
         coalesce(
@@ -45,6 +45,7 @@ export default async function ParametersPage() {
       left join public.clients c on c.id = cc.client_id
       order by lower(nullif(cc.nom, '')) asc nulls last, cc.id
     ` as unknown as Promise<ClientContacte[]>,
+    sql`select id, nom from public.tasca order by nom` as unknown as Promise<Tasca[]>,
   ]);
 
   return (
@@ -62,6 +63,7 @@ export default async function ParametersPage() {
           conceptesAltres={conceptesAltres}
           tipologies={tipologies}
           contactes={contactes}
+          tasques={tasques}
         />
       </main>
     </>

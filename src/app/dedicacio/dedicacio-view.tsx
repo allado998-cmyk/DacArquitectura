@@ -6,7 +6,7 @@ import type { Dedicacio, Expedient } from "@/types/db";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { CATEGORIES } from "@/lib/expedients";
-import { ChartCard, HBarChart, KpiCard, VBarChart } from "@/components/charts";
+import { ChartCard, HBarChart, KpiCard, LineChart } from "@/components/charts";
 
 const ACCENT_RGB = "31, 77, 63";
 const MONTHS_CA = [
@@ -217,7 +217,7 @@ function EntryForm({
         </div>
       </div>
       <div>
-        <label className="label">Fent què</label>
+        <label className="label">Tasca</label>
         <input className="input" list="tasques-list" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
         <datalist id="tasques-list">
           {tasques.map((t) => (
@@ -406,8 +406,8 @@ function DedicacioForm({
           <input type="number" step="0.25" min="0" className="input text-right" value={hores} onChange={(e) => setHores(e.target.value)} />
         </div>
         <div className="sm:col-span-2">
-          <label className="label">Fent què</label>
-          <input className="input" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
+          <label className="label">Tasca</label>
+          <input className="input" list="tasques-list" placeholder="Tasca…" value={tasca} onChange={(e) => setTasca(e.target.value)} />
         </div>
         <div className="sm:col-span-2">
           <label className="label">Comentari</label>
@@ -648,8 +648,49 @@ function StatsTab({
   const weekdayRows = weekdayAgg.map((w) => ({ label: w.label, total: w.total, avg: w.dates.size ? w.total / w.dates.size : 0 }));
   const weekdayMaxAvg = Math.max(1, ...weekdayRows.map((w) => w.avg));
 
+  // Mitjana d'hores per dia treballat, mes a mes.
+  const monthAggMap = new Map<string, { hores: number; dies: Set<string> }>();
+  for (const d of filtered) {
+    const k = d.data.slice(0, 7);
+    const g = monthAggMap.get(k) ?? { hores: 0, dies: new Set<string>() };
+    g.hores += parseFloat(d.hores) || 0;
+    g.dies.add(d.data);
+    monthAggMap.set(k, g);
+  }
+  function monthLabel(key: string) {
+    const [y, m] = key.split("-").map(Number);
+    return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
+  }
+  const monthAvgRows = Array.from(monthAggMap, ([key, g]) => ({ key, avg: g.dies.size ? g.hores / g.dies.size : 0 })).sort((a, b) => a.key.localeCompare(b.key));
+
+  const filterSummary = [
+    fAny && `Any ${fAny}`,
+    fExpedient != null && (expedientOpts.find((o) => o.id === fExpedient)?.label ?? ""),
+    fClient,
+    fCategoria && (CATEGORIES.find((c) => c.code === fCategoria)?.label ?? fCategoria),
+    (dStart || dEnd) && `${dStart || "…"} → ${dEnd || "…"}`,
+  ].filter(Boolean).join(" · ") || "Tota la dedicació";
+
+  function exportStatsPdf() {
+    exportDedicacioStatsPdf({
+      filterSummary,
+      totalHores, dies, nExpedients,
+      mitjanaDia: dies ? totalHores / dies : 0,
+      categoria: catRows.map((r) => ({ label: r.label, hores: r.hores })),
+      client: clientRows.map((r) => ({ label: r.label, hores: r.hores })),
+      mesAvg: monthAvgRows.map((r) => ({ label: monthLabel(r.key), avg: r.avg })),
+      weekday: weekdayRows.map((w) => ({ label: w.label, avg: w.avg, total: w.total })),
+      evolucio: { meta: agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes", rows: periodRows.map((p) => ({ label: periodLabel(p.key), hores: p.hores })) },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+          <DedPdfIcon /> PDF
+        </button>
+      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm space-y-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -728,7 +769,12 @@ function StatsTab({
 
       {/* Evolució */}
       <ChartCard title="Evolució" meta={agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes"}>
-        <VBarChart bars={periodRows.map((p) => ({ label: periodLabel(p.key), value: p.hores, color: "#8b5cf6", display: fmtHores(p.hores) }))} />
+        <LineChart points={periodRows.map((p) => ({ label: periodLabel(p.key), value: p.hores }))} color="#8b5cf6" fmt={fmtHores} />
+      </ChartCard>
+
+      {/* Mitjana per dia, mes a mes */}
+      <ChartCard title="Mitjana d'hores per dia treballat" meta="mes a mes">
+        <LineChart points={monthAvgRows.map((r) => ({ label: monthLabel(r.key), value: Math.round(r.avg * 100) / 100 }))} color="#0ea5e9" fmt={fmtHores} />
       </ChartCard>
 
       {/* Per dia de la setmana */}
@@ -828,4 +874,86 @@ function DayModal({
       <DedicacioEditModal d={editing} onClose={() => setEditing(null)} expedientOpts={expedientOpts} />
     </Modal>
   );
+}
+
+// ============================================================================
+// PDF export (dedicació stats, respecting filters)
+// ============================================================================
+
+function DedPdfIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
+    </svg>
+  );
+}
+function escH(s: string | null | undefined) {
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+interface DedStatsPdf {
+  filterSummary: string;
+  totalHores: number;
+  dies: number;
+  nExpedients: number;
+  mitjanaDia: number;
+  categoria: { label: string; hores: number }[];
+  client: { label: string; hores: number }[];
+  mesAvg: { label: string; avg: number }[];
+  weekday: { label: string; avg: number; total: number }[];
+  evolucio: { meta: string; rows: { label: string; hores: number }[] };
+}
+
+function exportDedicacioStatsPdf(d: DedStatsPdf) {
+  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+  const twoCol = (title: string, rows: { label: string; v: string }[], head = ["Concepte", "Hores"]) =>
+    rows.length === 0 ? "" : `<h2>${escH(title)}</h2><table><thead><tr><th>${escH(head[0])}</th><th class="r">${escH(head[1])}</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escH(r.label)}</td><td class="r">${escH(r.v)}</td></tr>`).join("")}</tbody></table>`;
+  const weekdayTable = d.weekday.some((w) => w.total > 0)
+    ? `<h2>Per dia de la setmana</h2><table><thead><tr><th>Dia</th><th class="r">Mitjana</th><th class="r">Total</th></tr></thead><tbody>${d.weekday.map((w) => `<tr><td>${escH(w.label)}</td><td class="r">${escH(fmtHores(w.avg))}</td><td class="r">${escH(fmtHores(w.total))}</td></tr>`).join("")}</tbody></table>`
+    : "";
+
+  const kpis = `<div class="kpis">
+      <div class="kpi"><div class="l">Hores totals</div><div class="v">${escH(fmtHores(d.totalHores))}</div></div>
+      <div class="kpi"><div class="l">Dies treballats</div><div class="v">${d.dies}</div></div>
+      <div class="kpi"><div class="l">Expedients</div><div class="v">${d.nExpedients}</div></div>
+      <div class="kpi"><div class="l">Mitjana / dia</div><div class="v">${escH(fmtHores(d.mitjanaDia))}</div></div>
+    </div>`;
+
+  const inner = kpis
+    + twoCol("Hores per categoria", d.categoria.map((r) => ({ label: r.label, v: fmtHores(r.hores) })))
+    + twoCol("Hores per client", d.client.map((r) => ({ label: r.label, v: fmtHores(r.hores) })))
+    + twoCol("Mitjana d'hores per dia treballat (mes a mes)", d.mesAvg.map((r) => ({ label: r.label, v: fmtHores(r.avg) })), ["Mes", "Mitjana/dia"])
+    + twoCol(`Evolució (${d.evolucio.meta})`, d.evolucio.rows.map((r) => ({ label: r.label, v: fmtHores(r.hores) })), ["Període", "Hores"])
+    + weekdayTable;
+
+  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Dedicació — Estadístiques</title>
+    <style>
+      @page { size: A4; margin: 1.4cm; }
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: Arial, Helvetica, sans-serif; }
+      body { margin: 0; color: #1a1a1a; }
+      .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+      .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
+      .head .sub { font-size: 12px; color: #666; }
+      .head img { width: 150px; height: auto; }
+      h2 { font-size: 13px; margin: 16px 0 6px; }
+      .kpis { display: flex; flex-wrap: wrap; gap: 10px; }
+      .kpi { border: 1px solid #e2e2dd; border-radius: 10px; padding: 8px 12px; min-width: 130px; }
+      .kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #777; }
+      .kpi .v { font-size: 16px; font-weight: 700; }
+      table { border-collapse: collapse; width: 100%; max-width: 520px; font-size: 11px; }
+      thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; }
+      tbody td { padding: 5px 8px; border-bottom: 1px solid #e7e7e3; }
+      td.r, th.r { text-align: right; white-space: nowrap; }
+      .foot { margin-top: 16px; font-size: 10px; color: #999; }
+    </style></head><body>
+      <div class="head"><div><h1>Dedicació — Estadístiques</h1><div class="sub">${escH(d.filterSummary)}</div></div><img src="${logo}" alt="DAC arquitectura" /></div>
+      ${inner}
+      <div class="foot">Generat el ${new Date().toLocaleDateString("ca-ES")} · DACARQUITECTURA</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=1000,height=900");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
 }

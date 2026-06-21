@@ -141,6 +141,24 @@ export async function deleteTipologiaAction(id: number) {
   revalidatePath("/parameters");
 }
 
+// Tasques (dedicació lookup) ------------------------------------------------
+
+export async function createTascaAction(nom: string) {
+  await requireUser();
+  const trimmed = nom.trim();
+  if (!trimmed) return;
+  await sql`insert into public.tasca (nom) values (${trimmed}) on conflict (nom) do nothing`;
+  revalidatePath("/parameters");
+  revalidatePath("/dedicacio");
+}
+
+export async function deleteTascaAction(id: number) {
+  await requireUser();
+  await sql`delete from public.tasca where id = ${id}`;
+  revalidatePath("/parameters");
+  revalidatePath("/dedicacio");
+}
+
 // Concepte Despesa Directa --------------------------------------------------
 
 export async function createConcepteDirectaAction(nom: string, preu: number) {

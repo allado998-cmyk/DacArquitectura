@@ -126,6 +126,56 @@ export function VBarChart({ bars, height = 220 }: { bars: BarDatum[]; height?: n
   );
 }
 
+// Line chart with dots and value labels; stretches to its container width.
+export function LineChart({
+  points,
+  height = 220,
+  color = "#8b5cf6",
+  fmt = (n: number) => String(n),
+}: {
+  points: { label: string; value: number }[];
+  height?: number;
+  color?: string;
+  fmt?: (n: number) => string;
+}) {
+  const uid = useId().replace(/:/g, "");
+  if (points.length === 0) return <Empty />;
+  const max = Math.max(1, ...points.map((p) => p.value));
+  const n = points.length;
+  const x = (i: number) => ((i + 0.5) / n) * 100;
+  const y = (v: number) => 100 - (v / max) * 88 - 6; // 6% top / 6% bottom padding
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p.value)}`).join(" ");
+  const area = `${line} L ${x(n - 1)} 100 L ${x(0)} 100 Z`;
+
+  return (
+    <div>
+      <div className="relative" style={{ height }}>
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={`${uid}-area`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill={`url(#${uid}-area)`} />
+          <path d={line} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+        {points.map((p, i) => (
+          <div key={`d${i}`} className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white" style={{ left: `${x(i)}%`, top: `${y(p.value)}%`, backgroundColor: color }} />
+        ))}
+        {points.map((p, i) => (
+          <div key={`v${i}`} className="absolute -translate-x-1/2 -translate-y-[170%] whitespace-nowrap text-[10px] font-semibold tabular-nums text-[var(--color-ink)]" style={{ left: `${x(i)}%`, top: `${y(p.value)}%` }}>{fmt(p.value)}</div>
+        ))}
+      </div>
+      <div className="mt-2 flex">
+        {points.map((p, i) => (
+          <div key={`l${i}`} className="min-w-0 flex-1 truncate text-center text-[11px] text-[var(--color-muted)]" title={p.label}>{p.label}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Horizontal gradient bars with a value pill at the end of each bar.
 export function HBarChart({ bars }: { bars: BarDatum[] }) {
   if (bars.length === 0) return <Empty />;
@@ -159,8 +209,9 @@ export function HBarChart({ bars }: { bars: BarDatum[] }) {
 
 export interface DonutSegment {
   label: string;
-  value: number;
+  value: number; // drives the arc size and the % share
   color: string; // hex
+  count?: number; // when set, shown as the leading number instead of value
   note?: string;
 }
 
@@ -233,7 +284,7 @@ export function GradientDonut({
             <span>
               <span className="font-medium">{s.label}</span>{" "}
               <span className="text-[var(--color-muted)] tabular-nums">
-                {s.value}
+                {s.count ?? s.value}
                 {total ? ` · ${Math.round((s.value / total) * 100)}%` : ""}
               </span>
               {s.note && <span className="block text-xs text-[var(--color-muted)]">{s.note}</span>}

@@ -32,7 +32,7 @@ export default async function DedicacioPage() {
       left join public.clients c on c.id = e.client_id
       order by d.data desc, d.id desc
     ` as unknown as Promise<Dedicacio[]>,
-    sql`select nom from public.concepte_despesa_directa where actiu = true order by ordre, nom` as unknown as Promise<{ nom: string }[]>,
+    sql`select nom from public.tasca order by nom` as unknown as Promise<{ nom: string }[]>,
   ]);
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createExpedientAction,
   deleteExpedientAction,
@@ -58,6 +58,7 @@ export function ExpedientsView({
   propostes: PropostaOpt[];
 }) {
   const [tab, setTab] = useState<Tab>("llista");
+  const [listCount, setListCount] = useState(expedients.length);
   const [, startTransition] = useTransition();
 
   const clientOpts: ComboOption[] = clients.map((c) => ({
@@ -90,7 +91,7 @@ export function ExpedientsView({
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-6 border-b border-[var(--color-line)]">
         <TabBtn current={tab} value="llista" onClick={setTab}>
-          Expedients ({expedients.length})
+          Expedients ({listCount})
         </TabBtn>
         <TabBtn current={tab} value="estadistiques" onClick={setTab}>
           Estadístiques
@@ -107,7 +108,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} />}
     </div>
   );
@@ -180,6 +181,7 @@ function ExpedientsList({
   tipologies,
   calculs,
   propostes,
+  onCount,
 }: {
   rows: Expedient[];
   clientOpts: ComboOption[];
@@ -188,11 +190,12 @@ function ExpedientsList({
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
+  onCount: (n: number) => void;
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
   const [editing, setEditing] = useState<Expedient | null>(null);
   const [query, setQuery] = useState("");
-  const [fAny, setFAny] = useState("");
+  const [fAny, setFAny] = useState(String(new Date().getFullYear()));
   const [fClient, setFClient] = useState("");
   const [fCategoria, setFCategoria] = useState("");
   const [fTipus, setFTipus] = useState("");
@@ -221,6 +224,23 @@ function ExpedientsList({
     }
     return true;
   });
+
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
+
+  const filterSummary = [
+    fAny && `Any ${fAny}`,
+    fClient,
+    fCategoria && (CATEGORY_BY_CODE[fCategoria]?.label ?? fCategoria),
+    fTipologia && tipologies.find((t) => String(t.id) === fTipologia)?.nom,
+    fTipus && (fTipus === "public" ? "Públic" : "Privat"),
+    fWeb && `Web: ${fWeb === "si" ? "Sí" : "No"}`,
+    fEstat && (fEstat === "obert" ? "Oberts" : "Tancats"),
+    q && `"${query.trim()}"`,
+  ].filter(Boolean).join(" · ") || "Tots els expedients";
+
+  function exportPdf() {
+    exportExpedientsListPdf(filtered, filterSummary);
+  }
 
   if (rows.length === 0) {
     return (
@@ -288,6 +308,11 @@ function ExpedientsList({
             <option value="obert">Obert</option>
             <option value="tancat">Tancat</option>
           </select>
+        </div>
+        <div className="ml-auto">
+          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels expedients filtrats">
+            <PdfIcon /> PDF
+          </button>
         </div>
       </div>
 
@@ -787,19 +812,43 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
   const pressupostObert = filtered.filter((r) => r.estat === "obert").reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   const pressupostMitja = total ? pressupostTotal / total : 0;
 
-  const byCiutat = groupBy(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
-  const byTipologia = groupBy(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
-  // Pressupost split by category — drives the category donut.
-  const catPressupost = CATEGORIES.map((c) => ({
-    label: c.label,
-    color: c.color,
-    value: filtered.filter((r) => r.categoria === c.code).reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0),
-  })).filter((g) => g.value > 0);
-  const senseCatPress = filtered.filter((r) => !r.categoria).reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", value: senseCatPress });
+  const byCiutat = groupBySum(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
+  const byTipologia = groupBySum(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
+  // Pressupost split by category — drives the category donut (count + money).
+  const catPressupost = CATEGORIES.map((c) => {
+    const grp = filtered.filter((r) => r.categoria === c.code);
+    return { label: c.label, color: c.color, count: grp.length, value: grp.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0) };
+  }).filter((g) => g.value > 0);
+  const senseCat = filtered.filter((r) => !r.categoria);
+  const senseCatPress = senseCat.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
+  if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", count: senseCat.length, value: senseCatPress });
+
+  const filterSummary = [
+    fAny && `Any ${fAny}`,
+    fEstat && (fEstat === "obert" ? "Oberts" : "Tancats"),
+    fCategoria && (CATEGORY_BY_CODE[fCategoria]?.label ?? fCategoria),
+    fTipologia && tipologies.find((t) => String(t.id) === fTipologia)?.nom,
+    fTipus && (fTipus === "public" ? "Públic" : "Privat"),
+    fCiutat,
+  ].filter(Boolean).join(" · ") || "Tots els expedients";
+
+  function exportStatsPdf() {
+    exportExpedientsStatsPdf({
+      filterSummary, total, oberts, tancats, privats, publics,
+      pressupostTotal, pressupostPrivat, pressupostPublic, pressupostObert, pressupostMitja,
+      cat: catPressupost.map((g) => ({ label: g.label, count: g.count, money: g.value })),
+      tipologia: byTipologia.map((g) => ({ label: g.key, count: g.count, money: g.money })),
+      ciutat: byCiutat.map((g) => ({ label: g.key, count: g.count, money: g.money })),
+    });
+  }
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+          <PdfIcon /> PDF
+        </button>
+      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -852,8 +901,8 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
           ) : (
             <GradientDonut
               segments={[
-                { label: "Privat", value: Math.round(pressupostPrivat), color: TIPUS.privat.color, note: formatEur(pressupostPrivat) },
-                { label: "Públic", value: Math.round(pressupostPublic), color: TIPUS.public.color, note: formatEur(pressupostPublic) },
+                { label: "Privat", value: Math.round(pressupostPrivat), color: TIPUS.privat.color, count: privats, note: formatEur(pressupostPrivat) },
+                { label: "Públic", value: Math.round(pressupostPublic), color: TIPUS.public.color, count: publics, note: formatEur(pressupostPublic) },
               ]}
               centerValue={formatEur(pressupostTotal)}
               centerLabel="pressupost"
@@ -865,7 +914,7 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
             <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
           ) : (
             <GradientDonut
-              segments={catPressupost.map((g) => ({ label: g.label, value: Math.round(g.value), color: g.color, note: formatEur(g.value) }))}
+              segments={catPressupost.map((g) => ({ label: g.label, value: Math.round(g.value), color: g.color, count: g.count, note: formatEur(g.value) }))}
               centerValue={formatEur(pressupostTotal)}
               centerLabel="pressupost"
             />
@@ -889,14 +938,16 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
 interface Group {
   key: string;
   count: number;
+  money: number;
 }
 
-function groupBy(rows: Expedient[], keyFn: (r: Expedient) => string): Group[] {
+function groupBySum(rows: Expedient[], keyFn: (r: Expedient) => string): Group[] {
   const map = new Map<string, Group>();
   for (const r of rows) {
     const key = keyFn(r);
-    const g = map.get(key) ?? { key, count: 0 };
+    const g = map.get(key) ?? { key, count: 0, money: 0 };
     g.count += 1;
+    g.money += parseFloat(r.pressupost) || 0;
     map.set(key, g);
   }
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
@@ -924,4 +975,126 @@ function FilterSelect({
       </select>
     </div>
   );
+}
+
+// ============================================================================
+// PDF export (list + stats), respecting the active filters
+// ============================================================================
+
+function PdfIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
+    </svg>
+  );
+}
+
+function escHtml(s: string | null | undefined) {
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function eur(v: number) {
+  return new Intl.NumberFormat("ca-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v || 0);
+}
+function openPdf(title: string, headSub: string, innerHtml: string) {
+  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+    <style>
+      @page { size: A4 landscape; margin: 1.2cm; }
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: Arial, Helvetica, sans-serif; }
+      body { margin: 0; color: #1a1a1a; }
+      .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+      .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
+      .head .sub { font-size: 12px; color: #666; }
+      .head img { width: 150px; height: auto; }
+      h2 { font-size: 13px; margin: 18px 0 6px; }
+      .kpis { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+      .kpi { border: 1px solid #e2e2dd; border-radius: 10px; padding: 8px 12px; min-width: 150px; }
+      .kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #777; }
+      .kpi .v { font-size: 16px; font-weight: 700; }
+      table { border-collapse: collapse; width: 100%; font-size: 11px; margin-bottom: 4px; }
+      thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
+      tbody td { padding: 6px 8px; border-bottom: 1px solid #e7e7e3; }
+      tbody tr:nth-child(even) td { background: #f7f7f5; }
+      td.r, th.r { text-align: right; white-space: nowrap; }
+      td.c, th.c { text-align: center; }
+      td.mono { font-family: "Courier New", monospace; }
+      tr.tot td { border-top: 2px solid #1f4d3f; border-bottom: none; font-weight: 700; background: #eef2f0 !important; padding-top: 8px; }
+      .foot { margin-top: 16px; font-size: 10px; color: #999; }
+    </style></head><body>
+      <div class="head"><div><h1>${escHtml(title)}</h1><div class="sub">${escHtml(headSub)}</div></div><img src="${logo}" alt="DAC arquitectura" /></div>
+      ${innerHtml}
+      <div class="foot">Generat el ${new Date().toLocaleDateString("ca-ES")} · DACARQUITECTURA</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=1100,height=800");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
+}
+
+function exportExpedientsListPdf(rows: Expedient[], filterSummary: string) {
+  const body = rows
+    .map((r) => `<tr>
+      <td class="mono">${escHtml(r.num_expedient)}</td>
+      <td>${escHtml(r.projecte ?? "—")}</td>
+      <td>${escHtml(r.client_nom ?? "—")}</td>
+      <td>${escHtml(r.ciutat ?? "—")}</td>
+      <td>${escHtml((r.categoria && CATEGORY_BY_CODE[r.categoria]?.label) || "—")}</td>
+      <td>${escHtml(r.tipologia_nom ?? "—")}</td>
+      <td>${escHtml(TIPUS[r.tipus].label)}</td>
+      <td class="c">${r.web ? "Sí" : "—"}</td>
+      <td class="r">${eur(parseFloat(r.pressupost) || 0)}</td>
+      <td>${escHtml(ESTAT[r.estat].label)}</td>
+      <td>${fmtDate(r.data_tancament) ?? "—"}</td>
+    </tr>`)
+    .join("");
+  const sum = rows.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
+  const totalRow = `<tr class="tot"><td colspan="8">Total (${rows.length} ${rows.length === 1 ? "expedient" : "expedients"})</td><td class="r">${eur(sum)}</td><td colspan="2"></td></tr>`;
+  const table = `<table><thead><tr>
+      <th>Núm.</th><th>Projecte</th><th>Client</th><th>Ciutat</th><th>Categoria</th><th>Tipologia</th><th>Tipus</th><th class="c">Web</th><th class="r">Pressupost</th><th>Estat</th><th>Tancat el</th>
+    </tr></thead><tbody>${body || `<tr><td colspan="11" style="padding:14px;color:#888;">Cap expedient amb aquests filtres.</td></tr>`}${rows.length ? totalRow : ""}</tbody></table>`;
+  openPdf("Expedients", filterSummary, table);
+}
+
+interface StatsPdfData {
+  filterSummary: string;
+  total: number;
+  oberts: number;
+  tancats: number;
+  privats: number;
+  publics: number;
+  pressupostTotal: number;
+  pressupostPrivat: number;
+  pressupostPublic: number;
+  pressupostObert: number;
+  pressupostMitja: number;
+  cat: { label: string; count: number; money: number }[];
+  tipologia: { label: string; count: number; money: number }[];
+  ciutat: { label: string; count: number; money: number }[];
+}
+
+function breakdownTable(title: string, rowsData: { label: string; count: number; money: number }[], total: number) {
+  if (rowsData.length === 0) return "";
+  const body = rowsData
+    .map((g) => `<tr><td>${escHtml(g.label)}</td><td class="r">${g.count}</td><td class="r">${total ? Math.round((g.money / total) * 100) : 0}%</td><td class="r">${eur(g.money)}</td></tr>`)
+    .join("");
+  return `<h2>${escHtml(title)}</h2><table><thead><tr><th>Concepte</th><th class="r">Expedients</th><th class="r">% pressupost</th><th class="r">Pressupost</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function exportExpedientsStatsPdf(d: StatsPdfData) {
+  const kpis = `<div class="kpis">
+      <div class="kpi"><div class="l">Expedients</div><div class="v">${d.total}</div></div>
+      <div class="kpi"><div class="l">Oberts / Tancats</div><div class="v">${d.oberts} / ${d.tancats}</div></div>
+      <div class="kpi"><div class="l">Privats / Públics</div><div class="v">${d.privats} / ${d.publics}</div></div>
+      <div class="kpi"><div class="l">Pressupost total</div><div class="v">${eur(d.pressupostTotal)}</div></div>
+      <div class="kpi"><div class="l">Pressupost en obert</div><div class="v">${eur(d.pressupostObert)}</div></div>
+      <div class="kpi"><div class="l">Pressupost mitjà</div><div class="v">${eur(d.pressupostMitja)}</div></div>
+    </div>`;
+  const tipus = breakdownTable("Pressupost per tipus", [
+    { label: "Privat", count: d.privats, money: d.pressupostPrivat },
+    { label: "Públic", count: d.publics, money: d.pressupostPublic },
+  ].filter((x) => x.money > 0 || x.count > 0), d.pressupostTotal);
+  const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal);
+  openPdf("Expedients — Estadístiques", d.filterSummary, inner);
 }

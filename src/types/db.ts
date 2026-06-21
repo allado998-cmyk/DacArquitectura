@@ -17,6 +17,11 @@ export interface Client {
   contactes?: ClientContacte[]; // joined
 }
 
+export interface Tasca {
+  id: number;
+  nom: string;
+}
+
 export interface ClientContacte {
   id: number;
   client_id: number | null;

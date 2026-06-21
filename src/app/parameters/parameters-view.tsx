@@ -7,11 +7,13 @@ import {
   createConcepteAltraAction,
   createConcepteDirectaAction,
   createContacteAction,
+  createTascaAction,
   createTipologiaAction,
   deleteClientAction,
   deleteClientContacteAction,
   deleteConcepteAltraAction,
   deleteConcepteDirectaAction,
+  deleteTascaAction,
   deleteTipologiaAction,
   setContacteClientAction,
   updateClientAction,
@@ -26,6 +28,7 @@ import type {
   ClientStats,
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
+  Tasca,
   Tipologia,
 } from "@/types/db";
 import { formatEur, formatEurPrecise } from "@/lib/format";
@@ -33,7 +36,7 @@ import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
 
-type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies";
+type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
 
@@ -44,6 +47,7 @@ export function ParametersView({
   conceptesAltres,
   tipologies,
   contactes,
+  tasques,
 }: {
   clients: Client[];
   clientStats: ClientStats[];
@@ -51,6 +55,7 @@ export function ParametersView({
   conceptesAltres: ConcepteAltraDespesa[];
   tipologies: Tipologia[];
   contactes: ClientContacte[];
+  tasques: Tasca[];
 }) {
   const [tab, setTab] = useState<Tab>("clients");
 
@@ -66,6 +71,7 @@ export function ParametersView({
         <TabBtn current={tab} value="clients" onClick={setTab}>Clients ({clients.length})</TabBtn>
         <TabBtn current={tab} value="contactes" onClick={setTab}>Contactes ({contactes.length})</TabBtn>
         <TabBtn current={tab} value="tipologies" onClick={setTab}>Tipologies ({tipologies.length})</TabBtn>
+        <TabBtn current={tab} value="tasques" onClick={setTab}>Tasques ({tasques.length})</TabBtn>
         <TabBtn current={tab} value="directes" onClick={setTab}>Despeses Directes ({conceptesDirectes.length})</TabBtn>
         <TabBtn current={tab} value="altres" onClick={setTab}>Altres Despeses ({conceptesAltres.length})</TabBtn>
       </div>
@@ -73,6 +79,7 @@ export function ParametersView({
       {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} />}
       {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} />}
       {tab === "tipologies" && <TipologiesPanel rows={tipologies} />}
+      {tab === "tasques" && <TasquesPanel rows={tasques} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} />}
     </div>
@@ -270,6 +277,67 @@ function TipologiesPanel({ rows }: { rows: Tipologia[] }) {
       )}
       <p className="text-xs text-[var(--color-muted)]">
         Eliminar una tipologia no esborra els expedients: només es desvincula.
+      </p>
+    </div>
+  );
+}
+
+// ============================================================================
+// Tasques (dedicació lookup)
+// ============================================================================
+
+function TasquesPanel({ rows }: { rows: Tasca[] }) {
+  const [nom, setNom] = useState("");
+  const [query, setQuery] = useState("");
+  const [, startTransition] = useTransition();
+
+  const q = query.trim().toLowerCase();
+  const filtered = (q ? rows.filter((t) => t.nom.toLowerCase().includes(q)) : rows)
+    .slice()
+    .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <input className="input max-w-xs" placeholder="Cercar tasca…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!nom.trim()) return;
+            startTransition(() => createTascaAction(nom));
+            setNom("");
+          }}
+          className="flex gap-2 ml-auto"
+        >
+          <input className="input" placeholder="Nova tasca" value={nom} onChange={(e) => setNom(e.target.value)} />
+          <button className="btn-primary" type="submit">+ Afegir</button>
+        </form>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap tasca encara." : "Cap resultat."}</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((t) => (
+            <div key={t.id} className="flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-white px-3 py-2">
+              <span className="text-sm">{t.nom}</span>
+              <button
+                type="button"
+                className="text-red-700 hover:underline text-sm"
+                onClick={() => {
+                  if (confirm(`Eliminar la tasca "${t.nom}"?`)) {
+                    startTransition(() => deleteTascaAction(t.id));
+                  }
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-[var(--color-muted)]">
+        Les tasques apareixen com a suggeriments en registrar la dedicació.
       </p>
     </div>
   );

@@ -20,6 +20,7 @@ import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, lighten } from "@/components/charts";
 import { CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
+import { openStatsPdf } from "@/lib/pdf";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 
 export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
@@ -73,6 +74,7 @@ export function FacturacioView({
   const [tab, setTab] = useState<Tab>("factures");
   const [editing, setEditing] = useState<Factura | null>(null);
   const [pendingOpenId, setPendingOpenId] = useState<number | null>(null);
+  const [listCount, setListCount] = useState(factures.length);
   const [creating, startCreate] = useTransition();
 
   // After "Nova factura" inserts a row and the list revalidates, open its popup
@@ -112,7 +114,7 @@ export function FacturacioView({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-6 border-b border-[var(--color-line)]">
-        <TabBtn current={tab} value="factures" onClick={setTab}>Factures ({factures.length})</TabBtn>
+        <TabBtn current={tab} value="factures" onClick={setTab}>Factures ({listCount})</TabBtn>
         <TabBtn current={tab} value="estadistiques" onClick={setTab}>Estadístiques</TabBtn>
         {tab === "factures" && (
           <button type="button" className="btn-primary ml-auto" onClick={novaFactura} disabled={creating}>
@@ -122,7 +124,7 @@ export function FacturacioView({
       </div>
 
       {tab === "factures" ? (
-        <FacturesList factures={factures} suplitsByFactura={suplitsByFactura} onEdit={setEditing} today={today} />
+        <FacturesList factures={factures} suplitsByFactura={suplitsByFactura} onEdit={setEditing} today={today} onCount={setListCount} />
       ) : (
         <StatsPanel factures={factures} today={today} />
       )}
@@ -208,6 +210,9 @@ function FacturesSummary({
   nPagades,
   hidePagades,
   onToggle,
+  nPendents,
+  hidePendents,
+  onTogglePendents,
   nProperes,
   hideProperes,
   onToggleProperes,
@@ -217,6 +222,9 @@ function FacturesSummary({
   nPagades: number;
   hidePagades: boolean;
   onToggle: () => void;
+  nPendents: number;
+  hidePendents: boolean;
+  onTogglePendents: () => void;
   nProperes: number;
   hideProperes: boolean;
   onToggleProperes: () => void;
@@ -235,6 +243,17 @@ function FacturesSummary({
             >
               <EyeIcon off={hideProperes} />
               {hideProperes ? `Mostrar properes (${nProperes})` : `Amagar properes (${nProperes})`}
+            </button>
+          )}
+          {nPendents > 0 && (
+            <button
+              type="button"
+              onClick={onTogglePendents}
+              aria-pressed={hidePendents}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-white px-3 py-1.5 text-sm text-[var(--color-muted)] transition-colors hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-ink)]"
+            >
+              <EyeIcon off={hidePendents} />
+              {hidePendents ? `Mostrar pendents (${nPendents})` : `Amagar pendents (${nPendents})`}
             </button>
           )}
           {nPagades > 0 && (
@@ -278,8 +297,9 @@ function facturaTrim(f: Factura) {
   return String(Math.ceil(m / 3)); // "1".."4"
 }
 
-function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures: Factura[]; suplitsByFactura: Map<number, FacturaSuplit[]>; onEdit: (f: Factura) => void; today: string }) {
+function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { factures: Factura[]; suplitsByFactura: Map<number, FacturaSuplit[]>; onEdit: (f: Factura) => void; today: string; onCount: (n: number) => void }) {
   const [hidePagades, setHidePagades] = useState(false);
+  const [hidePendents, setHidePendents] = useState(false);
   const [hideProperes, setHideProperes] = useState(false);
   const [query, setQuery] = useState("");
   const [fAny, setFAny] = useState(today.slice(0, 4)); // default: current year
@@ -344,11 +364,17 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
   else if (fEstat === "propera") { emeses = []; }
 
   const nPagades = emeses.filter((f) => f.pagada).length;
-  const visibleEmeses = sortRows(hidePagades ? emeses.filter((f) => !f.pagada) : emeses);
+  const nPendents = emeses.length - nPagades;
+  let shownEmeses = emeses;
+  if (hidePagades) shownEmeses = shownEmeses.filter((f) => !f.pagada);
+  if (hidePendents) shownEmeses = shownEmeses.filter((f) => f.pagada);
+  const visibleEmeses = sortRows(shownEmeses);
   const visibleProperes = hideProperes ? [] : sortRows(properes);
 
   const emesesSum = sumGroup(visibleEmeses, suplitsByFactura);
   const properesSum = sumGroup(visibleProperes, suplitsByFactura);
+
+  useEffect(() => onCount(visibleEmeses.length + visibleProperes.length), [visibleEmeses.length, visibleProperes.length, onCount]);
 
   function exportPdf() {
     const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
@@ -448,6 +474,9 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today }: { factures:
         nPagades={nPagades}
         hidePagades={hidePagades}
         onToggle={() => setHidePagades((v) => !v)}
+        nPendents={nPendents}
+        hidePendents={hidePendents}
+        onTogglePendents={() => setHidePendents((v) => !v)}
         nProperes={properes.length}
         hideProperes={hideProperes}
         onToggleProperes={() => setHideProperes((v) => !v)}
@@ -1010,11 +1039,11 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
     color: TRIM_COLORS[tri - 1],
   })).filter((t) => t.value > 0);
 
-  // Donuts by the linked expedient's categoria / tipus / tipologia — by base.
+  // Donuts by the linked expedient's categoria / tipus — by base, with a count.
   function donutSegments(keyFn: (r: { f: Factura; base: number }) => string, metaFn: (key: string) => { label: string; color: string }) {
-    const m = new Map<string, number>();
-    for (const r of rows) { const k = keyFn(r); m.set(k, (m.get(k) ?? 0) + r.base); }
-    return Array.from(m, ([key, v]) => ({ ...metaFn(key), value: Math.round(v), note: formatEur(v) }))
+    const m = new Map<string, { money: number; count: number }>();
+    for (const r of rows) { const k = keyFn(r); const g = m.get(k) ?? { money: 0, count: 0 }; g.money += r.base; g.count += 1; m.set(k, g); }
+    return Array.from(m, ([key, g]) => ({ ...metaFn(key), value: Math.round(g.money), count: g.count, note: formatEur(g.money) }))
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
   }
@@ -1027,8 +1056,41 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
     (k) => (k === "privat" || k === "public" ? { label: TIPUS[k].label, color: TIPUS[k].color } : { label: "Sense tipus", color: "#9ca3af" }),
   );
 
+  const filterSummary = [
+    fAny && `Any ${fAny}`,
+    fTrim && `Trimestre T${fTrim}`,
+    fClient,
+    (dStart || dEnd) && `${dStart || "…"} → ${dEnd || "…"}`,
+  ].filter(Boolean).join(" · ") || "Totes les factures emeses";
+
+  function exportStatsPdf() {
+    openStatsPdf({
+      title: "Facturació — Estadístiques",
+      subtitle: filterSummary,
+      kpis: [
+        { label: "Factures emeses", value: String(rows.length) },
+        { label: "Total facturat (base)", value: formatEur(baseTotal) },
+        { label: "Cobrat (base)", value: formatEur(cobrat) },
+        { label: "Pendent (base)", value: formatEur(pendent) },
+      ],
+      tables: [
+        { title: "Cobraments", columns: [{ label: "Estat" }, { label: "Factures", align: "right" }, { label: "Base", align: "right" }], rows: [["Cobrat", String(nPagades), formatEur(cobrat)], ["Pendent", String(rows.length - nPagades), formatEur(pendent)]] },
+        { title: "Base per categoria", columns: [{ label: "Categoria" }, { label: "Factures", align: "right" }, { label: "Base", align: "right" }], rows: catSegments.map((s) => [s.label, String(s.count), formatEur(s.value)]) },
+        { title: "Base per tipus", columns: [{ label: "Tipus" }, { label: "Factures", align: "right" }, { label: "Base", align: "right" }], rows: tipusSegments.map((s) => [s.label, String(s.count), formatEur(s.value)]) },
+        { title: "Per trimestre", columns: [{ label: "Trimestre" }, { label: "Base", align: "right" }], rows: byTrim.map((t) => [t.label, formatEur(t.value)]) },
+        { title: "Per mes", columns: [{ label: "Mes" }, { label: "Base", align: "right" }], rows: monthRows.map((m) => [m.label, formatEur(m.value)]) },
+        { title: "Per client", columns: [{ label: "Client" }, { label: "Base", align: "right" }], rows: clientRows.map((c) => [c.label, formatEur(c.value)]) },
+      ],
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+          <FactPdfIcon /> PDF
+        </button>
+      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -1082,8 +1144,8 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
         <ChartCard title="Cobraments" meta="base · pagat / pendent">
           <GradientDonut
             segments={[
-              { label: "Cobrat", value: Math.round(cobrat), color: "#16a34a", note: formatEur(cobrat) },
-              { label: "Pendent", value: Math.round(pendent), color: "#dc2626", note: formatEur(pendent) },
+              { label: "Cobrat", value: Math.round(cobrat), color: "#16a34a", count: nPagades, note: formatEur(cobrat) },
+              { label: "Pendent", value: Math.round(pendent), color: "#dc2626", count: rows.length - nPagades, note: formatEur(pendent) },
             ]}
             centerValue={formatEur(baseTotal)}
             centerLabel="base"
@@ -1117,6 +1179,14 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
         <HBarChart bars={clientRows} />
       </ChartCard>
     </div>
+  );
+}
+
+function FactPdfIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
+    </svg>
   );
 }
 

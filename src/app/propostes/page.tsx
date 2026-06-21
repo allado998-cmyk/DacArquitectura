@@ -13,11 +13,12 @@ export default async function PropostesPage() {
   const rows = (await sql`
     select d.id, d.num, to_char(d.data, 'YYYY-MM-DD') as data, d.descripcio, d.adreca, d.ciutat,
            d.codi_postal, d.client_id, d.calcul_id, d.estat, d.created_at, d.updated_at,
-           c.nom as client_nom
+           c.nom as client_nom,
+           coalesce((select sum(preu) from public.proposta_doc_servei where doc_id = d.id), 0)::text as total
     from public.proposta_doc d
     left join public.clients c on c.id = d.client_id
     order by d.num desc nulls last, d.id desc
-  `) as unknown as (PropostaDoc & { client_nom: string | null })[];
+  `) as unknown as (PropostaDoc & { client_nom: string | null; total: string })[];
 
   return (
     <>

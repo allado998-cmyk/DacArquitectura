@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { deletePropostaDocAction } from "./actions";
-import { formatDataCa } from "@/lib/format";
+import { formatDataCa, formatEur } from "@/lib/format";
+import { openListPdf } from "@/lib/pdf";
 import type { PropostaDoc, PropostaDocEstat } from "@/types/db";
 
-type Row = PropostaDoc & { client_nom: string | null };
+type Row = PropostaDoc & { client_nom: string | null; total: string };
 
 const ESTAT_META: Record<PropostaDocEstat, { label: string; bg: string; text: string }> = {
   pendent: { label: "Pendent", bg: "#fef9c3", text: "#854d0e" },
@@ -44,6 +45,16 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
     }
     return true;
   });
+
+  const filterSummary = [fAny && `Any ${fAny}`, fTrim && `T${fTrim}`, fClient, fEstat && (ESTAT_META[fEstat as PropostaDocEstat]?.label ?? fEstat), q && `"${query.trim()}"`].filter(Boolean).join(" · ") || "Totes les propostes";
+  function exportPdf() {
+    openListPdf({
+      title: "Propostes d'honoraris",
+      subtitle: filterSummary,
+      columns: [{ label: "Núm." }, { label: "Data" }, { label: "Descripció" }, { label: "Client" }, { label: "Import", align: "right" }, { label: "Estat" }],
+      rows: filtered.map((r) => [r.num, formatDataCa(r.data), r.descripcio ?? "—", r.client_nom ?? "—", formatEur(r.total), ESTAT_META[r.estat].label]),
+    });
+  }
 
   if (rows.length === 0) {
     return (
@@ -93,6 +104,11 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
             <option value="rebutjada">Rebutjada</option>
           </select>
         </div>
+        <div className="ml-auto">
+          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF de les propostes filtrades">
+            <PdfIcon /> PDF
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -103,6 +119,7 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
               <th className="th text-center w-32">Data</th>
               <th className="th text-left">Descripció</th>
               <th className="th text-left">Client</th>
+              <th className="th text-right w-36">Import</th>
               <th className="th text-center w-32">Estat</th>
               <th className="th text-center w-32"></th>
             </tr>
@@ -116,6 +133,7 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
                   <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
                   <td className="td text-left">{r.descripcio ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                   <td className="td text-left">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                  <td className="td text-right tabular-nums">{formatEur(r.total)}</td>
                   <td className="td text-center">
                     <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: m.bg, color: m.text }}>
                       {m.label}
@@ -132,11 +150,19 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td className="td text-center text-[var(--color-muted)]" colSpan={6}>Cap resultat.</td></tr>
+              <tr><td className="td text-center text-[var(--color-muted)]" colSpan={7}>Cap resultat.</td></tr>
             )}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function PdfIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
+    </svg>
   );
 }

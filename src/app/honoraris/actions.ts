@@ -4,23 +4,18 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
+// CH-YY-XXX, restarting at 001 each calendar year (3 digits).
 async function nextNumProposta(): Promise<string> {
   const yy = String(new Date().getFullYear()).slice(-2);
   const rows = (await sql`
-    select num_proposta
-    from public.propostes
-    where num_proposta like ${yy + "-%"}
-    order by num_proposta desc
-    limit 1
+    select num_proposta from public.propostes where num_proposta like ${yy + "-%"}
   `) as { num_proposta: string }[];
-
-  let next = 1;
-  const last = rows[0]?.num_proposta;
-  if (last) {
-    const m = /-(\d{4})$/.exec(last);
-    if (m) next = parseInt(m[1], 10) + 1;
+  let max = 0;
+  for (const r of rows) {
+    const m = /-(\d+)$/.exec(r.num_proposta ?? "");
+    if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  return `${yy}-${String(next).padStart(4, "0")}`;
+  return `${yy}-${String(max + 1).padStart(3, "0")}`;
 }
 
 export async function createPropostaAction() {

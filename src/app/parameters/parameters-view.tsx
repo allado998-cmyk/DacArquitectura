@@ -32,6 +32,7 @@ import type {
   Tipologia,
 } from "@/types/db";
 import { formatEur, formatEurPrecise } from "@/lib/format";
+import { openListPdf } from "@/lib/pdf";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
@@ -39,6 +40,14 @@ import { KpiCard } from "@/components/charts";
 type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
+
+function ParamPdfIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
+    </svg>
+  );
+}
 
 export function ParametersView({
   clients,
@@ -104,11 +113,22 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
     : rows
   ).slice().sort((a, b) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca"));
 
+  function exportPdf() {
+    openListPdf({
+      title: "Contactes",
+      subtitle: q ? `Cerca: "${query.trim()}" · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
+      landscape: false,
+      columns: [{ label: "Nom" }, { label: "Telèfon" }, { label: "Mail" }, { label: "Comentari" }, { label: "Client" }],
+      rows: filtered.map((c) => [c.nom ?? "—", c.telefon ?? "—", c.mail ?? "—", c.comentari ?? "—", c.client_nom ?? "—"]),
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <input className="input max-w-xs" placeholder="Cercar contacte…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <button type="button" className="btn-primary ml-auto" onClick={() => setCreating(true)}>+ Nou contacte</button>
+        <button type="button" className="btn-ghost ml-auto inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels contactes mostrats"><ParamPdfIcon /> PDF</button>
+        <button type="button" className="btn-primary" onClick={() => setCreating(true)}>+ Nou contacte</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -382,8 +402,11 @@ function ClientsPanel({
   statsByClient: Map<number, ClientStats>;
 }) {
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<Client | null>(null);
+  // Track the OPEN client by id and re-derive from rows, so it reflects fresh
+  // server data (e.g. a contact just added) without needing to reopen.
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const editing = rows.find((c) => c.id === editingId) ?? null;
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -397,6 +420,19 @@ function ClientsPanel({
     [rows],
   );
 
+  function exportPdf() {
+    openListPdf({
+      title: "Clients",
+      subtitle: q ? `Cerca: "${query.trim()}" · ${filtered.length} de ${rows.length}` : `${rows.length} clients`,
+      landscape: false,
+      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Exp.", align: "right" }, { label: "Oberts", align: "right" }],
+      rows: filtered.map((c) => {
+        const s = statsByClient.get(c.id);
+        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(s?.n ?? 0), String(s?.oberts ?? 0)];
+      }),
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -406,7 +442,8 @@ function ClientsPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button type="button" className="btn-primary ml-auto" onClick={() => setCreating(true)}>+ Nou client</button>
+        <button type="button" className="btn-ghost ml-auto inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels clients mostrats"><ParamPdfIcon /> PDF</button>
+        <button type="button" className="btn-primary" onClick={() => setCreating(true)}>+ Nou client</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -418,7 +455,7 @@ function ClientsPanel({
             return (
               <div
                 key={c.id}
-                onClick={() => setEditing(c)}
+                onClick={() => setEditingId(c.id)}
                 className="cursor-pointer rounded-xl border border-[var(--color-line)] bg-white p-4 text-left shadow-sm transition hover:border-[var(--color-accent)] hover:shadow"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -426,7 +463,7 @@ function ClientsPanel({
                     <div className="font-medium truncate">{c.nom}</div>
                     <div className="text-xs text-[var(--color-muted)] truncate">{c.ciutat ?? "—"}</div>
                   </div>
-                  <button type="button" className="shrink-0 text-sm text-[var(--color-accent)] hover:underline" onClick={(e) => { e.stopPropagation(); setEditing(c); }}>Editar</button>
+                  <button type="button" className="shrink-0 text-sm text-[var(--color-accent)] hover:underline" onClick={(e) => { e.stopPropagation(); setEditingId(c.id); }}>Editar</button>
                 </div>
                 <div className="mt-3 flex gap-4 text-sm">
                   <span><span className="font-semibold tabular-nums">{s?.n ?? 0}</span> <span className="text-[var(--color-muted)]">exp.</span></span>
@@ -443,7 +480,7 @@ function ClientsPanel({
         client={editing}
         stats={editing ? statsByClient.get(editing.id) : undefined}
         ciutats={ciutats}
-        onClose={() => { setCreating(false); setEditing(null); }}
+        onClose={() => { setCreating(false); setEditingId(null); }}
       />
     </div>
   );

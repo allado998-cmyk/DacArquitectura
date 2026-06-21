@@ -45,6 +45,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Base de Dades</h2>
             <p className="text-sm text-[var(--color-muted)]">Clients i catàlegs de despeses.</p>
           </Link>
+          <Link href="/notes" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Notes</h2>
+            <p className="text-sm text-[var(--color-muted)]">Bloc de notes lliure.</p>
+          </Link>
         </div>
       </main>
     </>

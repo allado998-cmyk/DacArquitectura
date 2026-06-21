@@ -8,24 +8,17 @@ const ESTATS = ["obert", "tancat"];
 const CATEGORIES = ["re", "co", "ed", "rec", "do"];
 const TIPUS = ["public", "privat"];
 
-// Generate the next "YY-NNNN" number for the current year.
+// "YY-NNNN" with the current year prefix, but NNNN is a global running counter
+// that keeps increasing across years (it never resets when the year changes).
 async function nextNumExpedient(): Promise<string> {
   const yy = String(new Date().getFullYear()).slice(-2);
-  const rows = (await sql`
-    select num_expedient
-    from public.expedients
-    where num_expedient like ${yy + "-%"}
-    order by num_expedient desc
-    limit 1
-  `) as { num_expedient: string }[];
-
-  let next = 1;
-  const last = rows[0]?.num_expedient;
-  if (last) {
-    const m = /-(\d{4})$/.exec(last);
-    if (m) next = parseInt(m[1], 10) + 1;
+  const rows = (await sql`select num_expedient from public.expedients`) as { num_expedient: string }[];
+  let max = 0;
+  for (const r of rows) {
+    const m = /-(\d+)$/.exec(r.num_expedient ?? "");
+    if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  return `${yy}-${String(next).padStart(4, "0")}`;
+  return `${yy}-${String(max + 1).padStart(4, "0")}`;
 }
 
 export async function createExpedientAction() {

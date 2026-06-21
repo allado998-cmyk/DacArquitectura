@@ -20,21 +20,19 @@ export function NotesView({ initial }: { initial: string }) {
   const [state, setState] = useState<SaveState>("idle");
   const [showColors, setShowColors] = useState(false);
 
-  // Enable CSS styling for execCommand (colours/highlight as inline styles).
+  // Set the content ONCE, imperatively. The contentEditable is never managed by
+  // React after this (no dangerouslySetInnerHTML), so re-renders never wipe it.
   useEffect(() => {
-    try {
-      document.execCommand("styleWithCSS", false, "true");
-    } catch {
-      /* older browsers */
-    }
-  }, []);
+    if (ref.current) ref.current.innerHTML = initial || "";
+    try { document.execCommand("styleWithCSS", false, "true"); } catch { /* older browsers */ }
+  }, [initial]);
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const save = useCallback(() => {
     const html = ref.current?.innerHTML ?? "";
     setState("saving");
-    saveNoteAction(html)
-      .then(() => setState("saved"))
-      .catch(() => setState("idle"));
+    saveNoteAction(html).then(() => setState("saved")).catch(() => setState("idle"));
   }, []);
 
   const scheduleSave = useCallback(() => {
@@ -42,8 +40,6 @@ export function NotesView({ initial }: { initial: string }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(save, 700);
   }, [save]);
-
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   function exec(cmd: string, value?: string) {
     ref.current?.focus();
@@ -80,20 +76,11 @@ export function NotesView({ initial }: { initial: string }) {
       </div>
 
       {/* Toolbar — sticky so it stays reachable on mobile while scrolling */}
-      <div className="sticky top-0 z-10 -mx-3 mb-0 flex flex-wrap items-center gap-1 border border-[var(--color-line)] bg-white/95 px-3 py-2 backdrop-blur sm:mx-0 sm:rounded-t-xl">
+      <div className="sticky top-0 z-10 -mx-3 flex flex-wrap items-center gap-1 border border-[var(--color-line)] bg-white/95 px-3 py-2 backdrop-blur sm:mx-0 sm:rounded-t-xl">
         <Group>
-          <select
-            className="h-9 rounded-md border border-[var(--color-line)] bg-white px-2 text-sm"
-            onMouseDown={(e) => e.preventDefault()}
-            onChange={(e) => { exec("formatBlock", e.target.value); e.target.selectedIndex = 0; }}
-            defaultValue=""
-            aria-label="Estil"
-          >
-            <option value="" disabled>Estil</option>
-            <option value="<h1>">Títol gran</option>
-            <option value="<h2>">Títol</option>
-            <option value="<p>">Text normal</option>
-          </select>
+          <TBtn label="Títol gran" onClick={() => exec("formatBlock", "<h1>")}><span className="text-base font-bold">T1</span></TBtn>
+          <TBtn label="Títol" onClick={() => exec("formatBlock", "<h2>")}><span className="font-bold">T2</span></TBtn>
+          <TBtn label="Text normal" onClick={() => exec("formatBlock", "<p>")}>¶</TBtn>
         </Group>
         <Group>
           <TBtn label="Negreta" onClick={() => exec("bold")}><b>B</b></TBtn>
@@ -108,7 +95,10 @@ export function NotesView({ initial }: { initial: string }) {
         </Group>
         <Group>
           <div className="relative">
-            <TBtn label="Color del text" onClick={() => setShowColors((v) => !v)}><span className="text-base">A</span><span className="ml-0.5 inline-block h-1 w-3 rounded-sm" style={{ background: "linear-gradient(90deg,#dc2626,#2563eb,#16a34a)" }} /></TBtn>
+            <TBtn label="Color del text" onClick={() => setShowColors((v) => !v)}>
+              <span className="text-base">A</span>
+              <span className="ml-0.5 inline-block h-1 w-3 rounded-sm" style={{ background: "linear-gradient(90deg,#dc2626,#2563eb,#16a34a)" }} />
+            </TBtn>
             {showColors && (
               <div className="absolute left-0 top-10 z-20 flex gap-1.5 rounded-lg border border-[var(--color-line)] bg-white p-2 shadow-lg" onMouseDown={(e) => e.preventDefault()}>
                 {COLORS.map((c) => (
@@ -132,7 +122,6 @@ export function NotesView({ initial }: { initial: string }) {
         onInput={scheduleSave}
         onBlur={save}
         onClick={onEditorClick}
-        dangerouslySetInnerHTML={{ __html: initial }}
         data-placeholder="Comença a escriure les teves notes…"
       />
     </div>

@@ -1086,14 +1086,10 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
-          <FactPdfIcon /> PDF
-        </button>
-      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="grid flex-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div>
             <label className="label">Any</label>
             <select className="input" value={fAny} onChange={(e) => setFAny(e.target.value)}>
@@ -1126,6 +1122,10 @@ function StatsPanel({ factures, today }: { factures: Factura[]; today: string })
             <label className="label">Fins a</label>
             <input type="date" className="input" value={dEnd} onChange={(e) => setDEnd(e.target.value)} />
           </div>
+          </div>
+          <button type="button" className="btn-ghost shrink-0 inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+            <FactPdfIcon /> PDF
+          </button>
         </div>
         {(dStart || dEnd) && (
           <button type="button" className="mt-2 text-sm text-[var(--color-muted)] hover:underline" onClick={() => { setDStart(""); setDEnd(""); }}>Esborrar dates</button>

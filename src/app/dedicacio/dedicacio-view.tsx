@@ -686,11 +686,6 @@ function StatsTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
-          <DedPdfIcon /> PDF
-        </button>
-      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm space-y-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -746,6 +741,9 @@ function StatsTab({
               </button>
             )}
           </div>
+          <button type="button" className="btn-ghost ml-auto inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+            <DedPdfIcon /> PDF
+          </button>
         </div>
       </div>
 

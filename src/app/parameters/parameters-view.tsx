@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   addClientContacteAction,
   createClientFullAction,
@@ -67,6 +67,10 @@ export function ParametersView({
   tasques: Tasca[];
 }) {
   const [tab, setTab] = useState<Tab>("clients");
+  // The active tab's count reflects its filtered/shown rows.
+  const [shown, setShown] = useState<number | null>(null);
+  function changeTab(v: Tab) { setShown(null); setTab(v); }
+  const cnt = (t: Tab, total: number) => (tab === t ? shown ?? total : total);
 
   const statsByClient = useMemo(() => {
     const map = new Map<number, ClientStats>();
@@ -77,20 +81,20 @@ export function ParametersView({
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
-        <TabBtn current={tab} value="clients" onClick={setTab}>Clients ({clients.length})</TabBtn>
-        <TabBtn current={tab} value="contactes" onClick={setTab}>Contactes ({contactes.length})</TabBtn>
-        <TabBtn current={tab} value="tipologies" onClick={setTab}>Tipologies ({tipologies.length})</TabBtn>
-        <TabBtn current={tab} value="tasques" onClick={setTab}>Tasques ({tasques.length})</TabBtn>
-        <TabBtn current={tab} value="directes" onClick={setTab}>Despeses Directes ({conceptesDirectes.length})</TabBtn>
-        <TabBtn current={tab} value="altres" onClick={setTab}>Altres Despeses ({conceptesAltres.length})</TabBtn>
+        <TabBtn current={tab} value="clients" onClick={changeTab}>Clients ({cnt("clients", clients.length)})</TabBtn>
+        <TabBtn current={tab} value="contactes" onClick={changeTab}>Contactes ({cnt("contactes", contactes.length)})</TabBtn>
+        <TabBtn current={tab} value="tipologies" onClick={changeTab}>Tipologies ({cnt("tipologies", tipologies.length)})</TabBtn>
+        <TabBtn current={tab} value="tasques" onClick={changeTab}>Tasques ({cnt("tasques", tasques.length)})</TabBtn>
+        <TabBtn current={tab} value="directes" onClick={changeTab}>Despeses Directes ({cnt("directes", conceptesDirectes.length)})</TabBtn>
+        <TabBtn current={tab} value="altres" onClick={changeTab}>Altres Despeses ({cnt("altres", conceptesAltres.length)})</TabBtn>
       </div>
 
-      {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} />}
-      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} />}
-      {tab === "tipologies" && <TipologiesPanel rows={tipologies} />}
-      {tab === "tasques" && <TasquesPanel rows={tasques} />}
-      {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} />}
-      {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} />}
+      {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} onCount={setShown} />}
+      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} onCount={setShown} />}
+      {tab === "tipologies" && <TipologiesPanel rows={tipologies} onCount={setShown} />}
+      {tab === "tasques" && <TasquesPanel rows={tasques} onCount={setShown} />}
+      {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
+      {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} onCount={setShown} />}
     </div>
   );
 }
@@ -99,7 +103,7 @@ export function ParametersView({
 // Contactes (flat list across all clients + standalone)
 // ============================================================================
 
-function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Client[] }) {
+function ContactesPanel({ rows, clients, onCount }: { rows: ClientContacte[]; clients: Client[]; onCount: (n: number) => void }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ClientContacte | null>(null);
   const [creating, setCreating] = useState(false);
@@ -112,6 +116,7 @@ function ContactesPanel({ rows, clients }: { rows: ClientContacte[]; clients: Cl
     ? rows.filter((r) => `${r.nom ?? ""} ${r.telefon ?? ""} ${r.mail ?? ""} ${r.comentari ?? ""} ${r.client_nom ?? ""}`.toLowerCase().includes(q))
     : rows
   ).slice().sort((a, b) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca"));
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   function exportPdf() {
     openListPdf({
@@ -245,7 +250,7 @@ function ContacteForm({
 // Tipologies
 // ============================================================================
 
-function TipologiesPanel({ rows }: { rows: Tipologia[] }) {
+function TipologiesPanel({ rows, onCount }: { rows: Tipologia[]; onCount: (n: number) => void }) {
   const [nom, setNom] = useState("");
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
@@ -254,6 +259,7 @@ function TipologiesPanel({ rows }: { rows: Tipologia[] }) {
   const filtered = (q ? rows.filter((t) => t.nom.toLowerCase().includes(q)) : rows)
     .slice()
     .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   return (
     <div className="space-y-4">
@@ -306,7 +312,7 @@ function TipologiesPanel({ rows }: { rows: Tipologia[] }) {
 // Tasques (dedicació lookup)
 // ============================================================================
 
-function TasquesPanel({ rows }: { rows: Tasca[] }) {
+function TasquesPanel({ rows, onCount }: { rows: Tasca[]; onCount: (n: number) => void }) {
   const [nom, setNom] = useState("");
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
@@ -315,6 +321,7 @@ function TasquesPanel({ rows }: { rows: Tasca[] }) {
   const filtered = (q ? rows.filter((t) => t.nom.toLowerCase().includes(q)) : rows)
     .slice()
     .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   return (
     <div className="space-y-4">
@@ -397,9 +404,11 @@ function TabBtn({
 function ClientsPanel({
   rows,
   statsByClient,
+  onCount,
 }: {
   rows: Client[];
   statsByClient: Map<number, ClientStats>;
+  onCount: (n: number) => void;
 }) {
   const [query, setQuery] = useState("");
   // Track the OPEN client by id and re-derive from rows, so it reflects fresh
@@ -414,6 +423,7 @@ function ClientsPanel({
         (c) => c.nom.toLowerCase().includes(q) || (c.ciutat ?? "").toLowerCase().includes(q),
       )
     : rows;
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   const ciutats = useMemo(
     () => Array.from(new Set(rows.map((c) => (c.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
@@ -679,7 +689,7 @@ function ContacteRow({ row }: { row: ClientContacte }) {
 // Concepte Despesa Directa
 // ============================================================================
 
-function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
+function ConceptesDirectesPanel({ rows, onCount }: { rows: ConcepteDespesaDirecta[]; onCount: (n: number) => void }) {
   const [nom, setNom] = useState("");
   const [preu, setPreu] = useState("28.27");
   const [query, setQuery] = useState("");
@@ -689,6 +699,7 @@ function ConceptesDirectesPanel({ rows }: { rows: ConcepteDespesaDirecta[] }) {
   const filtered = (q ? rows.filter((c) => c.nom.toLowerCase().includes(q)) : rows)
     .slice()
     .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   return (
     <div className="space-y-4">
@@ -790,7 +801,7 @@ function ConcepteDirectaRow({ row }: { row: ConcepteDespesaDirecta }) {
 // Concepte Altra Despesa
 // ============================================================================
 
-function ConceptesAltresPanel({ rows }: { rows: ConcepteAltraDespesa[] }) {
+function ConceptesAltresPanel({ rows, onCount }: { rows: ConcepteAltraDespesa[]; onCount: (n: number) => void }) {
   const [nom, setNom] = useState("");
   const [preu, setPreu] = useState("0");
   const [query, setQuery] = useState("");
@@ -800,6 +811,7 @@ function ConceptesAltresPanel({ rows }: { rows: ConcepteAltraDespesa[] }) {
   const filtered = (q ? rows.filter((c) => c.nom.toLowerCase().includes(q)) : rows)
     .slice()
     .sort((a, b) => a.nom.localeCompare(b.nom, "ca"));
+  useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
   return (
     <div className="space-y-4">

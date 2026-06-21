@@ -844,20 +844,20 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
-          <PdfIcon /> PDF
-        </button>
-      </div>
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
-          <FilterSelect label="Estat" value={fEstat} onChange={setFEstat} options={[["obert", "Oberts"], ["tancat", "Tancats"]]} />
-          <FilterSelect label="Categoria" value={fCategoria} onChange={setFCategoria} options={CATEGORIES.map((c) => [c.code, c.label])} />
-          <FilterSelect label="Tipologia" value={fTipologia} onChange={setFTipologia} options={tipologies.map((t) => [String(t.id), t.nom])} />
-          <FilterSelect label="Tipus" value={fTipus} onChange={setFTipus} options={[["privat", "Privat"], ["public", "Públic"]]} />
-          <FilterSelect label="Ciutat" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="grid flex-1 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
+            <FilterSelect label="Estat" value={fEstat} onChange={setFEstat} options={[["obert", "Oberts"], ["tancat", "Tancats"]]} />
+            <FilterSelect label="Categoria" value={fCategoria} onChange={setFCategoria} options={CATEGORIES.map((c) => [c.code, c.label])} />
+            <FilterSelect label="Tipologia" value={fTipologia} onChange={setFTipologia} options={tipologies.map((t) => [String(t.id), t.nom])} />
+            <FilterSelect label="Tipus" value={fTipus} onChange={setFTipus} options={[["privat", "Privat"], ["public", "Públic"]]} />
+            <FilterSelect label="Ciutat" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+          </div>
+          <button type="button" className="btn-ghost shrink-0 inline-flex items-center gap-1.5" onClick={exportStatsPdf} title="Genera un PDF de les estadístiques filtrades">
+            <PdfIcon /> PDF
+          </button>
         </div>
       </div>
 

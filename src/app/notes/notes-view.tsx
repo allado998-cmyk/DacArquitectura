@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { saveNoteAction } from "./actions";
-
-type SaveState = "idle" | "saving" | "saved";
 
 const COLORS = [
   { name: "Negre", value: "#1a1a1a" },
@@ -14,46 +12,80 @@ const COLORS = [
   { name: "Lila", value: "#7c3aed" },
 ];
 
+// The editor lives in a memoised child so re-renders of the toolbar/status never
+// reconcile (and therefore never wipe) the contentEditable DOM.
+const Editor = memo(function Editor({
+  editorRef,
+  initial,
+  onInput,
+  onBlur,
+  onClick,
+}: {
+  editorRef: React.RefObject<HTMLDivElement | null>;
+  initial: string;
+  onInput: () => void;
+  onBlur: () => void;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  useEffect(() => {
+    const el = editorRef.current;
+    if (el && !el.innerHTML) el.innerHTML = initial || "";
+  }, [editorRef, initial]);
+
+  return (
+    <div
+      ref={editorRef}
+      className="note-editor min-h-[60vh] rounded-b-xl border border-t-0 border-[var(--color-line)] bg-white px-4 py-4 text-[16px] leading-relaxed shadow-sm focus:outline-none sm:px-6"
+      contentEditable
+      suppressContentEditableWarning
+      onInput={onInput}
+      onBlur={onBlur}
+      onClick={onClick}
+      data-placeholder="Comença a escriure les teves notes…"
+    />
+  );
+});
+
 export function NotesView({ initial }: { initial: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [state, setState] = useState<SaveState>("idle");
   const [showColors, setShowColors] = useState(false);
 
-  // Set the content ONCE, imperatively. The contentEditable is never managed by
-  // React after this (no dangerouslySetInnerHTML), so re-renders never wipe it.
-  useEffect(() => {
-    if (ref.current) ref.current.innerHTML = initial || "";
-    try { document.execCommand("styleWithCSS", false, "true"); } catch { /* older browsers */ }
-  }, [initial]);
-
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // Save status is updated imperatively (no setState) so typing never re-renders.
+  const setStatus = useCallback((t: string) => { if (statusRef.current) statusRef.current.textContent = t; }, []);
 
   const save = useCallback(() => {
-    const html = ref.current?.innerHTML ?? "";
-    setState("saving");
-    saveNoteAction(html).then(() => setState("saved")).catch(() => setState("idle"));
-  }, []);
+    setStatus("Desant…");
+    saveNoteAction(editorRef.current?.innerHTML ?? "")
+      .then(() => setStatus("Desat ✓"))
+      .catch(() => setStatus("No s'ha pogut desar"));
+  }, [setStatus]);
 
   const scheduleSave = useCallback(() => {
-    setState("saving");
+    setStatus("Desant…");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(save, 700);
-  }, [save]);
+  }, [save, setStatus]);
 
-  function exec(cmd: string, value?: string) {
-    ref.current?.focus();
+  useEffect(() => {
+    try { document.execCommand("styleWithCSS", false, "true"); } catch { /* older browsers */ }
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, []);
+
+  const exec = useCallback((cmd: string, value?: string) => {
+    editorRef.current?.focus();
     document.execCommand(cmd, false, value);
     scheduleSave();
-  }
+  }, [scheduleSave]);
 
-  function insertCheckbox() {
-    ref.current?.focus();
+  const insertCheckbox = useCallback(() => {
+    editorRef.current?.focus();
     document.execCommand("insertHTML", false, '<span class="chk" contenteditable="false" data-done="0">☐</span>&nbsp;');
     scheduleSave();
-  }
+  }, [scheduleSave]);
 
-  function onEditorClick(e: React.MouseEvent) {
+  const onEditorClick = useCallback((e: React.MouseEvent) => {
     const el = e.target as HTMLElement;
     if (el.classList?.contains("chk")) {
       const done = el.getAttribute("data-done") === "1";
@@ -61,7 +93,7 @@ export function NotesView({ initial }: { initial: string }) {
       el.textContent = done ? "☐" : "☑";
       scheduleSave();
     }
-  }
+  }, [scheduleSave]);
 
   return (
     <div>
@@ -70,9 +102,7 @@ export function NotesView({ initial }: { initial: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
           <p className="text-sm text-[var(--color-muted)]">Bloc de notes. Es desa automàticament.</p>
         </div>
-        <span className="shrink-0 text-xs text-[var(--color-muted)] inline-flex items-center gap-1">
-          {state === "saving" ? "Desant…" : state === "saved" ? (<><CheckIcon /> Desat</>) : ""}
-        </span>
+        <span ref={statusRef} className="shrink-0 text-xs text-[var(--color-muted)]" />
       </div>
 
       {/* Toolbar — sticky so it stays reachable on mobile while scrolling */}
@@ -114,16 +144,7 @@ export function NotesView({ initial }: { initial: string }) {
         </Group>
       </div>
 
-      <div
-        ref={ref}
-        className="note-editor min-h-[60vh] rounded-b-xl border border-t-0 border-[var(--color-line)] bg-white px-4 py-4 text-[16px] leading-relaxed shadow-sm focus:outline-none sm:px-6"
-        contentEditable
-        suppressContentEditableWarning
-        onInput={scheduleSave}
-        onBlur={save}
-        onClick={onEditorClick}
-        data-placeholder="Comença a escriure les teves notes…"
-      />
+      <Editor editorRef={editorRef} initial={initial} onInput={scheduleSave} onBlur={save} onClick={onEditorClick} />
     </div>
   );
 }
@@ -144,11 +165,5 @@ function TBtn({ label, onClick, children }: { label: string; onClick: () => void
     >
       {children}
     </button>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
   );
 }

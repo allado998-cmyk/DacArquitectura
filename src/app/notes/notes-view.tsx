@@ -222,15 +222,16 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
   }, [scheduleSave]);
 
   // Highlight is a toggle: if the selection is already highlighted, clear it.
+  // "Off" paints white (the editor background) — setting "transparent" doesn't
+  // work because the original yellow span still shows through underneath.
   const toggleHighlight = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return;
     ed.focus();
     const sel = document.getSelection();
-    if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); }
     const node = sel?.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : (sel?.anchorNode as HTMLElement | null);
     const on = node ? isHighlightBg(window.getComputedStyle(node).backgroundColor) : false;
-    document.execCommand("hiliteColor", false, on ? "transparent" : "#fef08a");
+    document.execCommand("hiliteColor", false, on ? "#ffffff" : "#fef08a");
     refreshActive();
     scheduleSave();
   }, [refreshActive, scheduleSave]);

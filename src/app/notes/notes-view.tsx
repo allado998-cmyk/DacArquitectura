@@ -10,6 +10,15 @@ export interface NoteItem {
   updated: string;
 }
 
+const SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40];
+// Map a pixel size to the nearest legacy execCommand fontSize bucket (1..7).
+const LEGACY: [number, string][] = [[10, "1"], [13, "2"], [16, "3"], [18, "4"], [24, "5"], [32, "6"], [48, "7"]];
+function nearestLegacy(px: number) {
+  let best = "3", bd = Infinity;
+  for (const [p, l] of LEGACY) { const d = Math.abs(p - px); if (d < bd) { bd = d; best = l; } }
+  return best;
+}
+
 const COLORS = [
   { name: "Negre", value: "#1a1a1a" },
   { name: "Vermell", value: "#dc2626" },
@@ -63,10 +72,11 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
   const [mobileView, setMobileView] = useState<"list" | "editor">("list");
   const [showColors, setShowColors] = useState(false);
   const [active, setActive] = useState<Record<string, boolean>>({});
-  const [block, setBlock] = useState("");
+  const [curSize, setCurSize] = useState(16);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,6 +97,7 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
     const sel = document.getSelection();
     const ed = editorRef.current;
     if (!ed || !sel || sel.rangeCount === 0 || !ed.contains(sel.anchorNode)) return;
+    savedRange.current = sel.getRangeAt(0).cloneRange();
     setActive({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
@@ -95,9 +106,11 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
       insertUnorderedList: document.queryCommandState("insertUnorderedList"),
       insertOrderedList: document.queryCommandState("insertOrderedList"),
     });
-    let b = "";
-    try { b = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch { /* */ }
-    setBlock(b);
+    const node = sel.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : (sel.anchorNode as HTMLElement | null);
+    if (node) {
+      const fs = parseInt(window.getComputedStyle(node).fontSize || "16", 10);
+      if (fs) setCurSize(fs);
+    }
   }, []);
 
   useEffect(() => {
@@ -180,6 +193,24 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
     scheduleSave();
   }, [refreshActive, scheduleSave]);
 
+  // Apply an exact pixel font-size to the selection (works via the legacy
+  // fontSize command, then rewriting the generated <font> tags to inline px).
+  const applySize = useCallback((px: number) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    ed.focus();
+    const sel = document.getSelection();
+    if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); }
+    const legacy = nearestLegacy(px);
+    document.execCommand("fontSize", false, legacy);
+    ed.querySelectorAll(`font[size="${legacy}"]`).forEach((f) => {
+      f.removeAttribute("size");
+      (f as HTMLElement).style.fontSize = `${px}px`;
+    });
+    setCurSize(px);
+    scheduleSave();
+  }, [scheduleSave]);
+
   const insertCheckbox = useCallback(() => {
     editorRef.current?.focus();
     document.execCommand("insertHTML", false, '<span class="chk" contenteditable="false" data-done="0">☐</span>&nbsp;');
@@ -242,9 +273,22 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-1 border-b border-[var(--color-line)] bg-white px-2 py-1.5">
               <Group>
-                <TBtn label="Títol gran" active={block === "h1"} onClick={() => exec("formatBlock", "<h1>")}><span className="text-base font-bold">T1</span></TBtn>
-                <TBtn label="Títol" active={block === "h2"} onClick={() => exec("formatBlock", "<h2>")}><span className="font-bold">T2</span></TBtn>
-                <TBtn label="Text normal" active={block === "p" || block === "div" || block === ""} onClick={() => exec("formatBlock", "<p>")}>¶</TBtn>
+                <label className="sr-only" htmlFor="note-size">Mida del text</label>
+                <select
+                  id="note-size"
+                  className="h-9 rounded-md border border-[var(--color-line)] bg-white px-2 text-sm"
+                  value={curSize}
+                  onMouseDown={() => {
+                    const s = document.getSelection();
+                    if (s && s.rangeCount && editorRef.current?.contains(s.anchorNode)) savedRange.current = s.getRangeAt(0).cloneRange();
+                  }}
+                  onChange={(e) => applySize(Number(e.target.value))}
+                  title="Mida del text"
+                >
+                  {(SIZES.includes(curSize) ? SIZES : [...SIZES, curSize].sort((a, b) => a - b)).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </Group>
               <Group>
                 <TBtn label="Negreta" active={active.bold} onClick={() => exec("bold")}><b>B</b></TBtn>

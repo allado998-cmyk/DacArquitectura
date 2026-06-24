@@ -18,6 +18,12 @@ function nearestLegacy(px: number) {
   for (const [p, l] of LEGACY) { const d = Math.abs(p - px); if (d < bd) { bd = d; best = l; } }
   return best;
 }
+// A real (non-transparent, non-white) background means the text is highlighted.
+function isHighlightBg(bg: string) {
+  if (!bg) return false;
+  const b = bg.replace(/\s/g, "").toLowerCase();
+  return b !== "rgba(0,0,0,0)" && b !== "transparent" && b !== "rgb(255,255,255)" && b !== "#ffffff";
+}
 
 const COLORS = [
   { name: "Negre", value: "#1a1a1a" },
@@ -98,6 +104,14 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
     const ed = editorRef.current;
     if (!ed || !sel || sel.rangeCount === 0 || !ed.contains(sel.anchorNode)) return;
     savedRange.current = sel.getRangeAt(0).cloneRange();
+    const node = sel.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : (sel.anchorNode as HTMLElement | null);
+    let highlighted = false;
+    if (node) {
+      const cs = window.getComputedStyle(node);
+      const fs = parseInt(cs.fontSize || "16", 10);
+      if (fs) setCurSize(fs);
+      highlighted = isHighlightBg(cs.backgroundColor);
+    }
     setActive({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
@@ -105,12 +119,8 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
       strikeThrough: document.queryCommandState("strikeThrough"),
       insertUnorderedList: document.queryCommandState("insertUnorderedList"),
       insertOrderedList: document.queryCommandState("insertOrderedList"),
+      highlight: highlighted,
     });
-    const node = sel.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : (sel.anchorNode as HTMLElement | null);
-    if (node) {
-      const fs = parseInt(window.getComputedStyle(node).fontSize || "16", 10);
-      if (fs) setCurSize(fs);
-    }
   }, []);
 
   useEffect(() => {
@@ -210,6 +220,20 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
     setCurSize(px);
     scheduleSave();
   }, [scheduleSave]);
+
+  // Highlight is a toggle: if the selection is already highlighted, clear it.
+  const toggleHighlight = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    ed.focus();
+    const sel = document.getSelection();
+    if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); }
+    const node = sel?.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : (sel?.anchorNode as HTMLElement | null);
+    const on = node ? isHighlightBg(window.getComputedStyle(node).backgroundColor) : false;
+    document.execCommand("hiliteColor", false, on ? "transparent" : "#fef08a");
+    refreshActive();
+    scheduleSave();
+  }, [refreshActive, scheduleSave]);
 
   const insertCheckbox = useCallback(() => {
     editorRef.current?.focus();
@@ -315,7 +339,7 @@ export function NotesApp({ initialNotes }: { initialNotes: NoteItem[] }) {
                     </div>
                   )}
                 </div>
-                <TBtn label="Subratllat groc" onClick={() => exec("hiliteColor", "#fef08a")}><span className="rounded-sm bg-[#fef08a] px-1">H</span></TBtn>
+                <TBtn label="Subratllat groc" active={active.highlight} onClick={toggleHighlight}><span className="rounded-sm bg-[#fef08a] px-1">H</span></TBtn>
               </Group>
               <Group>
                 <TBtn label="Treure format" onClick={() => exec("removeFormat")}>✕</TBtn>

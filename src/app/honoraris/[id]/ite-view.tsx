@@ -47,7 +47,6 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
     ut_locals_800: proposta.ut_locals_800 ?? "0",
     ut_locals_1000: proposta.ut_locals_1000 ?? "0",
   });
-  const [descompte, setDescompte] = useState(proposta.ite_descompte_pct ?? "0");
   const [iva, setIva] = useState(proposta.ite_iva_pct ?? "21");
   const [comissioOn, setComissioOn] = useState(proposta.ite_comissio_activa);
   const [comissio, setComissio] = useState(proposta.ite_comissio_pct ?? "10");
@@ -73,14 +72,12 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
   const totalEntitats = ROWS.reduce((s, r) => s + r.mult * n(ut[r.key]), 0);
   const computedPreu = itePreu(totalEntitats, { p1: n(tarifa.preu_1) || 650, p2: n(tarifa.preu_2) || 750, p3: n(tarifa.preu_3) || 850, inc: n(tarifa.increment) });
   const effectivePreu = override === "" ? computedPreu : n(override);
-  const descN = Math.max(0, n(descompte));
   const ivaN = Math.max(0, n(iva));
-  const descompteAmount = effectivePreu * (descN / 100);
-  const base = effectivePreu - descompteAmount;
+  const comissioAmount = comissioOn ? effectivePreu * (Math.max(0, n(comissio)) / 100) : 0;
+  const base = effectivePreu + comissioAmount;
   const ivaAmount = base * (ivaN / 100);
   const totalFacturar = base + ivaAmount;
   const despesaPerEntitat = totalEntitats > 0 ? totalFacturar / totalEntitats : 0;
-  const comissioValue = base * (1 + Math.max(0, n(comissio)) / 100);
 
   return (
     <div className="space-y-8">
@@ -189,7 +186,18 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
             Calculat: {formatEur(computedPreu)} (segons total entitats). Deixa el camp buit per usar-lo, o escriu un preu per arrodonir-lo.
           </p>
 
-          <SummaryPercent label="Descompte client" value={descompte} amount={-descompteAmount} onChange={setDescompte} onCommit={() => persistIte({ ite_descompte_pct: Math.max(0, n(descompte)) })} />
+          {/* Comissió (opcional) — s'afegeix al preu ITE proposat */}
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={comissioOn} onChange={(e) => { setComissioOn(e.target.checked); persistIte({ ite_comissio_activa: e.target.checked }); }} />
+              <span>Comissió</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input type="number" step="0.5" min="0" className="input w-20 text-right disabled:opacity-50" value={comissio} disabled={!comissioOn} onChange={(e) => setComissio(e.target.value)} onBlur={() => persistIte({ ite_comissio_pct: Math.max(0, n(comissio)) })} />
+              <span>%</span>
+              <span className="w-28 text-right font-mono tabular-nums">{formatEur(comissioAmount)}</span>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between border-t border-[var(--color-line)] pt-2">
             <span className="font-semibold">Base imponible</span>
@@ -205,26 +213,6 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-muted)]">Despesa per entitat (IVA inclòs)</span>
             <span className="font-mono">{formatEur(despesaPerEntitat)}</span>
-          </div>
-
-          {/* Comissió (opcional) */}
-          <div className="mt-3 rounded-lg border border-[var(--color-line)] p-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={comissioOn} onChange={(e) => { setComissioOn(e.target.checked); persistIte({ ite_comissio_activa: e.target.checked }); }} />
-                <span className="font-medium">Comissió</span>
-              </label>
-              {comissioOn && (
-                <>
-                  <div className="flex items-center gap-1">
-                    <input type="number" step="0.5" min="0" className="input w-20 text-right" value={comissio} onChange={(e) => setComissio(e.target.value)} onBlur={() => persistIte({ ite_comissio_pct: Math.max(0, n(comissio)) })} />
-                    <span>%</span>
-                  </div>
-                  <span className="ml-auto font-mono font-semibold">{formatEur(comissioValue)}</span>
-                </>
-              )}
-            </div>
-            {comissioOn && <p className="mt-1 text-xs text-[var(--color-muted)]">Base imponible amb comissió afegida.</p>}
           </div>
         </div>
       </section>

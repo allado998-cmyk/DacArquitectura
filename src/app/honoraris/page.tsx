@@ -18,7 +18,7 @@ export default async function HonorarisListPage() {
            c.nom as client_nom,
            (case
              when p.es_ite then
-               coalesce(p.total_honoraris_override, ip.preu) * (1 - coalesce(p.ite_descompte_pct, 0) / 100.0)
+               coalesce(p.total_honoraris_override, ip.preu) * (1 + case when p.ite_comissio_activa then coalesce(p.ite_comissio_pct, 0) / 100.0 else 0 end)
              else
                coalesce(
                  p.total_honoraris_override,

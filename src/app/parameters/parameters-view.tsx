@@ -10,6 +10,7 @@ import {
   createTascaAction,
   createTipologiaAction,
   updateIteTarifaAction,
+  updateTascaAction,
   deleteClientAction,
   deleteClientContacteAction,
   deleteConcepteAltraAction,
@@ -410,26 +411,35 @@ function TasquesPanel({ rows, onCount }: { rows: Tasca[]; onCount: (n: number) =
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((t) => (
-            <div key={t.id} className="flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-white px-3 py-2">
-              <span className="text-sm">{t.nom}</span>
-              <button
-                type="button"
-                className="text-red-700 hover:underline text-sm"
-                onClick={() => {
-                  if (confirm(`Eliminar la tasca "${t.nom}"?`)) {
-                    startTransition(() => deleteTascaAction(t.id));
-                  }
-                }}
-              >
-                ✕
-              </button>
-            </div>
+            <TascaRow key={t.id} row={t} />
           ))}
         </div>
       )}
       <p className="text-xs text-[var(--color-muted)]">
-        Les tasques apareixen com a suggeriments en registrar la dedicació.
+        Les tasques apareixen com a suggeriments en registrar la dedicació. Edita el nom directament.
       </p>
+    </div>
+  );
+}
+
+function TascaRow({ row }: { row: Tasca }) {
+  const [nom, setNom] = useState(row.nom);
+  const [, startTransition] = useTransition();
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-[var(--color-line)] bg-white px-2 py-1.5">
+      <input
+        className="input flex-1 min-w-0"
+        value={nom}
+        onChange={(e) => setNom(e.target.value)}
+        onBlur={() => { if (nom.trim() && nom.trim() !== row.nom) startTransition(() => updateTascaAction(row.id, nom)); }}
+      />
+      <button
+        type="button"
+        className="shrink-0 text-red-700 hover:underline text-sm"
+        onClick={() => { if (confirm(`Eliminar la tasca "${row.nom}"?`)) startTransition(() => deleteTascaAction(row.id)); }}
+      >
+        ✕
+      </button>
     </div>
   );
 }

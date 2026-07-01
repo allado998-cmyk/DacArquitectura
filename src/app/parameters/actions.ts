@@ -152,6 +152,20 @@ export async function createTascaAction(nom: string) {
   revalidatePath("/dedicacio");
 }
 
+export async function updateTascaAction(id: number, nom: string) {
+  await requireUser();
+  const trimmed = nom.trim();
+  if (!trimmed) return;
+  try {
+    await sql`update public.tasca set nom = ${trimmed} where id = ${id}`;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/duplicate|unique/i.test(msg)) throw e; // ignore rename to an existing name
+  }
+  revalidatePath("/parameters");
+  revalidatePath("/dedicacio");
+}
+
 export async function deleteTascaAction(id: number) {
   await requireUser();
   await sql`delete from public.tasca where id = ${id}`;

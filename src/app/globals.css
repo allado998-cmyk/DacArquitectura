@@ -179,8 +179,13 @@ tbody tr:last-child .td {
 .note-editor .chk {
   cursor: pointer;
   user-select: none;
-  font-size: 1.15em;
+  display: inline-block;
+  width: 20px;
+  font-size: 18px;
   line-height: 1;
-  margin-right: 0.15em;
+  vertical-align: middle;
+  text-align: center;
+  margin-right: 4px;
+  color: var(--color-ink);
 }
 .note-editor .chk[data-done="1"] { color: #16a34a; }

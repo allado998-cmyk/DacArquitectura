@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { deletePropostaDocAction } from "./actions";
+import { deletePropostaDocAction, duplicatePropostaDocAction } from "./actions";
 import { formatDataCa, formatEur } from "@/lib/format";
 import { openListPdf } from "@/lib/pdf";
 import type { PropostaDoc, PropostaDocEstat } from "@/types/db";
@@ -121,7 +121,7 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
               <th className="th text-left">Client</th>
               <th className="th text-right w-36">Import</th>
               <th className="th text-center w-32">Estat</th>
-              <th className="th text-center w-32"></th>
+              <th className="th text-center w-52"></th>
             </tr>
           </thead>
           <tbody>
@@ -141,6 +141,10 @@ export function PropostesListView({ rows }: { rows: Row[] }) {
                   </td>
                   <td className="td text-center whitespace-nowrap">
                     <Link href={`/propostes/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>
+                    <form action={duplicatePropostaDocAction} className="inline">
+                      <input type="hidden" name="id" value={r.id} />
+                      <button type="submit" className="text-[var(--color-accent)] hover:underline text-sm mr-3">Duplicar</button>
+                    </form>
                     <form action={deletePropostaDocAction} className="inline" onSubmit={(e) => { if (!confirm("Eliminar aquesta proposta?")) e.preventDefault(); }}>
                       <input type="hidden" name="id" value={r.id} />
                       <button type="submit" className="text-red-700 hover:underline text-sm">Eliminar</button>

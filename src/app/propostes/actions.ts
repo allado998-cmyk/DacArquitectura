@@ -44,6 +44,33 @@ export async function deletePropostaDocAction(formData: FormData) {
   redirect("/propostes");
 }
 
+// Create a full copy of a proposta (header + serveis/inclusions/exclusions/
+// pagaments) with a fresh number and today's date, then open it for editing.
+export async function duplicatePropostaDocAction(formData: FormData) {
+  await requireUser();
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id)) return;
+
+  const num = await nextNum();
+  const rows = (await sql`
+    insert into public.proposta_doc
+      (num, data, descripcio, adreca, ciutat, codi_postal, client_id, calcul_id, estat, hidden_inclusions, hidden_exclusions)
+    select ${num}, current_date, descripcio, adreca, ciutat, codi_postal, client_id, calcul_id, 'pendent', hidden_inclusions, hidden_exclusions
+    from public.proposta_doc where id = ${id}
+    returning id
+  `) as { id: number }[];
+  const newId = rows[0]?.id;
+  if (!newId) return;
+
+  await sql`insert into public.proposta_doc_servei (doc_id, descripcio, preu, ordre) select ${newId}, descripcio, preu, ordre from public.proposta_doc_servei where doc_id = ${id}`;
+  await sql`insert into public.proposta_doc_inclusio (doc_id, text, ordre) select ${newId}, text, ordre from public.proposta_doc_inclusio where doc_id = ${id}`;
+  await sql`insert into public.proposta_doc_exclusio (doc_id, text, ordre) select ${newId}, text, ordre from public.proposta_doc_exclusio where doc_id = ${id}`;
+  await sql`insert into public.proposta_doc_pagament (doc_id, descripcio, import, ordre) select ${newId}, descripcio, import, ordre from public.proposta_doc_pagament where doc_id = ${id}`;
+
+  revalidatePath("/propostes");
+  redirect(`/propostes/${newId}`);
+}
+
 export interface DocPatch {
   data?: string;
   descripcio?: string | null;

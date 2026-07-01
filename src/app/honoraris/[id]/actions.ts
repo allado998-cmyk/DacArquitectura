@@ -33,6 +33,42 @@ export async function updatePropostaAction(id: number, patch: PropostaUpdate) {
   revalidatePath(`/honoraris/${id}`);
 }
 
+// ITE (Relació d'entitats) ---------------------------------------------------
+
+export interface IteUpdate {
+  ut_habitatges?: number;
+  ut_locals_200?: number;
+  ut_locals_400?: number;
+  ut_locals_600?: number;
+  ut_locals_800?: number;
+  ut_locals_1000?: number;
+  ite_descompte_pct?: number;
+  ite_iva_pct?: number;
+  ite_comissio_activa?: boolean;
+  ite_comissio_pct?: number;
+}
+
+export async function updateIteAction(id: number, patch: IteUpdate) {
+  await requireUser();
+  if (!Number.isFinite(id)) throw new Error("id invàlid");
+  const num = (v: number | undefined) => (v === undefined ? null : v);
+  await sql`
+    update public.propostes set
+      ut_habitatges  = coalesce(${num(patch.ut_habitatges)}::numeric, ut_habitatges),
+      ut_locals_200  = coalesce(${num(patch.ut_locals_200)}::numeric, ut_locals_200),
+      ut_locals_400  = coalesce(${num(patch.ut_locals_400)}::numeric, ut_locals_400),
+      ut_locals_600  = coalesce(${num(patch.ut_locals_600)}::numeric, ut_locals_600),
+      ut_locals_800  = coalesce(${num(patch.ut_locals_800)}::numeric, ut_locals_800),
+      ut_locals_1000 = coalesce(${num(patch.ut_locals_1000)}::numeric, ut_locals_1000),
+      ite_descompte_pct = coalesce(${num(patch.ite_descompte_pct)}::numeric, ite_descompte_pct),
+      ite_iva_pct = coalesce(${num(patch.ite_iva_pct)}::numeric, ite_iva_pct),
+      ite_comissio_activa = coalesce(${patch.ite_comissio_activa ?? null}::boolean, ite_comissio_activa),
+      ite_comissio_pct = coalesce(${num(patch.ite_comissio_pct)}::numeric, ite_comissio_pct)
+    where id = ${id}
+  `;
+  revalidatePath(`/honoraris/${id}`);
+}
+
 // Despeses Directes lines ----------------------------------------------------
 
 export async function addDespesaDirectaLineAction(propostaId: number, concepteId: number) {

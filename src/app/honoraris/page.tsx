@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
-import { createPropostaAction } from "./actions";
+import { createIteAction, createPropostaAction } from "./actions";
 import { HonorarisListView, type PropostaListRow } from "./honoraris-list-view";
 
 export const dynamic = "force-dynamic";
@@ -14,15 +14,21 @@ export default async function HonorarisListPage() {
            p.num_proposta,
            to_char(p.data, 'YYYY-MM-DD') as data,
            p.projecte,
+           p.es_ite,
            c.nom as client_nom,
-           coalesce(
-             p.total_honoraris_override,
-             case
-               when (100 - coalesce(p.despeses_indirectes_pct, 0) - coalesce(p.benefici_pct, 0)) > 0
-                 then (b.base * 100.0) / (100 - coalesce(p.despeses_indirectes_pct, 0) - coalesce(p.benefici_pct, 0))
-               else b.base
-             end
-           )::text as total
+           (case
+             when p.es_ite then
+               coalesce(p.total_honoraris_override, ip.preu) * (1 - coalesce(p.ite_descompte_pct, 0) / 100.0)
+             else
+               coalesce(
+                 p.total_honoraris_override,
+                 case
+                   when (100 - coalesce(p.despeses_indirectes_pct, 0) - coalesce(p.benefici_pct, 0)) > 0
+                     then (b.base * 100.0) / (100 - coalesce(p.despeses_indirectes_pct, 0) - coalesce(p.benefici_pct, 0))
+                   else b.base
+                 end
+               )
+           end)::text as total
     from public.propostes p
     left join public.clients c on c.id = p.client_id
     cross join lateral (
@@ -35,6 +41,12 @@ export default async function HonorarisListPage() {
             where adl.proposta_id = p.id and ca.nom not ilike 'Responsabilitat Civil'
           ), 0) as base
     ) b
+    cross join lateral (
+      select (p.ut_habitatges + p.ut_locals_200 + p.ut_locals_400 * 2 + p.ut_locals_600 * 3 + p.ut_locals_800 * 4 + p.ut_locals_1000 * 5) as ent
+    ) e
+    cross join lateral (
+      select case when e.ent < 6 then 650 when e.ent < 11 then 750 else 850 + 15 * (e.ent - 10) end as preu
+    ) ip
     order by p.num_proposta desc nulls last, p.id desc
   `) as unknown as PropostaListRow[];
 
@@ -47,9 +59,14 @@ export default async function HonorarisListPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Honoraris</h1>
             <p className="text-sm text-[var(--color-muted)]">Càlcul d&apos;honoraris.</p>
           </div>
-          <form action={createPropostaAction}>
-            <button className="btn-primary" type="submit">Nou càlcul</button>
-          </form>
+          <div className="flex items-center gap-2">
+            <form action={createPropostaAction}>
+              <button className="btn-primary" type="submit">Nou càlcul</button>
+            </form>
+            <form action={createIteAction}>
+              <button className="btn-primary" type="submit" style={{ backgroundColor: "#16a34a", borderColor: "#16a34a" }}>Nou càlcul ITE</button>
+            </form>
+          </div>
         </div>
 
         <HonorarisListView rows={rows} />

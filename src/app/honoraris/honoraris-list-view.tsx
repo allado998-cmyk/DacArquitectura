@@ -13,6 +13,7 @@ export interface PropostaListRow {
   projecte: string | null;
   client_nom: string | null;
   total: string;
+  es_ite?: boolean;
 }
 
 const trimOf = (d: string) => (d ? String(Math.ceil(Number(d.slice(5, 7)) / 3)) : "");
@@ -125,7 +126,10 @@ export function HonorarisListView({ rows }: { rows: PropostaListRow[] }) {
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id}>
-                <td className="td text-center font-mono">CH-{r.num_proposta ?? r.id}</td>
+                <td className="td text-center font-mono whitespace-nowrap">
+                  CH-{r.num_proposta ?? r.id}
+                  {r.es_ite && <span className="ml-1.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold not-italic text-green-700">ITE</span>}
+                </td>
                 <td className="td text-center tabular-nums">{formatDataCa(r.data)}</td>
                 <td className="td text-left">{r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                 <td className="td text-left">{r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>

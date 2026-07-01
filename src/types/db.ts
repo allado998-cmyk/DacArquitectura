@@ -60,6 +60,18 @@ export interface Proposta {
   despeses_indirectes_pct: string; // percentage
   benefici_pct: string; // percentage
   total_honoraris_override: string | null;
+  // ITE variant
+  es_ite: boolean;
+  ut_habitatges: string;
+  ut_locals_200: string;
+  ut_locals_400: string;
+  ut_locals_600: string;
+  ut_locals_800: string;
+  ut_locals_1000: string;
+  ite_descompte_pct: string;
+  ite_iva_pct: string;
+  ite_comissio_activa: boolean;
+  ite_comissio_pct: string;
   created_at: string;
   updated_at: string;
 }

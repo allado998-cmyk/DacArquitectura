@@ -55,3 +55,15 @@ export async function deletePropostaAction(formData: FormData) {
   await sql`delete from public.propostes where id = ${id}`;
   redirect("/honoraris");
 }
+
+// A "càlcul ITE" — uses the Relació d'entitats table instead of despeses.
+export async function createIteAction() {
+  await requireUser();
+  const num = await nextNumProposta();
+  const rows = (await sql`
+    insert into public.propostes (num_proposta, es_ite) values (${num}, true) returning id
+  `) as { id: number }[];
+  const id = rows[0]?.id;
+  if (!id) throw new Error("No s'ha pogut crear el càlcul ITE.");
+  redirect(`/honoraris/${id}`);
+}

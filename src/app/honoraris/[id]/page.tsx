@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { HonorarisView } from "./honoraris-view";
+import { IteView } from "./ite-view";
 import type {
   Client,
   ConcepteDespesaDirecta,
@@ -32,11 +33,34 @@ export default async function HonorarisDetailPage({
            despeses_indirectes_pct::text as despeses_indirectes_pct,
            benefici_pct::text as benefici_pct,
            total_honoraris_override::text as total_honoraris_override,
+           es_ite,
+           ut_habitatges::text as ut_habitatges,
+           ut_locals_200::text as ut_locals_200,
+           ut_locals_400::text as ut_locals_400,
+           ut_locals_600::text as ut_locals_600,
+           ut_locals_800::text as ut_locals_800,
+           ut_locals_1000::text as ut_locals_1000,
+           ite_descompte_pct::text as ite_descompte_pct,
+           ite_iva_pct::text as ite_iva_pct,
+           ite_comissio_activa,
+           ite_comissio_pct::text as ite_comissio_pct,
            created_at, updated_at
     from public.propostes where id = ${id}
   `) as unknown as Proposta[];
   if (propostaRows.length === 0) notFound();
   const proposta = propostaRows[0];
+
+  if (proposta.es_ite) {
+    const clients = (await sql`select id, nom, contacte, created_at from public.clients order by nom`) as unknown as Client[];
+    return (
+      <>
+        <AppNav current="honoraris" />
+        <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+          <IteView proposta={proposta} clients={clients} />
+        </main>
+      </>
+    );
+  }
 
   const [clients, conceptesDirectes, conceptesAltres, linesDirectes, linesAltres] = await Promise.all([
     sql`select id, nom, contacte, created_at from public.clients order by nom` as unknown as Promise<Client[]>,

@@ -52,16 +52,18 @@ export default async function HonorarisDetailPage({
   const proposta = propostaRows[0];
 
   if (proposta.es_ite) {
-    const [clients, tarifaRows] = await Promise.all([
+    const [clients, tarifaRows, iteRateRows] = await Promise.all([
       sql`select id, nom, contacte, created_at from public.clients order by nom` as unknown as Promise<Client[]>,
       sql`select preu_1::text as preu_1, preu_2::text as preu_2, preu_3::text as preu_3, increment::text as increment from public.ite_tarifa where id = 1` as unknown as Promise<IteTarifa[]>,
+      sql`select preu_hora_default::text as v from public.concepte_despesa_directa where nom ilike 'ITE' order by id limit 1` as unknown as Promise<{ v: string }[]>,
     ]);
     const tarifa: IteTarifa = tarifaRows[0] ?? { preu_1: "650", preu_2: "750", preu_3: "850", increment: "15" };
+    const preuHoraIte = iteRateRows[0]?.v ?? "0";
     return (
       <>
         <AppNav current="honoraris" />
         <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-          <IteView proposta={proposta} clients={clients} tarifa={tarifa} />
+          <IteView proposta={proposta} clients={clients} tarifa={tarifa} preuHoraIte={preuHoraIte} />
         </main>
       </>
     );

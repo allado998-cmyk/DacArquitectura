@@ -32,7 +32,7 @@ function itePreu(ent: number, t: { p1: number; p2: number; p3: number; inc: numb
   return t.p3 + t.inc * (ent - 10);
 }
 
-export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; clients: Client[]; tarifa: IteTarifa }) {
+export function IteView({ proposta, clients, tarifa, preuHoraIte }: { proposta: Proposta; clients: Client[]; tarifa: IteTarifa; preuHoraIte: string }) {
   const [data, setData] = useState(proposta.data);
   const [projecte, setProjecte] = useState(proposta.projecte ?? "");
   const [clientId, setClientId] = useState<number | "">(proposta.client_id ?? "");
@@ -78,6 +78,8 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
   const ivaAmount = base * (ivaN / 100);
   const totalFacturar = base + ivaAmount;
   const despesaPerEntitat = totalEntitats > 0 ? totalFacturar / totalEntitats : 0;
+  const rateIte = n(preuHoraIte);
+  const maxHores = rateIte > 0 ? base / 2 / rateIte : 0;
 
   return (
     <div className="space-y-8">
@@ -210,6 +212,13 @@ export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; cli
             <span className="font-semibold">Total a facturar</span>
             <span className="font-mono font-semibold">{formatEur(totalFacturar)}</span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Màxim d&apos;hores a treballar</span>
+            <span className="font-mono font-semibold">{fmt2(maxHores)} h</span>
+          </div>
+          {rateIte <= 0 && (
+            <p className="text-xs text-amber-700">Afegeix un concepte de Despeses Directes anomenat «ITE» amb el seu €/hora a Base de Dades per calcular les hores.</p>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-muted)]">Despesa per entitat (IVA inclòs)</span>
             <span className="font-mono">{formatEur(despesaPerEntitat)}</span>

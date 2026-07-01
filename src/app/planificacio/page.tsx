@@ -17,7 +17,7 @@ export default async function PlanificacioPage() {
              to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
              to_char(e.data_final, 'YYYY-MM-DD') as data_final,
              to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,
-             coalesce((select sum(hores) from public.proposta_despesa_directa_line where proposta_id = e.calcul_id), 0)::text as planned_hores,
+             coalesce(public.calcul_planned_hores(e.calcul_id), 0)::text as planned_hores,
              coalesce((select sum(hores) from public.dedicacions where expedient_id = e.id), 0)::text as actual_hores
       from public.expedients e
       left join public.clients c on c.id = e.client_id

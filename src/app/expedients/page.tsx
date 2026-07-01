@@ -19,7 +19,7 @@ export default async function ExpedientsPage() {
              e.tipus, e.direccio_obres, e.web,
              e.pressupost::text as pressupost,
              e.pressupost_origen, e.calcul_id, e.proposta_doc_id,
-             coalesce((select sum(hores) from public.proposta_despesa_directa_line where proposta_id = e.calcul_id), 0)::text as planned_hores,
+             coalesce(public.calcul_planned_hores(e.calcul_id), 0)::text as planned_hores,
              to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
              to_char(e.data_final, 'YYYY-MM-DD') as data_final,
              to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,

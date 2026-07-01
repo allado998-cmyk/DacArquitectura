@@ -2,14 +2,14 @@ import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ParametersView } from "./parameters-view";
-import type { Client, ClientContacte, ClientStats, ConcepteDespesaDirecta, ConcepteAltraDespesa, Tipologia, Tasca } from "@/types/db";
+import type { Client, ClientContacte, ClientStats, ConcepteDespesaDirecta, ConcepteAltraDespesa, Tipologia, Tasca, IteTarifa } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function ParametersPage() {
   await requireUser();
 
-  const [clients, clientStats, conceptesDirectes, conceptesAltres, tipologies, contactes, tasques] = await Promise.all([
+  const [clients, clientStats, conceptesDirectes, conceptesAltres, tipologies, contactes, tasques, tarifaRows] = await Promise.all([
     sql`
       select c.id, c.nom, c.nif, c.carrer, c.ciutat, c.codi_postal, c.contacte, c.created_at,
         coalesce(
@@ -46,7 +46,9 @@ export default async function ParametersPage() {
       order by lower(nullif(cc.nom, '')) asc nulls last, cc.id
     ` as unknown as Promise<ClientContacte[]>,
     sql`select id, nom from public.tasca order by nom` as unknown as Promise<Tasca[]>,
+    sql`select preu_1::text as preu_1, preu_2::text as preu_2, preu_3::text as preu_3, increment::text as increment from public.ite_tarifa where id = 1` as unknown as Promise<IteTarifa[]>,
   ]);
+  const iteTarifa: IteTarifa = tarifaRows[0] ?? { preu_1: "650", preu_2: "750", preu_3: "850", increment: "15" };
 
   return (
     <>
@@ -64,6 +66,7 @@ export default async function ParametersPage() {
           tipologies={tipologies}
           contactes={contactes}
           tasques={tasques}
+          iteTarifa={iteTarifa}
         />
       </main>
     </>

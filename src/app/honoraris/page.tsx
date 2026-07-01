@@ -45,7 +45,13 @@ export default async function HonorarisListPage() {
       select (p.ut_habitatges + p.ut_locals_200 + p.ut_locals_400 * 2 + p.ut_locals_600 * 3 + p.ut_locals_800 * 4 + p.ut_locals_1000 * 5) as ent
     ) e
     cross join lateral (
-      select case when e.ent < 6 then 650 when e.ent < 11 then 750 else 850 + 15 * (e.ent - 10) end as preu
+      select coalesce((select preu_1 from public.ite_tarifa where id = 1), 650) as t1,
+             coalesce((select preu_2 from public.ite_tarifa where id = 1), 750) as t2,
+             coalesce((select preu_3 from public.ite_tarifa where id = 1), 850) as t3,
+             coalesce((select increment from public.ite_tarifa where id = 1), 15) as inc
+    ) tf
+    cross join lateral (
+      select case when e.ent < 6 then tf.t1 when e.ent < 11 then tf.t2 else tf.t3 + tf.inc * (e.ent - 10) end as preu
     ) ip
     order by p.num_proposta desc nulls last, p.id desc
   `) as unknown as PropostaListRow[];

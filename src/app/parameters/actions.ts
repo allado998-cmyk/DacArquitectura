@@ -159,6 +159,27 @@ export async function deleteTascaAction(id: number) {
   revalidatePath("/dedicacio");
 }
 
+// ITE tariff (price tiers) --------------------------------------------------
+
+export async function updateIteTarifaAction(patch: { preu_1?: number; preu_2?: number; preu_3?: number; increment?: number }) {
+  await requireUser();
+  await sql`
+    insert into public.ite_tarifa (id) values (1) on conflict (id) do nothing
+  `;
+  const num = (v: number | undefined) => (v === undefined ? null : v);
+  await sql`
+    update public.ite_tarifa set
+      preu_1 = coalesce(${num(patch.preu_1)}::numeric, preu_1),
+      preu_2 = coalesce(${num(patch.preu_2)}::numeric, preu_2),
+      preu_3 = coalesce(${num(patch.preu_3)}::numeric, preu_3),
+      increment = coalesce(${num(patch.increment)}::numeric, increment),
+      updated_at = now()
+    where id = 1
+  `;
+  revalidatePath("/parameters");
+  revalidatePath("/honoraris");
+}
+
 // Concepte Despesa Directa --------------------------------------------------
 
 export async function createConcepteDirectaAction(nom: string, preu: number) {

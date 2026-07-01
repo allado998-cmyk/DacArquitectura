@@ -22,6 +22,13 @@ export interface Tasca {
   nom: string;
 }
 
+export interface IteTarifa {
+  preu_1: string;
+  preu_2: string;
+  preu_3: string;
+  increment: string;
+}
+
 export interface ClientContacte {
   id: number;
   client_id: number | null;

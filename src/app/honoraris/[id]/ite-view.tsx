@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { updateIteAction, updatePropostaAction, type IteUpdate } from "./actions";
 import { formatEur } from "@/lib/format";
-import type { Client, Proposta } from "@/types/db";
+import type { Client, IteTarifa, Proposta } from "@/types/db";
 
 function n(v: string | number | null | undefined): number {
   if (v == null || v === "") return 0;
@@ -26,13 +26,13 @@ const ROWS: { key: UtKey; nom: string; mult: number }[] = [
   { key: "ut_locals_1000", nom: "Nº de Locals < 1000 m²", mult: 5 },
 ];
 
-function itePreu(ent: number): number {
-  if (ent < 6) return 650;
-  if (ent < 11) return 750;
-  return 850 + 15 * (ent - 10);
+function itePreu(ent: number, t: { p1: number; p2: number; p3: number; inc: number }): number {
+  if (ent < 6) return t.p1;
+  if (ent < 11) return t.p2;
+  return t.p3 + t.inc * (ent - 10);
 }
 
-export function IteView({ proposta, clients }: { proposta: Proposta; clients: Client[] }) {
+export function IteView({ proposta, clients, tarifa }: { proposta: Proposta; clients: Client[]; tarifa: IteTarifa }) {
   const [data, setData] = useState(proposta.data);
   const [projecte, setProjecte] = useState(proposta.projecte ?? "");
   const [clientId, setClientId] = useState<number | "">(proposta.client_id ?? "");
@@ -71,7 +71,7 @@ export function IteView({ proposta, clients }: { proposta: Proposta; clients: Cl
   }
 
   const totalEntitats = ROWS.reduce((s, r) => s + r.mult * n(ut[r.key]), 0);
-  const computedPreu = itePreu(totalEntitats);
+  const computedPreu = itePreu(totalEntitats, { p1: n(tarifa.preu_1) || 650, p2: n(tarifa.preu_2) || 750, p3: n(tarifa.preu_3) || 850, inc: n(tarifa.increment) });
   const effectivePreu = override === "" ? computedPreu : n(override);
   const descN = Math.max(0, n(descompte));
   const ivaN = Math.max(0, n(iva));

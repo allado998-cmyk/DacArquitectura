@@ -9,6 +9,7 @@ import {
   createContacteAction,
   createTascaAction,
   createTipologiaAction,
+  updateIteTarifaAction,
   deleteClientAction,
   deleteClientContacteAction,
   deleteConcepteAltraAction,
@@ -28,6 +29,7 @@ import type {
   ClientStats,
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
+  IteTarifa,
   Tasca,
   Tipologia,
 } from "@/types/db";
@@ -37,7 +39,7 @@ import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
 
-type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques";
+type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques" | "ite";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
 
@@ -57,6 +59,7 @@ export function ParametersView({
   tipologies,
   contactes,
   tasques,
+  iteTarifa,
 }: {
   clients: Client[];
   clientStats: ClientStats[];
@@ -65,6 +68,7 @@ export function ParametersView({
   tipologies: Tipologia[];
   contactes: ClientContacte[];
   tasques: Tasca[];
+  iteTarifa: IteTarifa;
 }) {
   const [tab, setTab] = useState<Tab>("clients");
   // The active tab's count reflects its filtered/shown rows.
@@ -87,6 +91,7 @@ export function ParametersView({
         <TabBtn current={tab} value="tasques" onClick={changeTab}>Tasques ({cnt("tasques", tasques.length)})</TabBtn>
         <TabBtn current={tab} value="directes" onClick={changeTab}>Despeses Directes ({cnt("directes", conceptesDirectes.length)})</TabBtn>
         <TabBtn current={tab} value="altres" onClick={changeTab}>Altres Despeses ({cnt("altres", conceptesAltres.length)})</TabBtn>
+        <TabBtn current={tab} value="ite" onClick={changeTab}>Tarifa ITE</TabBtn>
       </div>
 
       {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} onCount={setShown} />}
@@ -95,6 +100,65 @@ export function ParametersView({
       {tab === "tasques" && <TasquesPanel rows={tasques} onCount={setShown} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} onCount={setShown} />}
+      {tab === "ite" && <IteTarifaPanel tarifa={iteTarifa} />}
+    </div>
+  );
+}
+
+// ============================================================================
+// Tarifa ITE (price tiers used by the ITE càlcul)
+// ============================================================================
+
+function IteTarifaPanel({ tarifa }: { tarifa: IteTarifa }) {
+  const [p1, setP1] = useState(tarifa.preu_1);
+  const [p2, setP2] = useState(tarifa.preu_2);
+  const [p3, setP3] = useState(tarifa.preu_3);
+  const [inc, setInc] = useState(tarifa.increment);
+  const [saved, setSaved] = useState(false);
+  const [, startTransition] = useTransition();
+
+  function save() {
+    setSaved(false);
+    startTransition(async () => {
+      await updateIteTarifaAction({
+        preu_1: parseFloat(p1) || 0,
+        preu_2: parseFloat(p2) || 0,
+        preu_3: parseFloat(p3) || 0,
+        increment: parseFloat(inc) || 0,
+      });
+      setSaved(true);
+    });
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <p className="text-sm text-[var(--color-muted)]">
+        Preus base del càlcul ITE segons el total d&apos;entitats equivalents (D):
+        <br />si D &lt; 6 → Preu 1; si D &lt; 11 → Preu 2; si D ≥ 11 → Preu 3 + increment × (D − 10).
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <IteTarifaField label="Preu 1 (menys de 6 entitats)" hint="Per defecte 650 €" value={p1} onChange={setP1} />
+        <IteTarifaField label="Preu 2 (de 6 a 10 entitats)" hint="Per defecte 750 €" value={p2} onChange={setP2} />
+        <IteTarifaField label="Preu 3 (11 o més entitats)" hint="Base per a 11+ entitats. Per defecte 850 €" value={p3} onChange={setP3} />
+        <IteTarifaField label="Increment per entitat (per sobre de 10)" hint="Per defecte 15 €" value={inc} onChange={setInc} />
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={save}>Desar tarifa</button>
+        {saved && <span className="text-sm text-green-700">Desat ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+function IteTarifaField({ label, hint, value, onChange }: { label: string; hint: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="flex items-center gap-1">
+        <input type="number" step="1" min="0" className="input text-right" value={value} onChange={(e) => onChange(e.target.value)} />
+        <span className="text-sm text-[var(--color-muted)]">€</span>
+      </div>
+      <p className="mt-1 text-xs text-[var(--color-muted)]">{hint}</p>
     </div>
   );
 }

@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { updateActaAction, deleteActaAction, type ActaPatch } from "../actions";
-import { openActaPdf, downloadActaWord, actaTitle } from "@/lib/acta-doc";
+import { updateActaAction, deleteActaAction, duplicateActaAction, type ActaPatch } from "../actions";
+import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS } from "@/lib/acta-doc";
 import type { Acta, ActaAssistent, ActaTema } from "@/types/db";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null };
 
 export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedients: ExpedientOpt[]; contactes: Contacte[] }) {
-  const [tipus, setTipus] = useState<"visita" | "reunio">(acta.tipus);
+  const [tipus, setTipus] = useState<string>(acta.tipus);
   const [expedientId, setExpedientId] = useState<number | "">(acta.expedient_id ?? "");
   const [actaNum, setActaNum] = useState(acta.acta_num ?? "");
   const [data, setData] = useState(acta.data ?? "");
@@ -89,12 +89,16 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
   // Temes helpers
   function setTms(next: ActaTema[]) { setTemes(next); save({ temes: next }); }
-  function addTema() { setTms([...temes, { titol: "", text: "", responsable: "" }]); }
+  function addTema() { setTms([...temes, { titol: "", text: "", responsable: "", estat: "pendent" }]); }
   function updTema(i: number, patch: Partial<ActaTema>) {
     setTemes((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   }
   function commitTemes() { save({ temes }); }
   function delTema(i: number) { setTms(temes.filter((_, j) => j !== i)); }
+  function toggleTemaEstat(i: number) {
+    const next: ActaTema[] = temes.map((t, j) => (j === i ? { ...t, estat: t.estat === "fet" ? "pendent" : "fet" } : t));
+    setTms(next);
+  }
   function moveTema(i: number, dir: -1 | 1) {
     const j = i + dir;
     if (j < 0 || j >= temes.length) return;
@@ -131,6 +135,10 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
           <span className="text-xs text-[var(--color-muted)]">{saved ? "Desat" : "Desant…"}</span>
           <button className="btn" onClick={() => openActaPdf(liveActa())}>PDF</button>
           <button className="btn" onClick={() => downloadActaWord(liveActa())}>Word</button>
+          <form action={duplicateActaAction}>
+            <input type="hidden" name="id" value={acta.id} />
+            <button className="btn" type="submit">Duplicar</button>
+          </form>
         </div>
       </div>
 
@@ -138,10 +146,9 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       <section className="card">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Tipus d&apos;acta</label>
-            <select className="input" value={tipus} onChange={(e) => { const v = e.target.value as "visita" | "reunio"; setTipus(v); save({ tipus: v }); }}>
-              <option value="visita">Visita d&apos;obra</option>
-              <option value="reunio">Reunió</option>
+            <label className="label">Motiu de l&apos;acta</label>
+            <select className="input" value={tipus} onChange={(e) => { const v = e.target.value; setTipus(v); save({ tipus: v }); }}>
+              {ACTA_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
           <div>
@@ -224,26 +231,37 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
       {/* Temes tractats */}
       <section className="card">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-1 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Temes tractats</h2>
           <button className="btn" onClick={addTema}>+ Tema</button>
         </div>
+        <p className="mb-3 text-xs text-[var(--color-muted)]">Marca cada tema com a Pendent o Fet, i ordena&apos;ls amb les fletxes.</p>
         <div className="space-y-4">
           {temes.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap tema.</p>}
-          {temes.map((t, i) => (
-            <div key={i} className="rounded-lg border border-[var(--color-line)] p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <input className="input flex-1 font-semibold" placeholder="Títol (opcional: PENDENTS, EXECUTAT…)" value={t.titol} onChange={(e) => updTema(i, { titol: e.target.value })} onBlur={commitTemes} />
-                <button className="btn-ghost" onClick={() => moveTema(i, -1)} title="Amunt" disabled={i === 0}>↑</button>
-                <button className="btn-ghost" onClick={() => moveTema(i, 1)} title="Avall" disabled={i === temes.length - 1}>↓</button>
-                <button className="btn-ghost" onClick={() => delTema(i)} title="Eliminar">✕</button>
+          {temes.map((t, i) => {
+            const fet = t.estat === "fet";
+            return (
+              <div key={i} className={`rounded-lg border p-3 ${fet ? "border-green-200 bg-green-50/40" : "border-[var(--color-line)]"}`}>
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${fet ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"}`}
+                    onClick={() => toggleTemaEstat(i)}
+                    title="Canviar entre Pendent i Fet"
+                  >
+                    {fet ? "✓ Fet" : "● Pendent"}
+                  </button>
+                  <input className={`input flex-1 font-semibold ${fet ? "line-through opacity-60" : ""}`} placeholder="Títol (opcional)" value={t.titol} onChange={(e) => updTema(i, { titol: e.target.value })} onBlur={commitTemes} />
+                  <button className="btn-ghost" onClick={() => moveTema(i, -1)} title="Amunt" disabled={i === 0}>↑</button>
+                  <button className="btn-ghost" onClick={() => moveTema(i, 1)} title="Avall" disabled={i === temes.length - 1}>↓</button>
+                  <button className="btn-ghost" onClick={() => delTema(i)} title="Eliminar">✕</button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
+                  <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
+                  <textarea className="input min-h-[80px]" placeholder="Responsable" value={t.responsable} onChange={(e) => updTema(i, { responsable: e.target.value })} onBlur={commitTemes} />
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
-                <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
-                <textarea className="input min-h-[80px]" placeholder="Responsable" value={t.responsable} onChange={(e) => updTema(i, { responsable: e.target.value })} onBlur={commitTemes} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

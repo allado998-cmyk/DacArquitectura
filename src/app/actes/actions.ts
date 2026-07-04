@@ -21,12 +21,10 @@ const DEFAULT_ASSISTENTS: ActaAssistent[] = [
   { present: true, nom: "Joan March (JM)", empresa: "DE i CSiS" },
 ];
 const DEFAULT_TEMES: ActaTema[] = [
-  { titol: "PENDENTS", text: "", responsable: "" },
-  { titol: "EXECUTAT", text: "", responsable: "" },
-  { titol: "ACTUAL", text: "", responsable: "" },
+  { titol: "", text: "", responsable: "", estat: "pendent" },
 ];
 
-async function insertActa(tipus: "visita" | "reunio", expedientId: number | null, dedicacioId: number | null): Promise<number> {
+async function insertActa(tipus: string, expedientId: number | null, dedicacioId: number | null): Promise<number> {
   const num = await nextActaNum();
   let projecte: string | null = null, referencia: string | null = null, ubicacio: string | null = null, client: string | null = null;
   if (expedientId) {
@@ -59,10 +57,29 @@ async function insertActa(tipus: "visita" | "reunio", expedientId: number | null
   return rows[0]?.id ?? 0;
 }
 
-export async function createActaAction(tipus: "visita" | "reunio", expedientId: number | null): Promise<void> {
+export async function createActaAction(tipus: string, expedientId: number | null): Promise<void> {
   await requireUser();
-  const id = await insertActa(tipus, expedientId ?? null, null);
+  const id = await insertActa(tipus || "visita", expedientId ?? null, null);
   if (!id) throw new Error("No s'ha pogut crear l'acta.");
+  redirect(`/actes/${id}`);
+}
+
+export async function duplicateActaAction(formData: FormData): Promise<void> {
+  await requireUser();
+  const srcId = Number(formData.get("id"));
+  if (!Number.isFinite(srcId)) return;
+  const num = await nextActaNum();
+  const rows = (await sql`
+    insert into public.acta
+      (num, tipus, expedient_id, dedicacio_id, acta_num, data, hora, lloc, projecte, referencia, ubicacio, client,
+       assistents, temes, propera_visita, sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona)
+    select ${num}, tipus, expedient_id, null, acta_num, current_date, hora, lloc, projecte, referencia, ubicacio, client,
+       assistents, temes, propera_visita, sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona
+    from public.acta where id = ${srcId}
+    returning id
+  `) as { id: number }[];
+  const id = rows[0]?.id;
+  if (!id) throw new Error("No s'ha pogut duplicar l'acta.");
   redirect(`/actes/${id}`);
 }
 
@@ -101,10 +118,9 @@ export interface ActaPatch {
 export async function updateActaAction(id: number, p: ActaPatch) {
   await requireUser();
   if (!Number.isFinite(id)) return;
-  const tipus = p.tipus === "reunio" ? "reunio" : p.tipus === "visita" ? "visita" : null;
   await sql`
     update public.acta set
-      tipus = coalesce(${tipus}, tipus),
+      tipus = coalesce(${p.tipus ?? null}, tipus),
       expedient_id = ${p.expedient_id === undefined ? null : p.expedient_id},
       acta_num = ${p.acta_num ?? null},
       data = coalesce(${p.data ?? null}::date, data),

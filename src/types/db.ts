@@ -38,11 +38,12 @@ export interface ActaTema {
   titol: string;
   text: string;
   responsable: string;
+  estat?: "pendent" | "fet";
 }
 export interface Acta {
   id: number;
   num: string | null; // ACT-XXX
-  tipus: "visita" | "reunio";
+  tipus: string; // motiu de l'acta (visita, reunio, replanteig, …)
   expedient_id: number | null;
   dedicacio_id: number | null;
   acta_num: string | null; // "Acta nº"

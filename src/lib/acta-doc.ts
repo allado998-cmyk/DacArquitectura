@@ -29,8 +29,25 @@ function shortDate(iso: string | null | undefined): string {
 
 const FOOTER = "A Gran Via Carles III, 46-48, esc. 'O', local 08028 Barcelona · T 34 933 017 940 · M info@dacarquitectura.com · NIF B-64205545";
 
+// Extensible list of acta reasons. `value` is stored in acta.tipus.
+export const ACTA_REASONS: { value: string; label: string; docTitle: string }[] = [
+  { value: "visita", label: "Visita d'obra", docTitle: "[Acta d'Obra]" },
+  { value: "reunio", label: "Reunió", docTitle: "[Acta de Reunió]" },
+  { value: "replanteig", label: "Replanteig", docTitle: "[Acta de Replanteig]" },
+  { value: "inici", label: "Inici d'obra", docTitle: "[Acta d'Inici d'Obra]" },
+  { value: "final", label: "Final d'obra", docTitle: "[Acta de Final d'Obra]" },
+  { value: "seguiment", label: "Seguiment d'obra", docTitle: "[Acta de Seguiment]" },
+  { value: "coordinacio", label: "Coordinació de seguretat", docTitle: "[Acta de Coordinació]" },
+  { value: "aprovacio", label: "Aprovació", docTitle: "[Acta d'Aprovació]" },
+  { value: "altres", label: "Altres", docTitle: "[Acta]" },
+];
+
+export function actaReasonLabel(tipus: string): string {
+  return ACTA_REASONS.find((r) => r.value === tipus)?.label ?? tipus;
+}
+
 export function actaTitle(tipus: string): string {
-  return tipus === "reunio" ? "[Acta de Reunió]" : "[Acta d'Obra]";
+  return ACTA_REASONS.find((r) => r.value === tipus)?.docTitle ?? "[Acta]";
 }
 
 export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
@@ -79,17 +96,21 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
   // Temes tractats.
   const temesRows = (a.temes ?? [])
     .filter((t) => (t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()))
-    .map(
-      (t) => `<tr>
-        <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;">
+    .map((t) => {
+      const fet = t.estat === "fet";
+      const box = fet ? "☑" : "☐";
+      const textStyle = fet ? "color:#666;" : "";
+      return `<tr>
+        <td style="border:${bd};padding:4px 6px;font-size:12px;vertical-align:top;text-align:center;width:22px;">${box}</td>
+        <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;${textStyle}">
           ${t.titol && t.titol.trim() ? `<div style="font-weight:bold;">${esc(t.titol)}</div>` : ""}
           ${t.text && t.text.trim() ? `<div>${escMultiline(t.text)}</div>` : ""}
         </td>
         <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(t.responsable)}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join("");
-  const temes = `<table style="width:100%;border-collapse:collapse;">${temesRows || `<tr><td style="border:${bd};padding:8px;font-size:11px;">&nbsp;</td></tr>`}</table>`;
+  const temes = `<table style="width:100%;border-collapse:collapse;">${temesRows || `<tr><td colspan="3" style="border:${bd};padding:8px;font-size:11px;">&nbsp;</td></tr>`}</table>`;
 
   // Propera visita.
   const propera = `<table style="width:100%;border-collapse:collapse;"><tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${esc(a.propera_visita ?? "")}</td></tr></table>`;

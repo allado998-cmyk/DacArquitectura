@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { createActaAction } from "./actions";
+import { createActaAction, duplicateActaAction, deleteActaAction } from "./actions";
+import { ACTA_REASONS, actaReasonLabel } from "@/lib/acta-doc";
 import { openListPdf } from "@/lib/pdf";
 
 type ActaRow = {
   id: number;
   num: string | null;
-  tipus: "visita" | "reunio";
+  tipus: string;
   expedient_id: number | null;
   acta_num: string | null;
   data: string | null;
@@ -17,8 +18,6 @@ type ActaRow = {
   expedient_num: string | null;
 };
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
-
-const TIPUS_LABEL: Record<string, string> = { visita: "Visita d'obra", reunio: "Reunió" };
 
 function fmtData(iso: string | null): string {
   if (!iso) return "";
@@ -39,7 +38,7 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
   const [q, setQ] = useState("");
 
   const [modal, setModal] = useState(false);
-  const [newTipus, setNewTipus] = useState<"visita" | "reunio">("visita");
+  const [newTipus, setNewTipus] = useState<string>("visita");
   const [newExp, setNewExp] = useState<number | "">("");
   const [pending, startTransition] = useTransition();
 
@@ -66,8 +65,8 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
     openListPdf({
       title: "Actes",
       subtitle: `${filtered.length} ${filtered.length === 1 ? "acta" : "actes"}`,
-      columns: [{ label: "Núm" }, { label: "Tipus" }, { label: "Expedient" }, { label: "Projecte" }, { label: "Client" }, { label: "Data", align: "right" }],
-      rows: filtered.map((a) => [a.num ?? "", TIPUS_LABEL[a.tipus] ?? a.tipus, a.expedient_num ?? "", a.projecte ?? "", a.client ?? "", fmtData(a.data)]),
+      columns: [{ label: "Núm" }, { label: "Motiu" }, { label: "Expedient" }, { label: "Projecte" }, { label: "Client" }, { label: "Data", align: "right" }],
+      rows: filtered.map((a) => [a.num ?? "", actaReasonLabel(a.tipus), a.expedient_num ?? "", a.projecte ?? "", a.client ?? "", fmtData(a.data)]),
     });
   }
 
@@ -83,10 +82,9 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
 
       <div className="flex flex-wrap items-center gap-2">
         <input className="input w-56" placeholder="Cercar…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input w-40" value={tipus} onChange={(e) => setTipus(e.target.value)}>
-          <option value="any">Tots els tipus</option>
-          <option value="visita">Visita d&apos;obra</option>
-          <option value="reunio">Reunió</option>
+        <select className="input w-48" value={tipus} onChange={(e) => setTipus(e.target.value)}>
+          <option value="any">Tots els motius</option>
+          {ACTA_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
         <select className="input w-32" value={year} onChange={(e) => setYear(e.target.value)}>
           <option value="any">Tots els anys</option>
@@ -99,12 +97,12 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
           <thead>
             <tr>
               <th className="th w-28">Núm</th>
-              <th className="th w-32">Tipus</th>
+              <th className="th w-40">Motiu</th>
               <th className="th w-28">Expedient</th>
               <th className="th">Projecte</th>
               <th className="th">Client</th>
               <th className="th w-28 text-right">Data</th>
-              <th className="th w-20"></th>
+              <th className="th w-48"></th>
             </tr>
           </thead>
           <tbody>
@@ -114,12 +112,24 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
               filtered.map((a) => (
                 <tr key={a.id}>
                   <td className="td font-mono">{a.num}</td>
-                  <td className="td">{TIPUS_LABEL[a.tipus] ?? a.tipus}</td>
+                  <td className="td">{actaReasonLabel(a.tipus)}</td>
                   <td className="td font-mono">{a.expedient_num ?? "—"}</td>
                   <td className="td">{a.projecte ?? ""}</td>
                   <td className="td">{a.client ?? ""}</td>
                   <td className="td text-right tabular-nums">{fmtData(a.data)}</td>
-                  <td className="td text-right"><Link href={`/actes/${a.id}`} className="text-[var(--color-accent)] hover:underline">Obrir</Link></td>
+                  <td className="td">
+                    <div className="flex items-center justify-end gap-3">
+                      <Link href={`/actes/${a.id}`} className="text-[var(--color-accent)] hover:underline">Obrir</Link>
+                      <form action={duplicateActaAction}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <button type="submit" className="text-[var(--color-muted)] hover:underline">Duplicar</button>
+                      </form>
+                      <form action={deleteActaAction}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <button type="submit" className="text-red-700 hover:underline" onClick={(e) => { if (!confirm(`Eliminar l'acta ${a.num}?`)) e.preventDefault(); }}>Eliminar</button>
+                      </form>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
@@ -133,10 +143,9 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
             <h2 className="mb-4 text-lg font-semibold">Nova acta</h2>
             <div className="space-y-4">
               <div>
-                <label className="label">Per a què és?</label>
-                <select className="input" value={newTipus} onChange={(e) => setNewTipus(e.target.value as "visita" | "reunio")}>
-                  <option value="visita">Visita d&apos;obra</option>
-                  <option value="reunio">Reunió</option>
+                <label className="label">Motiu de l&apos;acta</label>
+                <select className="input" value={newTipus} onChange={(e) => setNewTipus(e.target.value)}>
+                  {ACTA_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
               <div>

@@ -29,6 +29,45 @@ export interface IteTarifa {
   increment: string;
 }
 
+export interface ActaAssistent {
+  present: boolean;
+  nom: string;
+  empresa: string;
+}
+export interface ActaTema {
+  titol: string;
+  text: string;
+  responsable: string;
+}
+export interface Acta {
+  id: number;
+  num: string | null; // ACT-XXX
+  tipus: "visita" | "reunio";
+  expedient_id: number | null;
+  dedicacio_id: number | null;
+  acta_num: string | null; // "Acta nº"
+  data: string | null;
+  hora: string | null;
+  lloc: string | null;
+  projecte: string | null;
+  referencia: string | null;
+  ubicacio: string | null;
+  client: string | null;
+  assistents: ActaAssistent[];
+  temes: ActaTema[];
+  propera_visita: string | null;
+  sig_do: string | null;
+  sig_de: string | null;
+  sig_adj_empresa: string | null;
+  sig_adj_persona: string | null;
+  sig_prom_empresa: string | null;
+  sig_prom_persona: string | null;
+  // joined for the list
+  expedient_num?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ClientContacte {
   id: number;
   client_id: number | null;

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { createDedicacioAction, deleteDedicacioAction, updateDedicacioAction } from "./actions";
+import { createActaFromDedicacioAction } from "@/app/actes/actions";
 import type { Dedicacio, Expedient } from "@/types/db";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
@@ -246,9 +247,17 @@ function dedTarget(d: Dedicacio) {
   return d.num_expedient ? `${d.num_expedient}${d.projecte ? ` · ${d.projecte}` : ""}` : d.activitat ?? "—";
 }
 
-function EditDeleteBtns({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function isActaTasca(t: string | null | undefined) {
+  const s = (t ?? "").toLowerCase();
+  return s.includes("visita") || s.includes("reuni");
+}
+
+function EditDeleteBtns({ onEdit, onDelete, onActa }: { onEdit: () => void; onDelete: () => void; onActa?: () => void }) {
   return (
     <span className="flex shrink-0 items-center gap-1">
+      {onActa && (
+        <button type="button" title="Crear acta" aria-label="Crear acta" className="inline-flex h-6 items-center justify-center rounded px-1.5 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-paper)]" onClick={onActa}>+ Acta</button>
+      )}
       <button type="button" title="Editar" aria-label="Editar" className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-accent)] hover:bg-[var(--color-paper)]" onClick={onEdit}>✎</button>
       <button
         type="button"
@@ -316,7 +325,7 @@ function Last7Days({
                             <div className="truncate font-medium">{dedTarget(d)}</div>
                             {sub && <div className="truncate text-xs text-[var(--color-muted)]">{sub}</div>}
                           </div>
-                          <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
+                          <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} onActa={d.expedient_id && isActaTasca(d.tasca) ? () => startTransition(() => createActaFromDedicacioAction(d.id)) : undefined} />
                         </li>
                       );
                     })}
@@ -860,7 +869,7 @@ function DayModal({
                   <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
                   <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
                   <td className="td text-right">
-                    <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} />
+                    <EditDeleteBtns onEdit={() => setEditing(d)} onDelete={() => startTransition(() => deleteDedicacioAction(d.id))} onActa={d.expedient_id && isActaTasca(d.tasca) ? () => startTransition(() => createActaFromDedicacioAction(d.id)) : undefined} />
                   </td>
                 </tr>
               ))}

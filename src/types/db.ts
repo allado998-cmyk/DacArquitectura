@@ -187,6 +187,8 @@ export interface Dedicacio {
   tasca: string | null;
   comentari: string | null;
   created_at: string;
+  acta_id?: number | null; // joined: linked acta, if one was created from this entry
+  acta_num?: string | null; // joined
 }
 
 export type PropostaDocEstat = "pendent" | "acceptada" | "rebutjada";

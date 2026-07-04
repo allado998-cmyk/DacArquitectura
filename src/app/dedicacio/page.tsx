@@ -26,10 +26,14 @@ export default async function DedicacioPage() {
       select d.id, d.expedient_id, d.activitat, e.num_expedient, e.projecte,
              e.categoria, e.client_id, c.nom as client_nom,
              to_char(d.data, 'YYYY-MM-DD') as data,
-             d.hores::text as hores, d.tasca, d.comentari, d.created_at
+             d.hores::text as hores, d.tasca, d.comentari, d.created_at,
+             a.id as acta_id, a.num as acta_num
       from public.dedicacions d
       left join public.expedients e on e.id = d.expedient_id
       left join public.clients c on c.id = e.client_id
+      left join lateral (
+        select id, num from public.acta where dedicacio_id = d.id order by id limit 1
+      ) a on true
       order by d.data desc, d.id desc
     ` as unknown as Promise<Dedicacio[]>,
     sql`select nom from public.tasca order by nom` as unknown as Promise<{ nom: string }[]>,

@@ -85,6 +85,9 @@ export async function duplicateActaAction(formData: FormData): Promise<void> {
 
 export async function createActaFromDedicacioAction(dedicacioId: number): Promise<void> {
   await requireUser();
+  // Only one acta per dedicació — reuse the existing one if present.
+  const existing = (await sql`select id from public.acta where dedicacio_id = ${dedicacioId} order by id limit 1`) as { id: number }[];
+  if (existing[0]) redirect(`/actes/${existing[0].id}`);
   const rows = (await sql`select expedient_id, tasca from public.dedicacions where id = ${dedicacioId}`) as { expedient_id: number | null; tasca: string | null }[];
   const d = rows[0];
   const tipus: "visita" | "reunio" = (d?.tasca ?? "").toLowerCase().includes("visita") ? "visita" : "reunio";

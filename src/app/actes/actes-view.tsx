@@ -33,8 +33,13 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
   }, [actes]);
   const currentYear = String(new Date().getFullYear());
 
+  const projects = useMemo(() => Array.from(new Set(actes.map((a) => a.projecte ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")), [actes]);
+  const clients = useMemo(() => Array.from(new Set(actes.map((a) => a.client ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")), [actes]);
+
   const [year, setYear] = useState<string>(years.includes(currentYear) ? currentYear : "any");
   const [tipus, setTipus] = useState<string>("any");
+  const [fProject, setFProject] = useState<string>("any");
+  const [fClient, setFClient] = useState<string>("any");
   const [q, setQ] = useState("");
 
   const [modal, setModal] = useState(false);
@@ -47,13 +52,15 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
     return actes.filter((a) => {
       if (year !== "any" && (a.data ?? "").slice(0, 4) !== year) return false;
       if (tipus !== "any" && a.tipus !== tipus) return false;
+      if (fProject !== "any" && (a.projecte ?? "") !== fProject) return false;
+      if (fClient !== "any" && (a.client ?? "") !== fClient) return false;
       if (needle) {
         const hay = `${a.num ?? ""} ${a.expedient_num ?? ""} ${a.projecte ?? ""} ${a.client ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [actes, year, tipus, q]);
+  }, [actes, year, tipus, fProject, fClient, q]);
 
   function create() {
     startTransition(() => {
@@ -65,8 +72,8 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
     openListPdf({
       title: "Actes",
       subtitle: `${filtered.length} ${filtered.length === 1 ? "acta" : "actes"}`,
-      columns: [{ label: "Núm" }, { label: "Motiu" }, { label: "Expedient" }, { label: "Projecte" }, { label: "Client" }, { label: "Data", align: "right" }],
-      rows: filtered.map((a) => [a.num ?? "", actaReasonLabel(a.tipus), a.expedient_num ?? "", a.projecte ?? "", a.client ?? "", fmtData(a.data)]),
+      columns: [{ label: "Núm" }, { label: "Motiu" }, { label: "Acta nº" }, { label: "Expedient" }, { label: "Projecte" }, { label: "Client" }, { label: "Data", align: "right" }],
+      rows: filtered.map((a) => [a.num ?? "", actaReasonLabel(a.tipus), a.acta_num ?? "", a.expedient_num ?? "", a.projecte ?? "", a.client ?? "", fmtData(a.data)]),
     });
   }
 
@@ -86,6 +93,14 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
           <option value="any">Tots els motius</option>
           {ACTA_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
+        <select className="input w-56" value={fProject} onChange={(e) => setFProject(e.target.value)}>
+          <option value="any">Tots els projectes</option>
+          {projects.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select className="input w-48" value={fClient} onChange={(e) => setFClient(e.target.value)}>
+          <option value="any">Tots els clients</option>
+          {clients.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select className="input w-32" value={year} onChange={(e) => setYear(e.target.value)}>
           <option value="any">Tots els anys</option>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -98,6 +113,7 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
             <tr>
               <th className="th w-28">Núm</th>
               <th className="th w-40">Motiu</th>
+              <th className="th w-20">Acta nº</th>
               <th className="th w-28">Expedient</th>
               <th className="th">Projecte</th>
               <th className="th">Client</th>
@@ -107,12 +123,13 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td className="td text-[var(--color-muted)]" colSpan={7}>Cap acta.</td></tr>
+              <tr><td className="td text-[var(--color-muted)]" colSpan={8}>Cap acta.</td></tr>
             ) : (
               filtered.map((a) => (
                 <tr key={a.id}>
                   <td className="td font-mono">{a.num}</td>
                   <td className="td">{actaReasonLabel(a.tipus)}</td>
+                  <td className="td">{a.acta_num ?? ""}</td>
                   <td className="td font-mono">{a.expedient_num ?? "—"}</td>
                   <td className="td">{a.projecte ?? ""}</td>
                   <td className="td">{a.client ?? ""}</td>

@@ -44,6 +44,10 @@ export interface ActaSignatura {
   titol: string;
   persona: string;
 }
+export interface ActaDoc {
+  name: string;
+  dataUrl: string; // base64 data URI of the uploaded PDF
+}
 export interface Acta {
   id: number;
   num: string | null; // ACT-XXX
@@ -64,6 +68,8 @@ export interface Acta {
   propera_data: string | null;
   propera_hora: string | null;
   signatures: ActaSignatura[];
+  fotografies: string[]; // data URIs
+  documents: ActaDoc[];
   // legacy signature columns (kept for back-compat / seeding)
   sig_do: string | null;
   sig_de: string | null;

@@ -1,25 +1,70 @@
 // Acta d'Obra / de Reunió — HTML document builder used for the print/PDF output
 // and the Word (.doc) export. Mirrors the FE75 "Acta de Projecte" model.
+// Bilingual: labels/titles are translated (ca/es); user content is kept as-is.
 
 import type { Acta, ActaSignatura, ActaTema } from "@/types/db";
 
+export type ActaLang = "ca" | "es";
+
 const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 
-const MESOS = ["gener", "febrer", "març", "abril", "maig", "juny", "juliol", "agost", "setembre", "octubre", "novembre", "desembre"];
+const MESOS: Record<ActaLang, string[]> = {
+  ca: ["gener", "febrer", "març", "abril", "maig", "juny", "juliol", "agost", "setembre", "octubre", "novembre", "desembre"],
+  es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+};
+
+interface Txt {
+  dadesGenerals: string;
+  projecte: string;
+  referencia: string;
+  ubicacio: string;
+  client: string;
+  actaNum: string;
+  lloc: string;
+  data: string;
+  hora: string;
+  assistents: string;
+  temes: string;
+  responsable: string;
+  proximaVisita: string;
+  fotografies: string;
+  documents: string;
+  assabentats: string;
+  closing: (d: string) => string;
+}
+const TXT: Record<ActaLang, Txt> = {
+  ca: {
+    dadesGenerals: "DADES GENERALS",
+    projecte: "Projecte", referencia: "Referència", ubicacio: "Ubicació", client: "Client",
+    actaNum: "Acta nº", lloc: "Lloc", data: "Data", hora: "Hora",
+    assistents: "ASSISTENTS", temes: "TEMES TRACTATS", responsable: "RESPONSABLE",
+    proximaVisita: "PROPERA VISITA", fotografies: "FOTOGRAFIES", documents: "DOCUMENTS ADJUNTS",
+    assabentats: "Assabentats,",
+    closing: (d) => `I per que consti, tots signen per triplicat la present acta a Barcelona el ${d}.`,
+  },
+  es: {
+    dadesGenerals: "DATOS GENERALES",
+    projecte: "Proyecto", referencia: "Referencia", ubicacio: "Ubicación", client: "Cliente",
+    actaNum: "Acta nº", lloc: "Lugar", data: "Fecha", hora: "Hora",
+    assistents: "ASISTENTES", temes: "TEMAS TRATADOS", responsable: "RESPONSABLE",
+    proximaVisita: "PRÓXIMA VISITA", fotografies: "FOTOGRAFÍAS", documents: "DOCUMENTOS ADJUNTOS",
+    assabentats: "Enterados,",
+    closing: (d) => `Y para que conste, todos firman por triplicado la presente acta en Barcelona el ${d}.`,
+  },
+};
 
 function esc(s: string | null | undefined) {
   return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-// Preserve manual line breaks entered in a textarea.
 function escMultiline(s: string | null | undefined) {
   return esc(s).replace(/\r?\n/g, "<br>");
 }
-function longDate(iso: string | null | undefined): string {
+function longDate(iso: string | null | undefined, lang: ActaLang): string {
   if (!iso) return "";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;
   const d = parseInt(m[3], 10), mo = parseInt(m[2], 10) - 1, y = m[1];
-  return `${d} de ${MESOS[mo] ?? ""} de ${y}`;
+  return `${d} de ${MESOS[lang][mo] ?? ""} de ${y}`;
 }
 function shortDate(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -27,44 +72,44 @@ function shortDate(iso: string | null | undefined): string {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
 }
 
-const FOOTER = "A Gran Via Carles III, 46-48, esc. 'O', local 08028 Barcelona · T 34 933 017 940 · M info@dacarquitectura.com · NIF B-64205545";
-
 // Extensible list of acta reasons. `value` is stored in acta.tipus.
-export const ACTA_REASONS: { value: string; label: string; docTitle: string }[] = [
-  { value: "visita", label: "Visita d'obra", docTitle: "[Acta d'Obra]" },
-  { value: "reunio", label: "Reunió", docTitle: "[Acta de Reunió]" },
-  { value: "replanteig", label: "Replanteig", docTitle: "[Acta de Replanteig]" },
-  { value: "inici", label: "Inici d'obra", docTitle: "[Acta d'Inici d'Obra]" },
-  { value: "final", label: "Final d'obra", docTitle: "[Acta de Final d'Obra]" },
-  { value: "seguiment", label: "Seguiment d'obra", docTitle: "[Acta de Seguiment]" },
-  { value: "coordinacio", label: "Coordinació de seguretat", docTitle: "[Acta de Coordinació]" },
-  { value: "aprovacio", label: "Aprovació", docTitle: "[Acta d'Aprovació]" },
-  { value: "altres", label: "Altres", docTitle: "[Acta]" },
+export const ACTA_REASONS: { value: string; label: string; labelEs: string; docTitle: string; docTitleEs: string }[] = [
+  { value: "visita", label: "Visita d'obra", labelEs: "Visita de obra", docTitle: "[Acta d'Obra]", docTitleEs: "[Acta de Obra]" },
+  { value: "reunio", label: "Reunió", labelEs: "Reunión", docTitle: "[Acta de Reunió]", docTitleEs: "[Acta de Reunión]" },
+  { value: "coordinacio", label: "Coordinació de seguretat", labelEs: "Coordinación de seguridad", docTitle: "[Acta de Coordinació]", docTitleEs: "[Acta de Coordinación]" },
+  { value: "altres", label: "Altres", labelEs: "Otros", docTitle: "[Acta]", docTitleEs: "[Acta]" },
 ];
 
-export function actaReasonLabel(tipus: string): string {
-  return ACTA_REASONS.find((r) => r.value === tipus)?.label ?? tipus;
+export function actaReasonLabel(tipus: string, lang: ActaLang = "ca"): string {
+  const r = ACTA_REASONS.find((x) => x.value === tipus);
+  if (!r) return tipus;
+  return lang === "es" ? r.labelEs : r.label;
 }
-
-export function actaTitle(tipus: string): string {
-  return ACTA_REASONS.find((r) => r.value === tipus)?.docTitle ?? "[Acta]";
+export function actaTitle(tipus: string, lang: ActaLang = "ca"): string {
+  const r = ACTA_REASONS.find((x) => x.value === tipus);
+  if (!r) return "[Acta]";
+  return lang === "es" ? r.docTitleEs : r.docTitle;
 }
 
 // Temes categories.
-export const TEMA_CATS: { key: string; label: string }[] = [
-  { key: "pendent", label: "Pendent" },
-  { key: "executat", label: "Executat" },
-  { key: "tractat", label: "Tractat" },
+export const TEMA_CATS: { key: string; label: string; labelEs: string }[] = [
+  { key: "pendent", label: "Pendent", labelEs: "Pendiente" },
+  { key: "executat", label: "Executat", labelEs: "Ejecutado" },
+  { key: "tractat", label: "Tractat", labelEs: "Tratado" },
 ];
 export function temaCat(t: ActaTema): string {
   const e = t.estat ?? "pendent";
   if (e === "fet") return "executat"; // legacy
   return e === "executat" || e === "tractat" ? e : "pendent";
 }
+function temaCatLabel(key: string, lang: ActaLang): string {
+  const c = TEMA_CATS.find((x) => x.key === key);
+  if (!c) return key;
+  return lang === "es" ? c.labelEs : c.label;
+}
 function temaHasContent(t: ActaTema): boolean {
   return !!((t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()));
 }
-// Signatures fall back to the legacy columns if the jsonb list is empty.
 function actaSignatures(a: Acta): ActaSignatura[] {
   if (a.signatures && a.signatures.length) return a.signatures;
   const out: ActaSignatura[] = [];
@@ -75,41 +120,38 @@ function actaSignatures(a: Acta): ActaSignatura[] {
   return out;
 }
 
-export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
+export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg"): string {
+  const t = TXT[lang];
   const grey = "#7a7a72";
   const bd = "1px solid #c9c9c9";
-  // Table-based so it renders correctly in Word too (Word ignores flexbox).
   const barCell = "padding:4px 8px;font-size:10px;letter-spacing:.05em;color:#666;text-transform:uppercase;border-bottom:1px solid #bdbdbd;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
   const bar = (title: string, right?: string) =>
     `<table style="width:100%;border-collapse:collapse;margin:14px 0 0;"><tr>
       <td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;">${esc(title)}</td>
       ${right ? `<td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;text-align:right;">${esc(right)}</td>` : ""}
     </tr></table>`;
-  // A labelled cell: tiny italic grey label above the value.
   const cell = (label: string, value: string, opts: { span?: number; bold?: boolean; width?: string } = {}) =>
     `<td${opts.span ? ` colspan="${opts.span}"` : ""} style="border:${bd};padding:3px 7px;vertical-align:top;${opts.width ? `width:${opts.width};` : ""}">
       ${label ? `<div style="font-style:italic;color:${grey};font-size:8px;">${esc(label)}</div>` : ""}
       <div style="font-size:11px;${opts.bold ? "font-weight:bold;" : ""}">${value || "&nbsp;"}</div>
     </td>`;
 
-  // Dades generals (4-column grid).
   const dadesGenerals = `
     <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
       <tr>
-        ${cell("Projecte", esc(a.projecte ?? ""), { span: 3, bold: true })}
-        ${cell("Referència", esc(a.referencia ?? ""), { bold: true, width: "90px" })}
+        ${cell(t.projecte, esc(a.projecte ?? ""), { span: 3, bold: true })}
+        ${cell(t.referencia, esc(a.referencia ?? ""), { bold: true, width: "90px" })}
       </tr>
-      <tr>${cell("Ubicació", esc(a.ubicacio ?? ""), { span: 4 })}</tr>
-      <tr>${cell("Client", esc(a.client ?? ""), { span: 4 })}</tr>
+      <tr>${cell(t.ubicacio, esc(a.ubicacio ?? ""), { span: 4 })}</tr>
+      <tr>${cell(t.client, esc(a.client ?? ""), { span: 4 })}</tr>
       <tr>
-        ${cell("Acta nº", esc(a.acta_num ?? ""), { width: "25%" })}
-        ${cell("Lloc", esc(a.lloc ?? ""), { width: "25%" })}
-        ${cell("Data", shortDate(a.data), { width: "25%" })}
-        ${cell("Hora", esc(a.hora ?? ""), { width: "25%" })}
+        ${cell(t.actaNum, esc(a.acta_num ?? ""), { width: "25%" })}
+        ${cell(t.lloc, esc(a.lloc ?? ""), { width: "25%" })}
+        ${cell(t.data, shortDate(a.data), { width: "25%" })}
+        ${cell(t.hora, esc(a.hora ?? ""), { width: "25%" })}
       </tr>
     </table>`;
 
-  // Assistents.
   const assistentsRows = (a.assistents ?? [])
     .map(
       (as) => `<tr>
@@ -121,35 +163,33 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
     .join("");
   const assistents = `<table style="width:100%;border-collapse:collapse;">${assistentsRows}</table>`;
 
-  // Temes tractats — one table per category (Pendent / Executat / Tractat).
+  // Temes tractats — one table per category.
   const barTemes = (label: string) =>
     `<table style="width:100%;border-collapse:collapse;margin:14px 0 0;"><tr>
-      <td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;">TEMES TRACTATS - ${esc(label)}</td>
-      <td bgcolor="#e6e6e6" width="130" style="${barCell}background:#e6e6e6;text-align:right;">RESPONSABLE</td>
+      <td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;">${esc(t.temes)} - ${esc(label)}</td>
+      <td bgcolor="#e6e6e6" width="130" style="${barCell}background:#e6e6e6;text-align:right;">${esc(t.responsable)}</td>
     </tr></table>`;
   const temesSections = TEMA_CATS.map((cat) => {
     const rows = (a.temes ?? [])
-      .filter((t) => temaCat(t) === cat.key && temaHasContent(t))
+      .filter((tm) => temaCat(tm) === cat.key && temaHasContent(tm))
       .map(
-        (t) => `<tr>
+        (tm) => `<tr>
           <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;">
-            ${t.titol && t.titol.trim() ? `<div style="font-weight:bold;">${esc(t.titol)}</div>` : ""}
-            ${t.text && t.text.trim() ? `<div>${escMultiline(t.text)}</div>` : ""}
+            ${tm.titol && tm.titol.trim() ? `<div style="font-weight:bold;">${esc(tm.titol)}</div>` : ""}
+            ${tm.text && tm.text.trim() ? `<div>${escMultiline(tm.text)}</div>` : ""}
           </td>
-          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(t.responsable)}</td>
+          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(tm.responsable)}</td>
         </tr>`,
       )
       .join("");
     if (!rows) return "";
-    return barTemes(cat.label) + `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows}</table>`;
+    return barTemes(temaCatLabel(cat.key, lang)) + `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows}</table>`;
   }).join("");
 
-  // Propera visita — date · time · note.
   const properaBits = [a.propera_data ? shortDate(a.propera_data) : "", a.propera_hora ?? ""].filter(Boolean).join(" · ");
   const properaBody = [properaBits, a.propera_visita ?? ""].filter((x) => x && x.trim()).join(" — ");
   const propera = `<table style="width:100%;border-collapse:collapse;"><tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${esc(properaBody) || "&nbsp;"}</td></tr></table>`;
 
-  // Signatures — editable titles, blank space to sign, 2 per row.
   const sigs = actaSignatures(a);
   const sigBlock = (s: ActaSignatura) =>
     `<td style="border:${bd};padding:6px 8px;vertical-align:top;width:50%;">
@@ -163,40 +203,53 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
   }
   const signatures = sigs.length ? `<table style="width:100%;border-collapse:collapse;margin-top:6px;">${sigRows}</table>` : "";
 
-  const closing = `<p style="font-size:11px;margin:14px 0 4px;">I per que consti, tots signen per triplicat la present acta a Barcelona el ${esc(longDate(a.data))}.<br>Assabentats,</p>`;
+  // Fotografies — each image, one by one, full width.
+  const fotos = a.fotografies ?? [];
+  const fotosSection = fotos.length
+    ? bar(t.fotografies) + fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")
+    : "";
+
+  // Documents adjunts — list of attached PDFs.
+  const docs = a.documents ?? [];
+  const docsSection = docs.length
+    ? bar(t.documents) + `<table style="width:100%;border-collapse:collapse;">${docs.map((d, i) => `<tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${i + 1}. ${esc(d.name)}</td></tr>`).join("")}</table>`
+    : "";
+
+  const closing = `<p style="font-size:11px;margin:14px 0 4px;">${esc(t.closing(longDate(a.data, lang)))}<br>${esc(t.assabentats)}</p>`;
 
   return `
   <div style="font-family:${DOC_FONT};font-size:11px;color:#111;max-width:820px;margin:0 auto;">
     <div style="text-align:right;margin-bottom:2px;">
       <img src="${logoUrl}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" />
-      <div style="font-weight:bold;font-size:15px;margin-top:2px;">${esc(actaTitle(a.tipus))}</div>
+      <div style="font-weight:bold;font-size:15px;margin-top:2px;">${esc(actaTitle(a.tipus, lang))}</div>
     </div>
 
-    ${bar("DADES GENERALS")}
+    ${bar(t.dadesGenerals)}
     ${dadesGenerals}
 
-    ${bar("ASSISTENTS")}
+    ${bar(t.assistents)}
     ${assistents}
 
     ${temesSections}
 
-    ${bar("PROPERA VISITA")}
+    ${bar(t.proximaVisita)}
     ${propera}
 
     ${closing}
     ${signatures}
 
-    <div style="margin-top:22px;font-size:8px;color:#999;text-align:center;">${esc(FOOTER)}</div>
+    ${fotosSection}
+    ${docsSection}
   </div>`;
 }
 
 // ---- client-side output helpers ----
 
-export function openActaPdf(a: Acta) {
+export function openActaPdf(a: Acta, lang: ActaLang = "ca") {
   const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>
     <style>@page { size: A4 portrait; margin: 1.3cm; } *{-webkit-print-color-adjust:exact;print-color-adjust:exact;} body{margin:0;}</style>
-    </head><body>${buildActaHtml(a, logo)}</body></html>`;
+    </head><body>${buildActaHtml(a, lang, logo)}</body></html>`;
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
   w.document.write(html);
@@ -205,8 +258,6 @@ export function openActaPdf(a: Acta) {
   setTimeout(() => w.print(), 400);
 }
 
-// Word doesn't reliably fetch remote images, so embed the DAC logo as a
-// base64 data URI. Falls back to the URL if the fetch fails.
 async function logoDataUri(): Promise<string> {
   const url = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
   try {
@@ -223,10 +274,10 @@ async function logoDataUri(): Promise<string> {
   }
 }
 
-export async function downloadActaWord(a: Acta) {
+export async function downloadActaWord(a: Acta, lang: ActaLang = "ca") {
   const logo = await logoDataUri();
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, logo)}</body></html>`;
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo)}</body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

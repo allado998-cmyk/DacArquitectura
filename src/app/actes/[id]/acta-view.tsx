@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { updateActaAction, deleteActaAction, duplicateActaAction, createActaContacteAction, type ActaPatch } from "../actions";
-import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat } from "@/lib/acta-doc";
-import type { Acta, ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
+import { updateActaAction, deleteActaAction, createActaContacteAction, addActaFotoAction, removeActaFotoAction, addActaDocAction, removeActaDocAction, type ActaPatch } from "../actions";
+import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat, type ActaLang } from "@/lib/acta-doc";
+import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
@@ -37,12 +37,17 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [properaData, setProperaData] = useState(acta.propera_data ?? "");
   const [properaHora, setProperaHora] = useState(acta.propera_hora ?? "");
   const [signatures, setSignatures] = useState<ActaSignatura[]>(seedSignatures(acta));
+  const [fotos, setFotos] = useState<string[]>(acta.fotografies ?? []);
+  const [docs, setDocs] = useState<ActaDoc[]>(acta.documents ?? []);
+  const [docLang, setDocLang] = useState<ActaLang>("ca");
 
   const [contactList, setContactList] = useState<Contacte[]>(contactes);
   const [newContact, setNewContact] = useState(false);
   const [ncNom, setNcNom] = useState("");
   const [ncTel, setNcTel] = useState("");
   const [ncMail, setNcMail] = useState("");
+  const [contactQuery, setContactQuery] = useState("");
+  const [contactOpen, setContactOpen] = useState(false);
 
   const [saved, setSaved] = useState(true);
   const [, startTransition] = useTransition();
@@ -54,6 +59,14 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     for (const c of contactList) if ((c.nom ?? "").trim()) s.add((c.nom ?? "").trim());
     return Array.from(s);
   }, [assistents, contactList]);
+
+  // Searchable contacts for the "afegir contacte" lookup.
+  const filteredContacts = useMemo(() => {
+    const nq = contactQuery.trim().toLowerCase();
+    const base = contactList.filter((c) => (c.nom ?? "").trim());
+    const list = nq ? base.filter((c) => `${c.nom ?? ""} ${c.client_nom ?? ""}`.toLowerCase().includes(nq)) : base;
+    return list.slice(0, 60);
+  }, [contactList, contactQuery]);
 
   function currentPatch(override: Partial<ActaPatch> = {}): ActaPatch {
     return {
@@ -89,10 +102,30 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       ...acta,
       tipus, acta_num: actaNum, data, hora, lloc, projecte, referencia, ubicacio, client,
       assistents, temes, propera_visita: properaVisita, propera_data: properaData, propera_hora: properaHora,
-      signatures,
+      signatures, fotografies: fotos, documents: docs,
       expedient_id: expedientId === "" ? null : expedientId,
     };
   }
+
+  // Media uploads (no size limit).
+  function onUploadFotos(files: FileList | null) {
+    if (!files) return;
+    Array.from(files).forEach((f) => {
+      const fr = new FileReader();
+      fr.onload = () => { const url = fr.result as string; setFotos((p) => [...p, url]); startTransition(() => addActaFotoAction(acta.id, url)); };
+      fr.readAsDataURL(f);
+    });
+  }
+  function removeFoto(i: number) { setFotos((p) => p.filter((_, j) => j !== i)); startTransition(() => removeActaFotoAction(acta.id, i)); }
+  function onUploadDocs(files: FileList | null) {
+    if (!files) return;
+    Array.from(files).forEach((f) => {
+      const fr = new FileReader();
+      fr.onload = () => { const url = fr.result as string; const doc = { name: f.name, dataUrl: url }; setDocs((p) => [...p, doc]); startTransition(() => addActaDocAction(acta.id, doc)); };
+      fr.readAsDataURL(f);
+    });
+  }
+  function removeDoc(i: number) { setDocs((p) => p.filter((_, j) => j !== i)); startTransition(() => removeActaDocAction(acta.id, i)); }
 
   // Assistents helpers
   function setAss(next: ActaAssistent[]) { setAssistents(next); save({ assistents: next }); }
@@ -174,12 +207,12 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--color-muted)]">{saved ? "Desat" : "Desant…"}</span>
-          <button className="btn" onClick={() => openActaPdf(liveActa())}>PDF</button>
-          <button className="btn" onClick={() => downloadActaWord(liveActa())}>Word</button>
-          <form action={duplicateActaAction}>
-            <input type="hidden" name="id" value={acta.id} />
-            <button className="btn" type="submit">Duplicar</button>
-          </form>
+          <div className="flex overflow-hidden rounded-md border border-[var(--color-line)] text-xs font-semibold">
+            <button className={`px-2.5 py-1.5 ${docLang === "ca" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("ca")}>CA</button>
+            <button className={`px-2.5 py-1.5 ${docLang === "es" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("es")}>ES</button>
+          </div>
+          <button className="btn" onClick={() => openActaPdf(liveActa(), docLang)}>PDF</button>
+          <button className="btn" onClick={() => downloadActaWord(liveActa(), docLang)}>Word</button>
         </div>
       </div>
 
@@ -190,6 +223,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             <label className="label">Motiu de l&apos;acta</label>
             <select className="input" value={tipus} onChange={(e) => { const v = e.target.value; setTipus(v); save({ tipus: v }); }}>
               {ACTA_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              {!ACTA_REASONS.some((r) => r.value === tipus) && <option value={tipus}>{tipus}</option>}
             </select>
           </div>
           <div>
@@ -246,10 +280,34 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Assistents</h2>
           <div className="flex items-center gap-2">
-            <select className="input w-64" value="" onChange={(e) => { const c = contactList[Number(e.target.value)]; if (c) addAssistent(c.nom ?? ""); e.target.value = ""; }}>
-              <option value="">+ Afegir de contactes…</option>
-              {contactList.map((c, i) => <option key={i} value={i}>{c.nom}{c.client_nom ? ` — ${c.client_nom}` : ""}</option>)}
-            </select>
+            <div className="relative">
+              <input
+                className="input w-64"
+                placeholder="Cercar i afegir contacte…"
+                value={contactQuery}
+                onChange={(e) => { setContactQuery(e.target.value); setContactOpen(true); }}
+                onFocus={() => setContactOpen(true)}
+                onBlur={() => setTimeout(() => setContactOpen(false), 150)}
+              />
+              {contactOpen && (
+                <div className="absolute right-0 z-20 mt-1 max-h-60 w-72 overflow-auto rounded-md border border-[var(--color-line)] bg-white shadow-lg">
+                  {filteredContacts.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-[var(--color-muted)]">Cap contacte</div>
+                  ) : (
+                    filteredContacts.map((c, i) => (
+                      <button
+                        key={i}
+                        className="block w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--color-paper)]"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { addAssistent(c.nom ?? ""); setContactQuery(""); setContactOpen(false); }}
+                      >
+                        {c.nom}{c.client_nom ? <span className="text-[var(--color-muted)]"> — {c.client_nom}</span> : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button className="btn" onClick={() => setNewContact((v) => !v)}>+ Nou contacte</button>
             <button className="btn" onClick={() => addAssistent()}>+ Assistent</button>
           </div>
@@ -367,6 +425,54 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Fotografies */}
+      <section className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Fotografies</h2>
+          <label className="btn cursor-pointer">
+            + Afegir imatges
+            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadFotos(e.target.files); e.target.value = ""; }} />
+          </label>
+        </div>
+        {fotos.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted)]">Cap imatge. Apareixeran una a una al final del document.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {fotos.map((src, i) => (
+              <div key={i} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`Foto ${i + 1}`} className="h-32 w-full rounded-lg border border-[var(--color-line)] object-cover" />
+                <button className="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-semibold text-red-700 shadow hover:bg-white" onClick={() => removeFoto(i)} title="Eliminar">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Documents adjunts */}
+      <section className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Documents adjunts</h2>
+          <label className="btn cursor-pointer">
+            + Afegir PDF
+            <input type="file" accept="application/pdf" multiple className="hidden" onChange={(e) => { onUploadDocs(e.target.files); e.target.value = ""; }} />
+          </label>
+        </div>
+        {docs.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted)]">Cap document.</p>
+        ) : (
+          <ul className="space-y-2">
+            {docs.map((d, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <span className="text-[var(--color-muted)]">{i + 1}.</span>
+                <a href={d.dataUrl} download={d.name} className="flex-1 truncate text-[var(--color-accent)] hover:underline">{d.name}</a>
+                <button className="btn-ghost" onClick={() => removeDoc(i)} title="Eliminar">✕</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="flex justify-end">

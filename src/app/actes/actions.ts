@@ -4,16 +4,17 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import type { ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
+import type { ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 
 async function nextActaNum(): Promise<string> {
-  const rows = (await sql`select num from public.acta where num like 'ACT-%'`) as { num: string }[];
+  const yy = String(new Date().getFullYear()).slice(2);
+  const rows = (await sql`select num from public.acta where num like ${`AC-${yy}-%`}`) as { num: string }[];
   let max = 0;
   for (const r of rows) {
     const m = /-(\d+)$/.exec(r.num ?? "");
     if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  return `ACT-${String(max + 1).padStart(3, "0")}`;
+  return `AC-${yy}-${String(max + 1).padStart(3, "0")}`;
 }
 
 const DEFAULT_ASSISTENTS: ActaAssistent[] = [
@@ -161,6 +162,33 @@ export async function createActaContacteAction(data: { nom: string; telefon?: st
   `;
   revalidatePath("/parameters");
   return { nom };
+}
+
+// Media: photos + document attachments. Appended/removed one item at a time
+// (so a single large upload only travels once).
+export async function addActaFotoAction(id: number, dataUrl: string) {
+  await requireUser();
+  if (!Number.isFinite(id) || !dataUrl) return;
+  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) || ${JSON.stringify([dataUrl])}::jsonb, updated_at = now() where id = ${id}`;
+  revalidatePath(`/actes/${id}`);
+}
+export async function removeActaFotoAction(id: number, index: number) {
+  await requireUser();
+  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
+  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+  revalidatePath(`/actes/${id}`);
+}
+export async function addActaDocAction(id: number, doc: ActaDoc) {
+  await requireUser();
+  if (!Number.isFinite(id) || !doc?.dataUrl) return;
+  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) || ${JSON.stringify([doc])}::jsonb, updated_at = now() where id = ${id}`;
+  revalidatePath(`/actes/${id}`);
+}
+export async function removeActaDocAction(id: number, index: number) {
+  await requireUser();
+  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
+  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+  revalidatePath(`/actes/${id}`);
 }
 
 export async function deleteActaAction(formData: FormData) {

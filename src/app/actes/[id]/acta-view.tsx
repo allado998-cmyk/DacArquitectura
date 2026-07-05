@@ -9,6 +9,45 @@ import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/ty
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+// Downscale/re-encode so a whole album of phone photos stays a few MB, not tens.
+async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  if (!file.type.startsWith("image/")) return dataUrl;
+  try {
+    const img = await loadImage(dataUrl);
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    return dataUrl;
+  }
+}
+function temaResponsables(t: ActaTema): string[] {
+  if (t.responsables) return t.responsables;
+  return t.responsable ? t.responsable.split(" & ").map((s) => s.trim()).filter(Boolean) : [];
+}
+
 function seedSignatures(a: Acta): ActaSignatura[] {
   if (a.signatures && a.signatures.length) return a.signatures;
   const out: ActaSignatura[] = [];
@@ -48,6 +87,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [ncMail, setNcMail] = useState("");
   const [contactQuery, setContactQuery] = useState("");
   const [contactOpen, setContactOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [saved, setSaved] = useState(true);
   const [, startTransition] = useTransition();
@@ -107,25 +147,35 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     };
   }
 
-  // Media uploads (no size limit).
-  function onUploadFotos(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach((f) => {
-      const fr = new FileReader();
-      fr.onload = () => { const url = fr.result as string; setFotos((p) => [...p, url]); startTransition(() => addActaFotoAction(acta.id, url)); };
-      fr.readAsDataURL(f);
-    });
+  // Media uploads. Images are downscaled client-side, and each file is stored
+  // one at a time (sequentially) so a big batch never floods the server.
+  async function onUploadFotos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    for (const f of Array.from(files)) {
+      try {
+        const url = await compressImage(f);
+        setFotos((p) => [...p, url]);
+        await addActaFotoAction(acta.id, url);
+      } catch { /* skip this file */ }
+    }
+    setUploading(false);
   }
-  function removeFoto(i: number) { setFotos((p) => p.filter((_, j) => j !== i)); startTransition(() => removeActaFotoAction(acta.id, i)); }
-  function onUploadDocs(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach((f) => {
-      const fr = new FileReader();
-      fr.onload = () => { const url = fr.result as string; const doc = { name: f.name, dataUrl: url }; setDocs((p) => [...p, doc]); startTransition(() => addActaDocAction(acta.id, doc)); };
-      fr.readAsDataURL(f);
-    });
+  function removeFoto(i: number) { setFotos((p) => p.filter((_, j) => j !== i)); void removeActaFotoAction(acta.id, i); }
+  async function onUploadDocs(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    for (const f of Array.from(files)) {
+      try {
+        const url = await readFileAsDataUrl(f);
+        const doc = { name: f.name, dataUrl: url };
+        setDocs((p) => [...p, doc]);
+        await addActaDocAction(acta.id, doc);
+      } catch { /* skip this file */ }
+    }
+    setUploading(false);
   }
-  function removeDoc(i: number) { setDocs((p) => p.filter((_, j) => j !== i)); startTransition(() => removeActaDocAction(acta.id, i)); }
+  function removeDoc(i: number) { setDocs((p) => p.filter((_, j) => j !== i)); void removeActaDocAction(acta.id, i); }
 
   // Assistents helpers
   function setAss(next: ActaAssistent[]) { setAssistents(next); save({ assistents: next }); }
@@ -155,7 +205,14 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     setTemes((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   }
   function commitTemes() { save({ temes }); }
-  function setTemaResponsable(i: number, value: string) { setTms(temes.map((t, j) => (j === i ? { ...t, responsable: value } : t))); }
+  function toggleTemaResponsable(i: number, nom: string) {
+    setTms(temes.map((t, j) => {
+      if (j !== i) return t;
+      const cur = temaResponsables(t);
+      const next = cur.includes(nom) ? cur.filter((x) => x !== nom) : [...cur, nom];
+      return { ...t, responsables: next, responsable: next.join(" & ") };
+    }));
+  }
   function setTemaCat(i: number, catKey: string) { setTms(temes.map((t, j) => (j === i ? { ...t, estat: catKey } : t))); }
   function delTema(i: number) { setTms(temes.filter((_, j) => j !== i)); }
   function moveTemaInCat(i: number, dir: -1 | 1) {
@@ -365,15 +422,31 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
                         <button className="btn-ghost" onClick={() => moveTemaInCat(i, 1)} title="Avall" disabled={pos === entries.length - 1}>↓</button>
                         <button className="btn-ghost" onClick={() => delTema(i)} title="Eliminar">✕</button>
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
-                        <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
-                        <div>
-                          <select className="input" value={t.responsable} onChange={(e) => setTemaResponsable(i, e.target.value)} title="Responsable (assistent de la reunió)">
-                            <option value="">— Responsable —</option>
-                            {assistents.filter((a) => a.nom.trim()).map((a, ai) => <option key={ai} value={a.nom}>{a.nom}</option>)}
-                            {t.responsable && !assistents.some((a) => a.nom === t.responsable) && <option value={t.responsable}>{t.responsable}</option>}
-                          </select>
-                        </div>
+                      <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
+                      <div className="mt-2">
+                        <span className="label">Responsables</span>
+                        {(() => {
+                          const selected = temaResponsables(t);
+                          const names = Array.from(new Set([...assistents.map((a) => a.nom.trim()).filter(Boolean), ...selected]));
+                          if (names.length === 0) return <p className="text-xs text-[var(--color-muted)]">Afegeix assistents per assignar-ne un o més.</p>;
+                          return (
+                            <div className="flex flex-wrap gap-1.5">
+                              {names.map((nom) => {
+                                const sel = selected.includes(nom);
+                                return (
+                                  <button
+                                    key={nom}
+                                    type="button"
+                                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${sel ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-paper)]"}`}
+                                    onClick={() => toggleTemaResponsable(i, nom)}
+                                  >
+                                    {nom}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -431,10 +504,13 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       <section className="card">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Fotografies</h2>
-          <label className="btn cursor-pointer">
-            + Afegir imatges
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadFotos(e.target.files); e.target.value = ""; }} />
-          </label>
+          <div className="flex items-center gap-2">
+            {uploading && <span className="text-xs text-[var(--color-muted)]">Pujant…</span>}
+            <label className="btn cursor-pointer">
+              + Afegir imatges
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadFotos(e.target.files); e.target.value = ""; }} />
+            </label>
+          </div>
         </div>
         {fotos.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Cap imatge. Apareixeran una a una al final del document.</p>

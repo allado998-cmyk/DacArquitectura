@@ -165,30 +165,28 @@ export async function createActaContacteAction(data: { nom: string; telefon?: st
 }
 
 // Media: photos + document attachments. Appended/removed one item at a time
-// (so a single large upload only travels once).
+// (so a single large upload only travels once). No revalidatePath here — the
+// client keeps local state and the row can be very large, so we avoid
+// re-streaming the whole acta (with every image) after each upload.
 export async function addActaFotoAction(id: number, dataUrl: string) {
   await requireUser();
   if (!Number.isFinite(id) || !dataUrl) return;
   await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) || ${JSON.stringify([dataUrl])}::jsonb, updated_at = now() where id = ${id}`;
-  revalidatePath(`/actes/${id}`);
 }
 export async function removeActaFotoAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
   await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
-  revalidatePath(`/actes/${id}`);
 }
 export async function addActaDocAction(id: number, doc: ActaDoc) {
   await requireUser();
   if (!Number.isFinite(id) || !doc?.dataUrl) return;
   await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) || ${JSON.stringify([doc])}::jsonb, updated_at = now() where id = ${id}`;
-  revalidatePath(`/actes/${id}`);
 }
 export async function removeActaDocAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
   await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
-  revalidatePath(`/actes/${id}`);
 }
 
 export async function deleteActaAction(formData: FormData) {

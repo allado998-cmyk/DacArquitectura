@@ -178,7 +178,7 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
             ${tm.titol && tm.titol.trim() ? `<div style="font-weight:bold;">${esc(tm.titol)}</div>` : ""}
             ${tm.text && tm.text.trim() ? `<div>${escMultiline(tm.text)}</div>` : ""}
           </td>
-          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(tm.responsable)}</td>
+          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(tm.responsables && tm.responsables.length ? tm.responsables.join(" & ") : tm.responsable)}</td>
         </tr>`,
       )
       .join("");

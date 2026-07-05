@@ -37,7 +37,8 @@ export interface ActaAssistent {
 export interface ActaTema {
   titol: string;
   text: string;
-  responsable: string;
+  responsable: string; // legacy / joined display ("A & B")
+  responsables?: string[]; // multiple responsables
   estat?: string; // categoria: pendent | executat | tractat (legacy: fet)
 }
 export interface ActaSignatura {

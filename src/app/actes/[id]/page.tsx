@@ -18,6 +18,7 @@ export default async function ActaDetailPage({ params }: { params: Promise<{ id:
            to_char(data, 'YYYY-MM-DD') as data, hora, lloc,
            projecte, referencia, ubicacio, client,
            assistents, temes, propera_visita,
+           to_char(propera_data, 'YYYY-MM-DD') as propera_data, propera_hora, signatures,
            sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona
     from public.acta where id = ${id}
   `) as unknown as Acta[];

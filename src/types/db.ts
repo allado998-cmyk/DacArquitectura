@@ -38,7 +38,11 @@ export interface ActaTema {
   titol: string;
   text: string;
   responsable: string;
-  estat?: "pendent" | "fet";
+  estat?: string; // categoria: pendent | executat | tractat (legacy: fet)
+}
+export interface ActaSignatura {
+  titol: string;
+  persona: string;
 }
 export interface Acta {
   id: number;
@@ -57,6 +61,10 @@ export interface Acta {
   assistents: ActaAssistent[];
   temes: ActaTema[];
   propera_visita: string | null;
+  propera_data: string | null;
+  propera_hora: string | null;
+  signatures: ActaSignatura[];
+  // legacy signature columns (kept for back-compat / seeding)
   sig_do: string | null;
   sig_de: string | null;
   sig_adj_empresa: string | null;

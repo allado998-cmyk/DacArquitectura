@@ -1,7 +1,7 @@
 // Acta d'Obra / de Reunió — HTML document builder used for the print/PDF output
 // and the Word (.doc) export. Mirrors the FE75 "Acta de Projecte" model.
 
-import type { Acta } from "@/types/db";
+import type { Acta, ActaSignatura, ActaTema } from "@/types/db";
 
 const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 
@@ -50,6 +50,31 @@ export function actaTitle(tipus: string): string {
   return ACTA_REASONS.find((r) => r.value === tipus)?.docTitle ?? "[Acta]";
 }
 
+// Temes categories.
+export const TEMA_CATS: { key: string; label: string }[] = [
+  { key: "pendent", label: "Pendent" },
+  { key: "executat", label: "Executat" },
+  { key: "tractat", label: "Tractat" },
+];
+export function temaCat(t: ActaTema): string {
+  const e = t.estat ?? "pendent";
+  if (e === "fet") return "executat"; // legacy
+  return e === "executat" || e === "tractat" ? e : "pendent";
+}
+function temaHasContent(t: ActaTema): boolean {
+  return !!((t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()));
+}
+// Signatures fall back to the legacy columns if the jsonb list is empty.
+function actaSignatures(a: Acta): ActaSignatura[] {
+  if (a.signatures && a.signatures.length) return a.signatures;
+  const out: ActaSignatura[] = [];
+  if (a.sig_do != null) out.push({ titol: "Director d'obra", persona: a.sig_do ?? "" });
+  if (a.sig_de != null) out.push({ titol: "Director d'execució de l'obra", persona: a.sig_de ?? "" });
+  if (a.sig_adj_empresa || a.sig_adj_persona) out.push({ titol: `Representant de l'empresa adjudicatària${a.sig_adj_empresa ? `, ${a.sig_adj_empresa}` : ""}`, persona: a.sig_adj_persona ?? "" });
+  if (a.sig_prom_empresa || a.sig_prom_persona) out.push({ titol: `Representant de l'ens promotor${a.sig_prom_empresa ? `, ${a.sig_prom_empresa}` : ""}`, persona: a.sig_prom_persona ?? "" });
+  return out;
+}
+
 export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
   const grey = "#7a7a72";
   const bd = "1px solid #c9c9c9";
@@ -96,50 +121,47 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
     .join("");
   const assistents = `<table style="width:100%;border-collapse:collapse;">${assistentsRows}</table>`;
 
-  // Temes tractats.
-  const temesRows = (a.temes ?? [])
-    .filter((t) => (t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()))
-    .map((t) => {
-      const fet = t.estat === "fet";
-      const box = fet ? "☑" : "☐";
-      const textStyle = fet ? "color:#666;" : "";
-      return `<tr>
-        <td style="border:${bd};padding:4px 6px;font-size:12px;vertical-align:top;text-align:center;width:22px;">${box}</td>
-        <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;${textStyle}">
-          ${t.titol && t.titol.trim() ? `<div style="font-weight:bold;">${esc(t.titol)}</div>` : ""}
-          ${t.text && t.text.trim() ? `<div>${escMultiline(t.text)}</div>` : ""}
-        </td>
-        <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(t.responsable)}</td>
-      </tr>`;
-    })
-    .join("");
-  const temes = `<table style="width:100%;border-collapse:collapse;">${temesRows || `<tr><td colspan="3" style="border:${bd};padding:8px;font-size:11px;">&nbsp;</td></tr>`}</table>`;
+  // Temes tractats — one table per category (Pendent / Executat / Tractat).
+  const barTemes = (label: string) =>
+    `<table style="width:100%;border-collapse:collapse;margin:14px 0 0;"><tr>
+      <td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;">TEMES TRACTATS - ${esc(label)}</td>
+      <td bgcolor="#e6e6e6" width="130" style="${barCell}background:#e6e6e6;text-align:right;">RESPONSABLE</td>
+    </tr></table>`;
+  const temesSections = TEMA_CATS.map((cat) => {
+    const rows = (a.temes ?? [])
+      .filter((t) => temaCat(t) === cat.key && temaHasContent(t))
+      .map(
+        (t) => `<tr>
+          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;">
+            ${t.titol && t.titol.trim() ? `<div style="font-weight:bold;">${esc(t.titol)}</div>` : ""}
+            ${t.text && t.text.trim() ? `<div>${escMultiline(t.text)}</div>` : ""}
+          </td>
+          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(t.responsable)}</td>
+        </tr>`,
+      )
+      .join("");
+    if (!rows) return "";
+    return barTemes(cat.label) + `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows}</table>`;
+  }).join("");
 
-  // Propera visita.
-  const propera = `<table style="width:100%;border-collapse:collapse;"><tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${esc(a.propera_visita ?? "")}</td></tr></table>`;
+  // Propera visita — date · time · note.
+  const properaBits = [a.propera_data ? shortDate(a.propera_data) : "", a.propera_hora ?? ""].filter(Boolean).join(" · ");
+  const properaBody = [properaBits, a.propera_visita ?? ""].filter((x) => x && x.trim()).join(" — ");
+  const propera = `<table style="width:100%;border-collapse:collapse;"><tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${esc(properaBody) || "&nbsp;"}</td></tr></table>`;
 
-  // Signatures.
-  const sigBlock = (title: string, name: string) =>
+  // Signatures — editable titles, blank space to sign, 2 per row.
+  const sigs = actaSignatures(a);
+  const sigBlock = (s: ActaSignatura) =>
     `<td style="border:${bd};padding:6px 8px;vertical-align:top;width:50%;">
-      <div style="font-size:11px;white-space:pre-line;">${escMultiline(title)}</div>
-      <div style="height:56px;"></div>
-      <div style="font-size:11px;">${esc(name)}</div>
+      <div style="font-size:11px;white-space:pre-line;">${escMultiline(s.titol)}</div>
+      <div style="height:80px;"></div>
+      <div style="font-size:11px;border-top:1px solid #999;padding-top:3px;">${esc(s.persona)}</div>
     </td>`;
-  const adjTitle = a.sig_adj_empresa ? `Representant de l'empresa adjudicatària,\n${a.sig_adj_empresa}` : "";
-  const promTitle = a.sig_prom_empresa ? `Representant de l'ens promotor,\n${a.sig_prom_empresa}` : "";
-  const signatures = `
-    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
-      <tr>
-        ${sigBlock("Director d'obra", a.sig_do ?? "")}
-        ${sigBlock("Director d'execució de l'obra", a.sig_de ?? "")}
-      </tr>
-      ${a.sig_adj_empresa || a.sig_prom_empresa
-        ? `<tr>
-            ${sigBlock(adjTitle, a.sig_adj_persona ?? "")}
-            ${sigBlock(promTitle, a.sig_prom_persona ?? "")}
-          </tr>`
-        : ""}
-    </table>`;
+  let sigRows = "";
+  for (let i = 0; i < sigs.length; i += 2) {
+    sigRows += `<tr>${sigBlock(sigs[i])}${sigs[i + 1] ? sigBlock(sigs[i + 1]) : `<td style="border:${bd};width:50%;">&nbsp;</td>`}</tr>`;
+  }
+  const signatures = sigs.length ? `<table style="width:100%;border-collapse:collapse;margin-top:6px;">${sigRows}</table>` : "";
 
   const closing = `<p style="font-size:11px;margin:14px 0 4px;">I per que consti, tots signen per triplicat la present acta a Barcelona el ${esc(longDate(a.data))}.<br>Assabentats,</p>`;
 
@@ -156,8 +178,7 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
     ${bar("ASSISTENTS")}
     ${assistents}
 
-    ${bar("TEMES TRACTATS", "RESPONSABLE")}
-    ${temes}
+    ${temesSections}
 
     ${bar("PROPERA VISITA")}
     ${propera}

@@ -1,13 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { updateActaAction, deleteActaAction, duplicateActaAction, createActaContacteAction, type ActaPatch } from "../actions";
-import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS } from "@/lib/acta-doc";
-import type { Acta, ActaAssistent, ActaTema } from "@/types/db";
+import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat } from "@/lib/acta-doc";
+import type { Acta, ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
+
+function seedSignatures(a: Acta): ActaSignatura[] {
+  if (a.signatures && a.signatures.length) return a.signatures;
+  const out: ActaSignatura[] = [];
+  if (a.sig_do != null) out.push({ titol: "Director d'obra", persona: a.sig_do ?? "" });
+  if (a.sig_de != null) out.push({ titol: "Director d'execució de l'obra", persona: a.sig_de ?? "" });
+  if (a.sig_adj_empresa || a.sig_adj_persona) out.push({ titol: `Representant de l'empresa adjudicatària${a.sig_adj_empresa ? `, ${a.sig_adj_empresa}` : ""}`, persona: a.sig_adj_persona ?? "" });
+  if (a.sig_prom_empresa || a.sig_prom_persona) out.push({ titol: `Representant de l'ens promotor${a.sig_prom_empresa ? `, ${a.sig_prom_empresa}` : ""}`, persona: a.sig_prom_persona ?? "" });
+  if (!out.length) out.push({ titol: "Director d'obra", persona: "" });
+  return out;
+}
 
 export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedients: ExpedientOpt[]; contactes: Contacte[] }) {
   const [tipus, setTipus] = useState<string>(acta.tipus);
@@ -23,14 +34,10 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [assistents, setAssistents] = useState<ActaAssistent[]>(acta.assistents ?? []);
   const [temes, setTemes] = useState<ActaTema[]>(acta.temes ?? []);
   const [properaVisita, setProperaVisita] = useState(acta.propera_visita ?? "");
-  const [sigDo, setSigDo] = useState(acta.sig_do ?? "");
-  const [sigDe, setSigDe] = useState(acta.sig_de ?? "");
-  const [sigAdjEmpresa, setSigAdjEmpresa] = useState(acta.sig_adj_empresa ?? "");
-  const [sigAdjPersona, setSigAdjPersona] = useState(acta.sig_adj_persona ?? "");
-  const [sigPromEmpresa, setSigPromEmpresa] = useState(acta.sig_prom_empresa ?? "");
-  const [sigPromPersona, setSigPromPersona] = useState(acta.sig_prom_persona ?? "");
+  const [properaData, setProperaData] = useState(acta.propera_data ?? "");
+  const [properaHora, setProperaHora] = useState(acta.propera_hora ?? "");
+  const [signatures, setSignatures] = useState<ActaSignatura[]>(seedSignatures(acta));
 
-  // All DB contacts, kept locally so newly-created ones show up immediately.
   const [contactList, setContactList] = useState<Contacte[]>(contactes);
   const [newContact, setNewContact] = useState(false);
   const [ncNom, setNcNom] = useState("");
@@ -39,6 +46,14 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
   const [saved, setSaved] = useState(true);
   const [, startTransition] = useTransition();
+
+  // Names to pick a signatory / responsable from: attendees + all contacts.
+  const peopleOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of assistents) if (a.nom.trim()) s.add(a.nom.trim());
+    for (const c of contactList) if ((c.nom ?? "").trim()) s.add((c.nom ?? "").trim());
+    return Array.from(s);
+  }, [assistents, contactList]);
 
   function currentPatch(override: Partial<ActaPatch> = {}): ActaPatch {
     return {
@@ -55,12 +70,9 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       assistents,
       temes,
       propera_visita: properaVisita,
-      sig_do: sigDo,
-      sig_de: sigDe,
-      sig_adj_empresa: sigAdjEmpresa,
-      sig_adj_persona: sigAdjPersona,
-      sig_prom_empresa: sigPromEmpresa,
-      sig_prom_persona: sigPromPersona,
+      propera_data: properaData,
+      propera_hora: properaHora,
+      signatures,
       ...override,
     };
   }
@@ -72,15 +84,12 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     });
   }
 
-  // Build a fresh Acta object for PDF/Word from the live state.
   function liveActa(): Acta {
     return {
       ...acta,
       tipus, acta_num: actaNum, data, hora, lloc, projecte, referencia, ubicacio, client,
-      assistents, temes, propera_visita: properaVisita,
-      sig_do: sigDo, sig_de: sigDe,
-      sig_adj_empresa: sigAdjEmpresa, sig_adj_persona: sigAdjPersona,
-      sig_prom_empresa: sigPromEmpresa, sig_prom_persona: sigPromPersona,
+      assistents, temes, propera_visita: properaVisita, propera_data: properaData, propera_hora: properaHora,
+      signatures,
       expedient_id: expedientId === "" ? null : expedientId,
     };
   }
@@ -108,26 +117,32 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
   // Temes helpers
   function setTms(next: ActaTema[]) { setTemes(next); save({ temes: next }); }
-  function addTema() { setTms([...temes, { titol: "", text: "", responsable: "", estat: "pendent" }]); }
+  function addTemaCat(catKey: string) { setTms([...temes, { titol: "", text: "", responsable: "", estat: catKey }]); }
   function updTema(i: number, patch: Partial<ActaTema>) {
     setTemes((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   }
   function commitTemes() { save({ temes }); }
-  function setTemaResponsable(i: number, value: string) {
-    setTms(temes.map((t, j) => (j === i ? { ...t, responsable: value } : t)));
-  }
+  function setTemaResponsable(i: number, value: string) { setTms(temes.map((t, j) => (j === i ? { ...t, responsable: value } : t))); }
+  function setTemaCat(i: number, catKey: string) { setTms(temes.map((t, j) => (j === i ? { ...t, estat: catKey } : t))); }
   function delTema(i: number) { setTms(temes.filter((_, j) => j !== i)); }
-  function toggleTemaEstat(i: number) {
-    const next: ActaTema[] = temes.map((t, j) => (j === i ? { ...t, estat: t.estat === "fet" ? "pendent" : "fet" } : t));
-    setTms(next);
-  }
-  function moveTema(i: number, dir: -1 | 1) {
-    const j = i + dir;
+  function moveTemaInCat(i: number, dir: -1 | 1) {
+    const cat = temaCat(temes[i]);
+    let j = i + dir;
+    while (j >= 0 && j < temes.length && temaCat(temes[j]) !== cat) j += dir;
     if (j < 0 || j >= temes.length) return;
     const next = [...temes];
     [next[i], next[j]] = [next[j], next[i]];
     setTms(next);
   }
+
+  // Signatures helpers
+  function setSigs(next: ActaSignatura[]) { setSignatures(next); save({ signatures: next }); }
+  function addSig() { setSigs([...signatures, { titol: "", persona: "" }]); }
+  function updSig(i: number, patch: Partial<ActaSignatura>) {
+    setSignatures((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  }
+  function commitSigs() { save({ signatures }); }
+  function delSig(i: number) { setSigs(signatures.filter((_, j) => j !== i)); }
 
   function onExpedientChange(v: number | "") {
     setExpedientId(v);
@@ -148,6 +163,10 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
   return (
     <div className="space-y-8">
+      <datalist id="acta-people">
+        {peopleOptions.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/actes" className="text-sm text-[var(--color-muted)] hover:underline">← Totes les actes</Link>
@@ -262,41 +281,44 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
         </div>
       </section>
 
-      {/* Temes tractats */}
+      {/* Temes tractats — 3 categories */}
       <section className="card">
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Temes tractats</h2>
-          <button className="btn" onClick={addTema}>+ Tema</button>
-        </div>
-        <p className="mb-3 text-xs text-[var(--color-muted)]">Marca cada tema com a Pendent o Fet, i ordena&apos;ls amb les fletxes.</p>
-        <div className="space-y-4">
-          {temes.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap tema.</p>}
-          {temes.map((t, i) => {
-            const fet = t.estat === "fet";
+        <h2 className="mb-1 text-lg font-semibold">Temes tractats</h2>
+        <p className="mb-4 text-xs text-[var(--color-muted)]">Cada tema pertany a una categoria. Canvia&apos;n la categoria per moure&apos;l, i ordena amb les fletxes.</p>
+        <div className="space-y-6">
+          {TEMA_CATS.map((cat) => {
+            const entries = temes.map((t, i) => ({ t, i })).filter((e) => temaCat(e.t) === cat.key);
             return (
-              <div key={i} className={`rounded-lg border p-3 ${fet ? "border-green-200 bg-green-50/40" : "border-[var(--color-line)]"}`}>
-                <div className="mb-2 flex items-center gap-2">
-                  <button
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${fet ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"}`}
-                    onClick={() => toggleTemaEstat(i)}
-                    title="Canviar entre Pendent i Fet"
-                  >
-                    {fet ? "✓ Fet" : "● Pendent"}
-                  </button>
-                  <input className={`input flex-1 font-semibold ${fet ? "line-through opacity-60" : ""}`} placeholder="Títol (opcional)" value={t.titol} onChange={(e) => updTema(i, { titol: e.target.value })} onBlur={commitTemes} />
-                  <button className="btn-ghost" onClick={() => moveTema(i, -1)} title="Amunt" disabled={i === 0}>↑</button>
-                  <button className="btn-ghost" onClick={() => moveTema(i, 1)} title="Avall" disabled={i === temes.length - 1}>↓</button>
-                  <button className="btn-ghost" onClick={() => delTema(i)} title="Eliminar">✕</button>
+              <div key={cat.key}>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">{cat.label}</h3>
+                  <button className="btn" onClick={() => addTemaCat(cat.key)}>+ Tema</button>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
-                  <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
-                  <div>
-                    <select className="input" value={t.responsable} onChange={(e) => setTemaResponsable(i, e.target.value)} title="Responsable (assistent de la reunió)">
-                      <option value="">— Responsable —</option>
-                      {assistents.filter((a) => a.nom.trim()).map((a, ai) => <option key={ai} value={a.nom}>{a.nom}</option>)}
-                      {t.responsable && !assistents.some((a) => a.nom === t.responsable) && <option value={t.responsable}>{t.responsable}</option>}
-                    </select>
-                  </div>
+                {entries.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap tema.</p>}
+                <div className="space-y-3">
+                  {entries.map(({ t, i }, pos) => (
+                    <div key={i} className="rounded-lg border border-[var(--color-line)] p-3">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <select className="input w-32" value={cat.key} onChange={(e) => setTemaCat(i, e.target.value)} title="Categoria">
+                          {TEMA_CATS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                        </select>
+                        <input className="input flex-1 min-w-[140px] font-semibold" placeholder="Títol (opcional)" value={t.titol} onChange={(e) => updTema(i, { titol: e.target.value })} onBlur={commitTemes} />
+                        <button className="btn-ghost" onClick={() => moveTemaInCat(i, -1)} title="Amunt" disabled={pos === 0}>↑</button>
+                        <button className="btn-ghost" onClick={() => moveTemaInCat(i, 1)} title="Avall" disabled={pos === entries.length - 1}>↓</button>
+                        <button className="btn-ghost" onClick={() => delTema(i)} title="Eliminar">✕</button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
+                        <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
+                        <div>
+                          <select className="input" value={t.responsable} onChange={(e) => setTemaResponsable(i, e.target.value)} title="Responsable (assistent de la reunió)">
+                            <option value="">— Responsable —</option>
+                            {assistents.filter((a) => a.nom.trim()).map((a, ai) => <option key={ai} value={a.nom}>{a.nom}</option>)}
+                            {t.responsable && !assistents.some((a) => a.nom === t.responsable) && <option value={t.responsable}>{t.responsable}</option>}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -307,37 +329,43 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       {/* Propera visita */}
       <section className="card">
         <h2 className="mb-3 text-lg font-semibold">Propera visita</h2>
-        <input className="input" value={properaVisita} onChange={(e) => setProperaVisita(e.target.value)} onBlur={() => save()} />
+        <div className="grid gap-4 sm:grid-cols-4">
+          <div>
+            <label className="label">Data</label>
+            <input type="date" className="input" value={properaData} onChange={(e) => { setProperaData(e.target.value); save({ propera_data: e.target.value }); }} />
+          </div>
+          <div>
+            <label className="label">Hora</label>
+            <input className="input" placeholder="13:00" value={properaHora} onChange={(e) => setProperaHora(e.target.value)} onBlur={() => save()} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Nota</label>
+            <input className="input" placeholder="A concretar" value={properaVisita} onChange={(e) => setProperaVisita(e.target.value)} onBlur={() => save()} />
+          </div>
+        </div>
       </section>
 
       {/* Signatures */}
       <section className="card">
-        <h2 className="mb-4 text-lg font-semibold">Signatures</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label">Director d&apos;obra</label>
-            <input className="input" value={sigDo} onChange={(e) => setSigDo(e.target.value)} onBlur={() => save()} />
-          </div>
-          <div>
-            <label className="label">Director d&apos;execució de l&apos;obra</label>
-            <input className="input" value={sigDe} onChange={(e) => setSigDe(e.target.value)} onBlur={() => save()} />
-          </div>
-          <div>
-            <label className="label">Empresa adjudicatària</label>
-            <input className="input" placeholder="Nom empresa" value={sigAdjEmpresa} onChange={(e) => setSigAdjEmpresa(e.target.value)} onBlur={() => save()} />
-          </div>
-          <div>
-            <label className="label">Representant adjudicatària</label>
-            <input className="input" placeholder="Nom persona" value={sigAdjPersona} onChange={(e) => setSigAdjPersona(e.target.value)} onBlur={() => save()} />
-          </div>
-          <div>
-            <label className="label">Ens promotor</label>
-            <input className="input" placeholder="Nom entitat" value={sigPromEmpresa} onChange={(e) => setSigPromEmpresa(e.target.value)} onBlur={() => save()} />
-          </div>
-          <div>
-            <label className="label">Representant promotor</label>
-            <input className="input" placeholder="Nom persona" value={sigPromPersona} onChange={(e) => setSigPromPersona(e.target.value)} onBlur={() => save()} />
-          </div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Signatures</h2>
+          <button className="btn" onClick={addSig}>+ Signatari</button>
+        </div>
+        <div className="space-y-3">
+          {signatures.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap signatari.</p>}
+          {signatures.map((s, i) => (
+            <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div>
+                <label className="label">Càrrec / títol</label>
+                <input className="input" placeholder="p. ex. Director d'obra" value={s.titol} onChange={(e) => updSig(i, { titol: e.target.value })} onBlur={commitSigs} />
+              </div>
+              <div>
+                <label className="label">Persona</label>
+                <input className="input" list="acta-people" placeholder="Selecciona o escriu…" value={s.persona} onChange={(e) => updSig(i, { persona: e.target.value })} onBlur={commitSigs} />
+              </div>
+              <button className="btn-ghost mb-1" onClick={() => delSig(i)} title="Eliminar">✕</button>
+            </div>
+          ))}
         </div>
       </section>
 

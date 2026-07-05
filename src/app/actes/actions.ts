@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import type { ActaAssistent, ActaTema } from "@/types/db";
+import type { ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
 
 async function nextActaNum(): Promise<string> {
   const rows = (await sql`select num from public.acta where num like 'ACT-%'`) as { num: string }[];
@@ -23,34 +23,37 @@ const DEFAULT_ASSISTENTS: ActaAssistent[] = [
 const DEFAULT_TEMES: ActaTema[] = [
   { titol: "", text: "", responsable: "", estat: "pendent" },
 ];
+const DEFAULT_SIGNATURES: ActaSignatura[] = [
+  { titol: "Director d'obra", persona: "David Lladó Porta, Arquitecte" },
+  { titol: "Director d'execució de l'obra", persona: "Joan March Raurell, Arquitecte Tècnic" },
+];
 
 async function insertActa(tipus: string, expedientId: number | null, dedicacioId: number | null): Promise<number> {
   const num = await nextActaNum();
-  let projecte: string | null = null, referencia: string | null = null, ubicacio: string | null = null, client: string | null = null;
+  // Ubicació is intentionally left blank on creation.
+  let projecte: string | null = null, referencia: string | null = null, client: string | null = null;
   if (expedientId) {
     const rows = (await sql`
-      select e.projecte, e.num_expedient, e.ciutat as exp_ciutat,
-             c.nom as client_nom, c.carrer, c.codi_postal, c.ciutat as client_ciutat
+      select e.projecte, e.num_expedient, c.nom as client_nom
       from public.expedients e left join public.clients c on c.id = e.client_id
       where e.id = ${expedientId}
-    `) as { projecte: string | null; num_expedient: string; exp_ciutat: string | null; client_nom: string | null; carrer: string | null; codi_postal: string | null; client_ciutat: string | null }[];
+    `) as { projecte: string | null; num_expedient: string; client_nom: string | null }[];
     const r = rows[0];
     if (r) {
       projecte = r.projecte;
       referencia = r.num_expedient;
       client = r.client_nom;
-      ubicacio = [r.carrer, [r.codi_postal, r.client_ciutat].filter(Boolean).join(" ")].filter(Boolean).join(", ") || r.exp_ciutat;
     }
   }
   const rows = (await sql`
     insert into public.acta
       (num, tipus, expedient_id, dedicacio_id, acta_num, data, hora, lloc, projecte, referencia, ubicacio, client,
-       assistents, temes, propera_visita, sig_do, sig_de)
+       assistents, temes, propera_visita, signatures)
     values (
       ${num}, ${tipus}, ${expedientId}, ${dedicacioId}, '00', current_date, '', ${tipus === "visita" ? "Obra" : "Oficina"},
-      ${projecte}, ${referencia}, ${ubicacio}, ${client},
+      ${projecte}, ${referencia}, null, ${client},
       ${JSON.stringify(DEFAULT_ASSISTENTS)}::jsonb, ${JSON.stringify(DEFAULT_TEMES)}::jsonb, 'A concretar',
-      'David Lladó Porta, Arquitecte', 'Joan March Raurell, Arquitecte Tècnic'
+      ${JSON.stringify(DEFAULT_SIGNATURES)}::jsonb
     )
     returning id
   `) as { id: number }[];
@@ -72,9 +75,11 @@ export async function duplicateActaAction(formData: FormData): Promise<void> {
   const rows = (await sql`
     insert into public.acta
       (num, tipus, expedient_id, dedicacio_id, acta_num, data, hora, lloc, projecte, referencia, ubicacio, client,
-       assistents, temes, propera_visita, sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona)
+       assistents, temes, propera_visita, propera_data, propera_hora, signatures,
+       sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona)
     select ${num}, tipus, expedient_id, null, acta_num, current_date, hora, lloc, projecte, referencia, ubicacio, client,
-       assistents, temes, propera_visita, sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona
+       assistents, temes, propera_visita, propera_data, propera_hora, signatures,
+       sig_do, sig_de, sig_adj_empresa, sig_adj_persona, sig_prom_empresa, sig_prom_persona
     from public.acta where id = ${srcId}
     returning id
   `) as { id: number }[];
@@ -110,12 +115,9 @@ export interface ActaPatch {
   assistents?: ActaAssistent[];
   temes?: ActaTema[];
   propera_visita?: string;
-  sig_do?: string;
-  sig_de?: string;
-  sig_adj_empresa?: string;
-  sig_adj_persona?: string;
-  sig_prom_empresa?: string;
-  sig_prom_persona?: string;
+  propera_data?: string;
+  propera_hora?: string;
+  signatures?: ActaSignatura[];
 }
 
 export async function updateActaAction(id: number, p: ActaPatch) {
@@ -136,12 +138,9 @@ export async function updateActaAction(id: number, p: ActaPatch) {
       assistents = coalesce(${p.assistents ? JSON.stringify(p.assistents) : null}::jsonb, assistents),
       temes = coalesce(${p.temes ? JSON.stringify(p.temes) : null}::jsonb, temes),
       propera_visita = ${p.propera_visita ?? null},
-      sig_do = ${p.sig_do ?? null},
-      sig_de = ${p.sig_de ?? null},
-      sig_adj_empresa = ${p.sig_adj_empresa ?? null},
-      sig_adj_persona = ${p.sig_adj_persona ?? null},
-      sig_prom_empresa = ${p.sig_prom_empresa ?? null},
-      sig_prom_persona = ${p.sig_prom_persona ?? null},
+      propera_data = ${p.propera_data ? p.propera_data : null}::date,
+      propera_hora = ${p.propera_hora ?? null},
+      signatures = coalesce(${p.signatures ? JSON.stringify(p.signatures) : null}::jsonb, signatures),
       updated_at = now()
     where id = ${id}
   `;

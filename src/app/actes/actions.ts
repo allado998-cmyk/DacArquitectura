@@ -149,6 +149,21 @@ export async function updateActaAction(id: number, p: ActaPatch) {
   revalidatePath("/actes");
 }
 
+// Create a standalone contact (Base de Dades) from the acta assistents form.
+export async function createActaContacteAction(data: { nom: string; telefon?: string; mail?: string }): Promise<{ nom: string } | null> {
+  await requireUser();
+  const nom = (data.nom ?? "").trim();
+  const telefon = (data.telefon ?? "").trim();
+  const mail = (data.mail ?? "").trim();
+  if (!nom && !telefon && !mail) return null;
+  await sql`
+    insert into public.client_contactes (client_id, nom, telefon, mail)
+    values (null, ${nom || null}, ${telefon || null}, ${mail || null})
+  `;
+  revalidatePath("/parameters");
+  return { nom };
+}
+
 export async function deleteActaAction(formData: FormData) {
   await requireUser();
   const id = Number(formData.get("id"));

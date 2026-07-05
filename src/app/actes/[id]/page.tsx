@@ -28,15 +28,14 @@ export default async function ActaDetailPage({ params }: { params: Promise<{ id:
     sql`select id, num_expedient, projecte from public.expedients order by num_expedient desc` as unknown as Promise<
       { id: number; num_expedient: string; projecte: string | null }[]
     >,
-    acta.expedient_id
-      ? (sql`
-          select ct.nom, ct.telefon, ct.mail
-          from public.client_contactes ct
-          join public.expedients e on e.client_id = ct.client_id
-          where e.id = ${acta.expedient_id}
-          order by ct.ordre, ct.id
-        ` as unknown as Promise<{ nom: string | null; telefon: string | null; mail: string | null }[]>)
-      : Promise.resolve([] as { nom: string | null; telefon: string | null; mail: string | null }[]),
+    // All contacts in the database (Base de Dades), with their client for context.
+    sql`
+      select ct.nom, ct.telefon, ct.mail, c.nom as client_nom
+      from public.client_contactes ct
+      left join public.clients c on c.id = ct.client_id
+      where coalesce(ct.nom, '') <> ''
+      order by ct.nom
+    ` as unknown as Promise<{ nom: string | null; telefon: string | null; mail: string | null; client_nom: string | null }[]>,
   ]);
 
   return (

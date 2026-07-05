@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { updateActaAction, deleteActaAction, duplicateActaAction, type ActaPatch } from "../actions";
+import { updateActaAction, deleteActaAction, duplicateActaAction, createActaContacteAction, type ActaPatch } from "../actions";
 import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS } from "@/lib/acta-doc";
 import type { Acta, ActaAssistent, ActaTema } from "@/types/db";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
-type Contacte = { nom: string | null; telefon: string | null; mail: string | null };
+type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
 
 export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedients: ExpedientOpt[]; contactes: Contacte[] }) {
   const [tipus, setTipus] = useState<string>(acta.tipus);
@@ -29,6 +29,13 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [sigAdjPersona, setSigAdjPersona] = useState(acta.sig_adj_persona ?? "");
   const [sigPromEmpresa, setSigPromEmpresa] = useState(acta.sig_prom_empresa ?? "");
   const [sigPromPersona, setSigPromPersona] = useState(acta.sig_prom_persona ?? "");
+
+  // All DB contacts, kept locally so newly-created ones show up immediately.
+  const [contactList, setContactList] = useState<Contacte[]>(contactes);
+  const [newContact, setNewContact] = useState(false);
+  const [ncNom, setNcNom] = useState("");
+  const [ncTel, setNcTel] = useState("");
+  const [ncMail, setNcMail] = useState("");
 
   const [saved, setSaved] = useState(true);
   const [, startTransition] = useTransition();
@@ -86,6 +93,18 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   }
   function commitAssistents() { save({ assistents }); }
   function delAssistent(i: number) { setAss(assistents.filter((_, j) => j !== i)); }
+  function saveNewContact() {
+    const nom = ncNom.trim();
+    if (!nom && !ncTel.trim() && !ncMail.trim()) { setNewContact(false); return; }
+    startTransition(async () => {
+      const res = await createActaContacteAction({ nom, telefon: ncTel, mail: ncMail });
+      if (res) {
+        setContactList((prev) => [...prev, { nom: res.nom, telefon: ncTel, mail: ncMail, client_nom: null }].sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "ca")));
+        addAssistent(res.nom);
+      }
+      setNcNom(""); setNcTel(""); setNcMail(""); setNewContact(false);
+    });
+  }
 
   // Temes helpers
   function setTms(next: ActaTema[]) { setTemes(next); save({ temes: next }); }
@@ -94,6 +113,9 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     setTemes((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   }
   function commitTemes() { save({ temes }); }
+  function setTemaResponsable(i: number, value: string) {
+    setTms(temes.map((t, j) => (j === i ? { ...t, responsable: value } : t)));
+  }
   function delTema(i: number) { setTms(temes.filter((_, j) => j !== i)); }
   function toggleTemaEstat(i: number) {
     const next: ActaTema[] = temes.map((t, j) => (j === i ? { ...t, estat: t.estat === "fet" ? "pendent" : "fet" } : t));
@@ -202,18 +224,29 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
       {/* Assistents */}
       <section className="card">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Assistents</h2>
           <div className="flex items-center gap-2">
-            {contactes.length > 0 && (
-              <select className="input w-56" value="" onChange={(e) => { const c = contactes[Number(e.target.value)]; if (c) addAssistent(c.nom ?? ""); e.target.value = ""; }}>
-                <option value="">+ Afegir de contactes…</option>
-                {contactes.map((c, i) => <option key={i} value={i}>{c.nom}</option>)}
-              </select>
-            )}
+            <select className="input w-64" value="" onChange={(e) => { const c = contactList[Number(e.target.value)]; if (c) addAssistent(c.nom ?? ""); e.target.value = ""; }}>
+              <option value="">+ Afegir de contactes…</option>
+              {contactList.map((c, i) => <option key={i} value={i}>{c.nom}{c.client_nom ? ` — ${c.client_nom}` : ""}</option>)}
+            </select>
+            <button className="btn" onClick={() => setNewContact((v) => !v)}>+ Nou contacte</button>
             <button className="btn" onClick={() => addAssistent()}>+ Assistent</button>
           </div>
         </div>
+        {newContact && (
+          <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] p-3">
+            <p className="mb-2 text-xs text-[var(--color-muted)]">Nou contacte (es desarà a Base de Dades i s&apos;afegirà com a assistent)</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input className="input flex-1 min-w-[160px]" placeholder="Nom" value={ncNom} onChange={(e) => setNcNom(e.target.value)} autoFocus />
+              <input className="input w-40" placeholder="Telèfon" value={ncTel} onChange={(e) => setNcTel(e.target.value)} />
+              <input className="input w-52" placeholder="Correu" value={ncMail} onChange={(e) => setNcMail(e.target.value)} />
+              <button className="btn-primary" onClick={saveNewContact}>Desar</button>
+              <button className="btn-ghost" onClick={() => { setNewContact(false); setNcNom(""); setNcTel(""); setNcMail(""); }}>Cancel·lar</button>
+            </div>
+          </div>
+        )}
         <div className="space-y-2">
           {assistents.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap assistent.</p>}
           {assistents.map((a, i) => (
@@ -257,7 +290,13 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
                   <textarea className="input min-h-[80px]" placeholder="Text del tema" value={t.text} onChange={(e) => updTema(i, { text: e.target.value })} onBlur={commitTemes} />
-                  <textarea className="input min-h-[80px]" placeholder="Responsable" value={t.responsable} onChange={(e) => updTema(i, { responsable: e.target.value })} onBlur={commitTemes} />
+                  <div>
+                    <select className="input" value={t.responsable} onChange={(e) => setTemaResponsable(i, e.target.value)} title="Responsable (assistent de la reunió)">
+                      <option value="">— Responsable —</option>
+                      {assistents.filter((a) => a.nom.trim()).map((a, ai) => <option key={ai} value={a.nom}>{a.nom}</option>)}
+                      {t.responsable && !assistents.some((a) => a.nom === t.responsable) && <option value={t.responsable}>{t.responsable}</option>}
+                    </select>
+                  </div>
                 </div>
               </div>
             );

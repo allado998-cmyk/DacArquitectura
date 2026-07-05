@@ -53,10 +53,13 @@ export function actaTitle(tipus: string): string {
 export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
   const grey = "#7a7a72";
   const bd = "1px solid #c9c9c9";
+  // Table-based so it renders correctly in Word too (Word ignores flexbox).
+  const barCell = "padding:4px 8px;font-size:10px;letter-spacing:.05em;color:#666;text-transform:uppercase;border-bottom:1px solid #bdbdbd;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
   const bar = (title: string, right?: string) =>
-    `<div style="background:#e6e6e6;border-bottom:1px solid #bdbdbd;padding:4px 8px;margin:14px 0 0;font-size:10px;letter-spacing:.05em;color:#666;text-transform:uppercase;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-      <span>${esc(title)}</span>${right ? `<span>${esc(right)}</span>` : ""}
-    </div>`;
+    `<table style="width:100%;border-collapse:collapse;margin:14px 0 0;"><tr>
+      <td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;">${esc(title)}</td>
+      ${right ? `<td bgcolor="#e6e6e6" style="${barCell}background:#e6e6e6;text-align:right;">${esc(right)}</td>` : ""}
+    </tr></table>`;
   // A labelled cell: tiny italic grey label above the value.
   const cell = (label: string, value: string, opts: { span?: number; bold?: boolean; width?: string } = {}) =>
     `<td${opts.span ? ` colspan="${opts.span}"` : ""} style="border:${bd};padding:3px 7px;vertical-align:top;${opts.width ? `width:${opts.width};` : ""}">
@@ -150,7 +153,7 @@ export function buildActaHtml(a: Acta, logoUrl = "/logo.jpg"): string {
     ${bar("DADES GENERALS")}
     ${dadesGenerals}
 
-    ${bar("ASSISTENTS", "EMPRESA")}
+    ${bar("ASSISTENTS")}
     ${assistents}
 
     ${bar("TEMES TRACTATS", "RESPONSABLE")}
@@ -181,8 +184,26 @@ export function openActaPdf(a: Acta) {
   setTimeout(() => w.print(), 400);
 }
 
-export function downloadActaWord(a: Acta) {
-  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+// Word doesn't reliably fetch remote images, so embed the DAC logo as a
+// base64 data URI. Falls back to the URL if the fetch fails.
+async function logoDataUri(): Promise<string> {
+  const url = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
+export async function downloadActaWord(a: Acta) {
+  const logo = await logoDataUri();
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
   const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, logo)}</body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });

@@ -37,7 +37,7 @@ const TXT: Record<ActaLang, Txt> = {
     dadesGenerals: "DADES GENERALS",
     projecte: "Projecte", referencia: "Referència", ubicacio: "Ubicació", client: "Client",
     actaNum: "Acta nº", lloc: "Lloc", data: "Data", hora: "Hora",
-    assistents: "ASSISTENTS", temes: "TEMES TRACTATS", responsable: "RESPONSABLE",
+    assistents: "ASSISTENTS", temes: "TEMES", responsable: "RESPONSABLE",
     proximaVisita: "PROPERA VISITA", fotografies: "FOTOGRAFIES", documents: "DOCUMENTS ADJUNTS",
     assabentats: "Assabentats,",
     closing: (d) => `I per que consti, tots signen per triplicat la present acta a Barcelona el ${d}.`,
@@ -46,7 +46,7 @@ const TXT: Record<ActaLang, Txt> = {
     dadesGenerals: "DATOS GENERALES",
     projecte: "Proyecto", referencia: "Referencia", ubicacio: "Ubicación", client: "Cliente",
     actaNum: "Acta nº", lloc: "Lugar", data: "Fecha", hora: "Hora",
-    assistents: "ASISTENTES", temes: "TEMAS TRATADOS", responsable: "RESPONSABLE",
+    assistents: "ASISTENTES", temes: "TEMAS", responsable: "RESPONSABLE",
     proximaVisita: "PRÓXIMA VISITA", fotografies: "FOTOGRAFÍAS", documents: "DOCUMENTOS ADJUNTOS",
     assabentats: "Enterados,",
     closing: (d) => `Y para que conste, todos firman por triplicado la presente acta en Barcelona el ${d}.`,
@@ -95,7 +95,7 @@ export function actaTitle(tipus: string, lang: ActaLang = "ca"): string {
 export const TEMA_CATS: { key: string; label: string; labelEs: string }[] = [
   { key: "pendent", label: "Pendent", labelEs: "Pendiente" },
   { key: "executat", label: "Executat", labelEs: "Ejecutado" },
-  { key: "tractat", label: "Tractat", labelEs: "Tratado" },
+  { key: "tractat", label: "Tractats", labelEs: "Tratados" },
 ];
 export function temaCat(t: ActaTema): string {
   const e = t.estat ?? "pendent";
@@ -120,7 +120,9 @@ function actaSignatures(a: Acta): ActaSignatura[] {
   return out;
 }
 
-export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg"): string {
+export interface RenderedDoc { name: string; pages: string[] }
+
+export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg", renderedDocs?: RenderedDoc[]): string {
   const t = TXT[lang];
   const grey = "#7a7a72";
   const bd = "1px solid #c9c9c9";
@@ -191,10 +193,12 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
   const propera = `<table style="width:100%;border-collapse:collapse;"><tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${esc(properaBody) || "&nbsp;"}</td></tr></table>`;
 
   const sigs = actaSignatures(a);
+  // The blank signing space uses real content (nbsp + line breaks) so Word
+  // doesn't collapse it (Word ignores empty divs with only a CSS height).
   const sigBlock = (s: ActaSignatura) =>
     `<td style="border:${bd};padding:6px 8px;vertical-align:top;width:50%;">
       <div style="font-size:11px;white-space:pre-line;">${escMultiline(s.titol)}</div>
-      <div style="height:80px;"></div>
+      <div style="height:80px;line-height:20px;font-size:11px;">&nbsp;<br>&nbsp;<br>&nbsp;<br>&nbsp;</div>
       <div style="font-size:11px;border-top:1px solid #999;padding-top:3px;">${esc(s.persona)}</div>
     </td>`;
   let sigRows = "";
@@ -203,17 +207,27 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
   }
   const signatures = sigs.length ? `<table style="width:100%;border-collapse:collapse;margin-top:6px;">${sigRows}</table>` : "";
 
-  // Fotografies — each image, one by one, full width.
+  // Fotografies — start on a new page; each image one by one, full width.
+  const pageBreak = "page-break-before:always;-webkit-column-break-before:always;break-before:page;";
   const fotos = a.fotografies ?? [];
   const fotosSection = fotos.length
-    ? bar(t.fotografies) + fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")
+    ? `<div style="${pageBreak}">${bar(t.fotografies)}${fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")}</div>`
     : "";
 
-  // Documents adjunts — list of attached PDFs.
+  // Documents adjunts — start on a new page. If the PDFs have been rasterised,
+  // embed their pages so they appear in the generated PDF/Word; otherwise list
+  // the file names.
   const docs = a.documents ?? [];
-  const docsSection = docs.length
-    ? bar(t.documents) + `<table style="width:100%;border-collapse:collapse;">${docs.map((d, i) => `<tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${i + 1}. ${esc(d.name)}</td></tr>`).join("")}</table>`
-    : "";
+  let docsSection = "";
+  if (renderedDocs && renderedDocs.length) {
+    docsSection = `<div style="${pageBreak}">${bar(t.documents)}${renderedDocs
+      .map((d) => `<div style="font-weight:bold;font-size:11px;margin:10px 0 4px;">${esc(d.name)}</div>${d.pages
+        .map((p, pi) => `<div style="text-align:center;margin-bottom:6px;${pi > 0 ? pageBreak : ""}"><img src="${p}" width="720" style="max-width:100%;height:auto;border:1px solid #ddd;" /></div>`)
+        .join("")}`)
+      .join("")}</div>`;
+  } else if (docs.length) {
+    docsSection = `<div style="${pageBreak}">${bar(t.documents)}<table style="width:100%;border-collapse:collapse;">${docs.map((d, i) => `<tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${i + 1}. ${esc(d.name)}</td></tr>`).join("")}</table></div>`;
+  }
 
   const closing = `<p style="font-size:11px;margin:14px 0 4px;">${esc(t.closing(longDate(a.data, lang)))}<br>${esc(t.assabentats)}</p>`;
 
@@ -245,17 +259,63 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
 
 // ---- client-side output helpers ----
 
-export function openActaPdf(a: Acta, lang: ActaLang = "ca") {
-  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
-  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>
-    <style>@page { size: A4 portrait; margin: 1.3cm; } *{-webkit-print-color-adjust:exact;print-color-adjust:exact;} body{margin:0;}</style>
-    </head><body>${buildActaHtml(a, lang, logo)}</body></html>`;
+function dataUrlToUint8(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(",")[1] ?? "";
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// Rasterise a PDF (data URI) to one JPEG data-URI per page, so the attached
+// document's pages can be embedded into the generated PDF / Word.
+async function rasterizePdf(dataUrl: string, scale = 1.6): Promise<string[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    const doc = await pdfjs.getDocument({ data: dataUrlToUint8(dataUrl) }).promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.8));
+    }
+    return pages;
+  } catch {
+    return [];
+  }
+}
+
+async function renderActaDocs(a: Acta): Promise<RenderedDoc[]> {
+  const out: RenderedDoc[] = [];
+  for (const d of a.documents ?? []) {
+    out.push({ name: d.name, pages: await rasterizePdf(d.dataUrl) });
+  }
+  return out;
+}
+
+export async function openActaPdf(a: Acta, lang: ActaLang = "ca") {
+  // Open the window synchronously (within the click) to dodge popup blockers.
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
+  w.document.write("<!DOCTYPE html><html><body style='font-family:sans-serif;padding:24px;color:#555;'>Generant document…</body></html>");
+  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+  const renderedDocs = await renderActaDocs(a);
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>
+    <style>@page { size: A4 portrait; margin: 1.3cm; } *{-webkit-print-color-adjust:exact;print-color-adjust:exact;} body{margin:0;}</style>
+    </head><body>${buildActaHtml(a, lang, logo, renderedDocs)}</body></html>`;
+  w.document.open();
   w.document.write(html);
   w.document.close();
   w.focus();
-  setTimeout(() => w.print(), 400);
+  setTimeout(() => w.print(), 500);
 }
 
 async function logoDataUri(): Promise<string> {
@@ -276,8 +336,9 @@ async function logoDataUri(): Promise<string> {
 
 export async function downloadActaWord(a: Acta, lang: ActaLang = "ca") {
   const logo = await logoDataUri();
+  const renderedDocs = await renderActaDocs(a);
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo)}</body></html>`;
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo, renderedDocs)}</body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

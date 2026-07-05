@@ -88,6 +88,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [contactQuery, setContactQuery] = useState("");
   const [contactOpen, setContactOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [saved, setSaved] = useState(true);
   const [, startTransition] = useTransition();
@@ -268,8 +269,8 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             <button className={`px-2.5 py-1.5 ${docLang === "ca" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("ca")}>CA</button>
             <button className={`px-2.5 py-1.5 ${docLang === "es" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("es")}>ES</button>
           </div>
-          <button className="btn" onClick={() => openActaPdf(liveActa(), docLang)}>PDF</button>
-          <button className="btn" onClick={() => downloadActaWord(liveActa(), docLang)}>Word</button>
+          <button className="btn" disabled={generating} onClick={async () => { setGenerating(true); try { await openActaPdf(liveActa(), docLang); } finally { setGenerating(false); } }}>{generating ? "Generant…" : "PDF"}</button>
+          <button className="btn" disabled={generating} onClick={async () => { setGenerating(true); try { await downloadActaWord(liveActa(), docLang); } finally { setGenerating(false); } }}>Word</button>
         </div>
       </div>
 
@@ -398,7 +399,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
 
       {/* Temes tractats — 3 categories */}
       <section className="card">
-        <h2 className="mb-1 text-lg font-semibold">Temes tractats</h2>
+        <h2 className="mb-1 text-lg font-semibold">Temes</h2>
         <p className="mb-4 text-xs text-[var(--color-muted)]">Cada tema pertany a una categoria. Canvia&apos;n la categoria per moure&apos;l, i ordena amb les fletxes.</p>
         <div className="space-y-6">
           {TEMA_CATS.map((cat) => {

@@ -29,6 +29,12 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
             Dedicació
           </Link>
           <Link
+            href="/actes"
+            className={`px-3 py-1.5 rounded-md ${current === "actes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            Actes
+          </Link>
+          <Link
             href="/honoraris"
             className={`px-3 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
@@ -45,12 +51,6 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
             className={`px-3 py-1.5 rounded-md ${current === "facturacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Facturació
-          </Link>
-          <Link
-            href="/actes"
-            className={`px-3 py-1.5 rounded-md ${current === "actes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
-          >
-            Actes
           </Link>
           <Link
             href="/parameters"

@@ -93,7 +93,7 @@ export function actaTitle(tipus: string, lang: ActaLang = "ca"): string {
 
 // Temes categories.
 export const TEMA_CATS: { key: string; label: string; labelEs: string }[] = [
-  { key: "pendent", label: "Pendent", labelEs: "Pendiente" },
+  { key: "pendent", label: "Pendents", labelEs: "Pendientes" },
   { key: "executat", label: "Executat", labelEs: "Ejecutado" },
   { key: "tractat", label: "Tractats", labelEs: "Tratados" },
 ];
@@ -108,7 +108,21 @@ function temaCatLabel(key: string, lang: ActaLang): string {
   return lang === "es" ? c.labelEs : c.label;
 }
 function temaHasContent(t: ActaTema): boolean {
-  return !!((t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()));
+  return !!((t.titol && t.titol.trim()) || (t.text && t.text.trim()) || (t.responsable && t.responsable.trim()) || (t.responsables && t.responsables.length > 0));
+}
+// Initials for the responsable column: prefer the "(XX)" the user put in the
+// name, else first letters of the words. e.g. "David Lladó (DL)" -> "DL".
+function nameInitials(name: string): string {
+  const paren = /\(([^)]+)\)/.exec(name);
+  if (paren) return paren[1].trim();
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words.map((w) => (w[0] ?? "").toUpperCase()).join("").slice(0, 3);
+}
+function temaResponsablesInitials(t: ActaTema): string {
+  const list = t.responsables && t.responsables.length
+    ? t.responsables
+    : (t.responsable ? t.responsable.split(" & ").map((s) => s.trim()).filter(Boolean) : []);
+  return list.map(nameInitials).filter(Boolean).join(" & ");
 }
 function actaSignatures(a: Acta): ActaSignatura[] {
   if (a.signatures && a.signatures.length) return a.signatures;
@@ -180,7 +194,7 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
             ${tm.titol && tm.titol.trim() ? `<div style="font-weight:bold;">${esc(tm.titol)}</div>` : ""}
             ${tm.text && tm.text.trim() ? `<div>${escMultiline(tm.text)}</div>` : ""}
           </td>
-          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(tm.responsables && tm.responsables.length ? tm.responsables.join(" & ") : tm.responsable)}</td>
+          <td style="border:${bd};padding:4px 8px;font-size:11px;vertical-align:top;width:130px;">${esc(temaResponsablesInitials(tm))}</td>
         </tr>`,
       )
       .join("");
@@ -207,11 +221,14 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
   }
   const signatures = sigs.length ? `<table style="width:100%;border-collapse:collapse;margin-top:6px;">${sigRows}</table>` : "";
 
+  // A page break that works in both print (page-break-before) and Word (which
+  // ignores empty height divs, so it needs real content + mso break type).
+  const pageBreakEl = `<div style="page-break-before:always;break-before:page;mso-break-type:page-break;height:0;line-height:0;font-size:1px;">&nbsp;</div>`;
+
   // Fotografies — start on a new page; each image one by one, full width.
-  const pageBreak = "page-break-before:always;-webkit-column-break-before:always;break-before:page;";
   const fotos = a.fotografies ?? [];
   const fotosSection = fotos.length
-    ? `<div style="${pageBreak}">${bar(t.fotografies)}${fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")}</div>`
+    ? `${pageBreakEl}${bar(t.fotografies)}${fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")}`
     : "";
 
   // Documents adjunts — start on a new page. If the PDFs have been rasterised,
@@ -220,13 +237,21 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
   const docs = a.documents ?? [];
   let docsSection = "";
   if (renderedDocs && renderedDocs.length) {
-    docsSection = `<div style="${pageBreak}">${bar(t.documents)}${renderedDocs
-      .map((d) => `<div style="font-weight:bold;font-size:11px;margin:10px 0 4px;">${esc(d.name)}</div>${d.pages
-        .map((p, pi) => `<div style="text-align:center;margin-bottom:6px;${pi > 0 ? pageBreak : ""}"><img src="${p}" width="720" style="max-width:100%;height:auto;border:1px solid #ddd;" /></div>`)
-        .join("")}`)
-      .join("")}</div>`;
+    let firstDoc = true;
+    const body = renderedDocs
+      .map((d) => {
+        const docBreak = firstDoc ? "" : pageBreakEl;
+        firstDoc = false;
+        const head = `${docBreak}<div style="font-weight:bold;font-size:11px;margin:10px 0 4px;">${esc(d.name)}</div>`;
+        const pages = d.pages
+          .map((p, pi) => `${pi > 0 ? pageBreakEl : ""}<div style="text-align:center;margin-bottom:6px;page-break-inside:avoid;"><img src="${p}" width="720" style="max-width:100%;height:auto;border:1px solid #ddd;" /></div>`)
+          .join("");
+        return head + pages;
+      })
+      .join("");
+    docsSection = `${pageBreakEl}${bar(t.documents)}${body}`;
   } else if (docs.length) {
-    docsSection = `<div style="${pageBreak}">${bar(t.documents)}<table style="width:100%;border-collapse:collapse;">${docs.map((d, i) => `<tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${i + 1}. ${esc(d.name)}</td></tr>`).join("")}</table></div>`;
+    docsSection = `${pageBreakEl}${bar(t.documents)}<table style="width:100%;border-collapse:collapse;">${docs.map((d, i) => `<tr><td style="border:${bd};padding:4px 8px;font-size:11px;">${i + 1}. ${esc(d.name)}</td></tr>`).join("")}</table>`;
   }
 
   const closing = `<p style="font-size:11px;margin:14px 0 4px;">${esc(t.closing(longDate(a.data, lang)))}<br>${esc(t.assabentats)}</p>`;

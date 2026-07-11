@@ -71,6 +71,7 @@ export interface Acta {
   signatures: ActaSignatura[];
   fotografies: string[]; // data URIs
   documents: ActaDoc[];
+  audios: ActaDoc[]; // {name, dataUrl}; not printed
   // legacy signature columns (kept for back-compat / seeding)
   sig_do: string | null;
   sig_de: string | null;

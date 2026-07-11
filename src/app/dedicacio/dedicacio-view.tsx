@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { createContext, useContext, useMemo, useState, useTransition } from "react";
 import { createDedicacioAction, deleteDedicacioAction, updateDedicacioAction } from "./actions";
-import { createActaFromDedicacioAction } from "@/app/actes/actions";
+import { createActaFromDedicacioAction, linkActaToDedicacioAction } from "@/app/actes/actions";
+import { actaReasonLabel } from "@/lib/acta-doc";
 import type { Dedicacio, Expedient } from "@/types/db";
+
+export type UnlinkedActa = { id: number; num: string | null; tipus: string; projecte: string | null };
+const UnlinkedActesContext = createContext<UnlinkedActa[]>([]);
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { CATEGORIES } from "@/lib/expedients";
@@ -65,11 +69,13 @@ export function DedicacioView({
   dedicacions,
   tasques,
   today,
+  unlinkedActes = [],
 }: {
   expedients: Expedient[];
   dedicacions: Dedicacio[];
   tasques: string[];
   today: string;
+  unlinkedActes?: UnlinkedActa[];
 }) {
   const [tab, setTab] = useState<Tab>("registre");
   const [showForm, setShowForm] = useState(false);
@@ -81,6 +87,7 @@ export function DedicacioView({
   }));
 
   return (
+   <UnlinkedActesContext.Provider value={unlinkedActes}>
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-6 border-b border-[var(--color-line)]">
         <TabBtn current={tab} value="registre" onClick={setTab}>Registre</TabBtn>
@@ -115,6 +122,7 @@ export function DedicacioView({
         <EntryForm expedientOpts={expedientOpts} tasques={tasques} today={today} onDone={() => setShowForm(false)} />
       </Modal>
     </div>
+   </UnlinkedActesContext.Provider>
   );
 }
 
@@ -382,6 +390,16 @@ function DedicacioForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const unlinkedActes = useContext(UnlinkedActesContext);
+  const [actaToLink, setActaToLink] = useState<number | "">("");
+  function linkActa() {
+    if (actaToLink === "") return;
+    startTransition(async () => {
+      await linkActaToDedicacioAction(actaToLink, d.id);
+      onClose();
+    });
+  }
+
   function save() {
     setError(null);
     if (!expedientId) {
@@ -424,6 +442,26 @@ function DedicacioForm({
         <div className="sm:col-span-2">
           <label className="label">Comentari</label>
           <input className="input" placeholder="Opcional" value={comentari} onChange={(e) => setComentari(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Acta</label>
+          {d.acta_id ? (
+            <div className="text-sm">
+              Vinculada: <Link href={`/actes/${d.acta_id}`} className="font-mono font-semibold text-[var(--color-accent)] hover:underline">{d.acta_num}</Link>
+            </div>
+          ) : unlinkedActes.length > 0 ? (
+            <div className="flex gap-2">
+              <select className="input" value={actaToLink === "" ? "" : actaToLink} onChange={(e) => setActaToLink(e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">— Vincular una acta existent —</option>
+                {unlinkedActes.map((a) => (
+                  <option key={a.id} value={a.id}>{a.num} · {actaReasonLabel(a.tipus)}{a.projecte ? ` · ${a.projecte}` : ""}</option>
+                ))}
+              </select>
+              <button type="button" className="btn" onClick={linkActa} disabled={pending || actaToLink === ""}>Vincular</button>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--color-muted)]">Cap acta lliure per vincular.</p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-3">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { updateActaAction, deleteActaAction, createActaContacteAction, addActaFotoAction, removeActaFotoAction, addActaDocAction, removeActaDocAction, type ActaPatch } from "../actions";
+import { updateActaAction, deleteActaAction, createActaContacteAction, addActaFotoAction, removeActaFotoAction, addActaDocAction, removeActaDocAction, addActaAudioAction, removeActaAudioAction, type ActaPatch } from "../actions";
 import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat, type ActaLang } from "@/lib/acta-doc";
 import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 
@@ -78,6 +78,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   const [signatures, setSignatures] = useState<ActaSignatura[]>(seedSignatures(acta));
   const [fotos, setFotos] = useState<string[]>(acta.fotografies ?? []);
   const [docs, setDocs] = useState<ActaDoc[]>(acta.documents ?? []);
+  const [audios, setAudios] = useState<ActaDoc[]>(acta.audios ?? []);
   const [docLang, setDocLang] = useState<ActaLang>("ca");
 
   const [contactList, setContactList] = useState<Contacte[]>(contactes);
@@ -177,6 +178,20 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     setUploading(false);
   }
   function removeDoc(i: number) { setDocs((p) => p.filter((_, j) => j !== i)); void removeActaDocAction(acta.id, i); }
+  async function onUploadAudios(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    for (const f of Array.from(files)) {
+      try {
+        const url = await readFileAsDataUrl(f);
+        const audio = { name: f.name, dataUrl: url };
+        setAudios((p) => [...p, audio]);
+        await addActaAudioAction(acta.id, audio);
+      } catch { /* skip this file */ }
+    }
+    setUploading(false);
+  }
+  function removeAudio(i: number) { setAudios((p) => p.filter((_, j) => j !== i)); void removeActaAudioAction(acta.id, i); }
 
   // Assistents helpers
   function setAss(next: ActaAssistent[]) { setAssistents(next); save({ assistents: next }); }
@@ -263,14 +278,22 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
           <Link href="/actes" className="text-sm text-[var(--color-muted)] hover:underline">← Totes les actes</Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{acta.num} · {actaTitle(tipus).replace(/[[\]]/g, "")}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--color-muted)]">{saved ? "Desat" : "Desant…"}</span>
-          <div className="flex overflow-hidden rounded-md border border-[var(--color-line)] text-xs font-semibold">
-            <button className={`px-2.5 py-1.5 ${docLang === "ca" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("ca")}>CA</button>
-            <button className={`px-2.5 py-1.5 ${docLang === "es" ? "bg-[var(--color-accent)] text-white" : "hover:bg-[var(--color-paper)]"}`} onClick={() => setDocLang("es")}>ES</button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn-primary" onClick={() => save()}>{saved ? "Desar" : "Desant…"}</button>
+          <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-line)] text-sm" title="Idioma del document generat">
+            {(["es", "ca"] as const).map((lng) => (
+              <button
+                key={lng}
+                type="button"
+                onClick={() => setDocLang(lng)}
+                className={`px-3 py-1.5 ${docLang === lng ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}
+              >
+                {lng === "es" ? "Castellà" : "Català"}
+              </button>
+            ))}
           </div>
-          <button className="btn" disabled={generating} onClick={async () => { setGenerating(true); try { await openActaPdf(liveActa(), docLang); } finally { setGenerating(false); } }}>{generating ? "Generant…" : "PDF"}</button>
-          <button className="btn" disabled={generating} onClick={async () => { setGenerating(true); try { await downloadActaWord(liveActa(), docLang); } finally { setGenerating(false); } }}>Word</button>
+          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await downloadActaWord(liveActa(), docLang); } finally { setGenerating(false); } }}>Word</button>
+          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await openActaPdf(liveActa(), docLang); } finally { setGenerating(false); } }}>{generating ? "Generant…" : "PDF / Imprimir"}</button>
         </div>
       </div>
 
@@ -546,6 +569,35 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
                 <span className="text-[var(--color-muted)]">{i + 1}.</span>
                 <a href={d.dataUrl} download={d.name} className="flex-1 truncate text-[var(--color-accent)] hover:underline">{d.name}</a>
                 <button className="btn-ghost" onClick={() => removeDoc(i)} title="Eliminar">✕</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Audios */}
+      <section className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Àudios</h2>
+            <p className="text-xs text-[var(--color-muted)]">Missatges de veu per consultar aquí. No apareixen al PDF/Word.</p>
+          </div>
+          <label className="btn cursor-pointer">
+            + Afegir àudio
+            <input type="file" accept="audio/*" multiple className="hidden" onChange={(e) => { onUploadAudios(e.target.files); e.target.value = ""; }} />
+          </label>
+        </div>
+        {audios.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted)]">Cap àudio.</p>
+        ) : (
+          <ul className="space-y-3">
+            {audios.map((a, i) => (
+              <li key={i} className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 truncate text-sm">{a.name}</div>
+                  <audio controls src={a.dataUrl} className="w-full max-w-md" />
+                </div>
+                <button className="btn-ghost" onClick={() => removeAudio(i)} title="Eliminar">✕</button>
               </li>
             ))}
           </ul>

@@ -39,6 +39,13 @@ export default async function DedicacioPage() {
     sql`select nom from public.tasca order by nom` as unknown as Promise<{ nom: string }[]>,
   ]);
 
+  const unlinkedActes = (await sql`
+    select id, num, tipus, projecte
+    from public.acta
+    where dedicacio_id is null
+    order by num desc nulls last, id desc
+  `) as unknown as { id: number; num: string | null; tipus: string; projecte: string | null }[];
+
   return (
     <>
       <AppNav current="dedicacio" />
@@ -52,6 +59,7 @@ export default async function DedicacioPage() {
           dedicacions={dedicacions}
           tasques={tasques.map((t) => t.nom)}
           today={todayIso()}
+          unlinkedActes={unlinkedActes}
         />
       </main>
     </>

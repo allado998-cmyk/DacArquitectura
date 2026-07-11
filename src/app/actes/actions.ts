@@ -188,6 +188,27 @@ export async function removeActaDocAction(id: number, index: number) {
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
   await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
 }
+export async function addActaAudioAction(id: number, audio: ActaDoc) {
+  await requireUser();
+  if (!Number.isFinite(id) || !audio?.dataUrl) return;
+  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) || ${JSON.stringify([audio])}::jsonb, updated_at = now() where id = ${id}`;
+}
+export async function removeActaAudioAction(id: number, index: number) {
+  await requireUser();
+  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
+  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+}
+
+// Link an existing (unlinked) acta to a dedicació — one dedicació = one acta.
+export async function linkActaToDedicacioAction(actaId: number, dedicacioId: number) {
+  await requireUser();
+  if (!Number.isFinite(actaId) || !Number.isFinite(dedicacioId)) return;
+  const existing = (await sql`select id from public.acta where dedicacio_id = ${dedicacioId} limit 1`) as { id: number }[];
+  if (existing.length) return; // already has one
+  await sql`update public.acta set dedicacio_id = ${dedicacioId}, updated_at = now() where id = ${actaId}`;
+  revalidatePath("/dedicacio");
+  revalidatePath("/actes");
+}
 
 export async function deleteActaAction(formData: FormData) {
   await requireUser();

@@ -81,13 +81,14 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Actes</h1>
-        <div className="flex items-center gap-2">
-          <button className="btn" onClick={pdf}>PDF</button>
-          <button className="btn-primary" onClick={() => setModal(true)}>Nova acta</button>
-        </div>
+        <button className="btn-primary" onClick={() => setModal(true)}>Nova acta</button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <select className="input w-32" value={year} onChange={(e) => setYear(e.target.value)}>
+          <option value="any">Tots els anys</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
         <input className="input w-56" placeholder="Cercar…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input w-48" value={tipus} onChange={(e) => setTipus(e.target.value)}>
           <option value="any">Tots els motius</option>
@@ -101,10 +102,7 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
           <option value="any">Tots els clients</option>
           {clients.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select className="input w-32" value={year} onChange={(e) => setYear(e.target.value)}>
-          <option value="any">Tots els anys</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <button className="btn ml-auto" onClick={pdf}>PDF</button>
       </div>
 
       <div className="table-wrap">

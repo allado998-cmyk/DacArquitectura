@@ -729,24 +729,25 @@ function FacturaForm({
     // Economic block — mirrors the FE72.01-08 model: small italic labels on the
     // left, bold base & total values, thin rules under the base and IVA rows.
     const econRule = "border-bottom:1px solid #bbb;";
+    const valTd = `${econRule}padding:4px 0;text-align:right;font-size:13px;white-space:nowrap;width:26%;`;
     const concRows = conc
-      .map((c) => `<tr><td style="${econRule}padding:4px 10px 4px 0;font-size:11px;color:#555;">${esc(c.descripcio) || "—"}</td><td style="${econRule}padding:4px 0;text-align:left;font-size:13px;white-space:nowrap;">${eur(n(c.import))}</td></tr>`)
+      .map((c) => `<tr><td style="${econRule}padding:4px 10px 4px 0;font-size:11px;color:#555;">${esc(c.descripcio) || "—"}</td><td style="${valTd}">${eur(n(c.import))}</td></tr>`)
       .join("");
     const supRows = sup
-      .map((s) => `<tr><td style="${econRule}padding:4px 10px 4px 0;font-size:11px;color:#555;">${esc(s.descripcio) || "—"}</td><td style="${econRule}padding:4px 0;text-align:left;font-size:13px;white-space:nowrap;">+ ${eur(n(s.import))}</td></tr>`)
+      .map((s) => `<tr><td style="${econRule}padding:4px 10px 4px 0;font-size:11px;color:#555;">${esc(s.descripcio) || "—"}</td><td style="${valTd}">+ ${eur(n(s.import))}</td></tr>`)
       .join("");
     const ivaRow = ivaZero
       ? ""
-      : `<tr><td style="${econRule}padding:5px 10px 5px 0;font-size:11px;color:#555;">+${fmtPct(ivaNum)}% ${esc(L.ivaWord)}</td><td style="${econRule}padding:5px 0;text-align:left;font-size:13px;white-space:nowrap;">+ ${eur(t.iva)}</td></tr>`;
+      : `<tr><td style="${econRule}padding:5px 10px 5px 0;font-size:11px;color:#555;">+${fmtPct(ivaNum)}% ${esc(L.ivaWord)}</td><td style="${valTd}">+ ${eur(t.iva)}</td></tr>`;
     const grandTotal = ivaZero ? base + supTotal : (hasSup ? t.totalFinal : t.total);
 
     const econ = `
-      <table style="border-collapse:collapse;width:520px;max-width:100%;">
+      <table style="border-collapse:collapse;width:520px;max-width:100%;table-layout:fixed;">
         ${showConc ? concRows : ""}
-        <tr><td style="${econRule}padding:5px 10px 5px 0;font-size:11px;font-weight:bold;font-style:italic;width:48%;">${esc(L.base)}</td><td style="${econRule}padding:5px 0;text-align:left;font-size:16px;font-weight:bold;white-space:nowrap;">${eur(base)}</td></tr>
+        <tr><td style="${econRule}padding:5px 10px 5px 0;font-size:11px;font-weight:bold;font-style:italic;">${esc(L.base)}</td><td style="${econRule}padding:5px 0;text-align:right;font-size:16px;font-weight:bold;white-space:nowrap;width:26%;">${eur(base)}</td></tr>
         ${ivaRow}
         ${hasSup ? supRows : ""}
-        <tr><td style="padding:6px 10px 6px 0;font-size:11px;font-weight:bold;font-style:italic;">${esc(L.total)}</td><td style="padding:6px 0;text-align:left;font-size:16px;font-weight:bold;white-space:nowrap;">${eur(grandTotal)}</td></tr>
+        <tr><td style="padding:6px 10px 6px 0;font-size:11px;font-weight:bold;font-style:italic;">${esc(L.total)}</td><td style="padding:6px 0;text-align:right;font-size:16px;font-weight:bold;white-space:nowrap;width:26%;">${eur(grandTotal)}</td></tr>
       </table>
       ${ivaZero ? `<div style="margin-top:10px;font-size:11px;font-style:italic;color:#444;max-width:560px;line-height:1.5;">${esc(IVA_EXEMPT_NOTE)}</div>` : ""}`;
 
@@ -784,7 +785,7 @@ function FacturaForm({
 
         ${bar(L.formaPago)}
         <div style="font-size:12px;line-height:1.5;">${esc(L.pagoText)}</div>
-        <div style="margin-top:8px;margin-left:24px;font-size:12px;"><strong>${esc(BANK.nom)}</strong>&nbsp;&nbsp;&nbsp;&nbsp;${esc(BANK.iban)}</div>
+        <div style="margin-top:8px;margin-left:24px;font-size:12px;"><strong>${esc(L.bancNom)}</strong>&nbsp;&nbsp;&nbsp;&nbsp;${esc(BANK.iban)}</div>
       </div>`;
 
     // Force Century Gothic everywhere; print-color-adjust keeps the grey section
@@ -1218,6 +1219,7 @@ const FACT_LABELS = {
     rol: "arq. administrador",
     formaPago: "FORMA DE PAGO",
     pagoText: "Para mayor comodidad del cliente, transferencia bancaria, indicando el número de factura, en el siguiente número de cuenta corriente:",
+    bancNom: "CAJA DE ARQUITECTOS ARQUIA",
   },
   ca: {
     datosProf: "DADES FACTURA PROFESSIONAL",
@@ -1229,6 +1231,7 @@ const FACT_LABELS = {
     rol: "arq. administrador",
     formaPago: "FORMA DE PAGAMENT",
     pagoText: "Per a major comoditat del client, transferència bancària, indicant el número de factura, en el següent número de compte corrent:",
+    bancNom: "CAIXA D'ARQUITECTES ARQUIA",
   },
 } as const;
 

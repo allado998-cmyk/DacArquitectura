@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createContext, useContext, useMemo, useState, useTransition } from "react";
 import { createDedicacioAction, deleteDedicacioAction, updateDedicacioAction } from "./actions";
-import { createActaFromDedicacioAction, linkActaToDedicacioAction } from "@/app/actes/actions";
+import { createActaFromDedicacioAction, linkActaToDedicacioAction, unlinkActaFromDedicacioAction } from "@/app/actes/actions";
 import { actaReasonLabel } from "@/lib/acta-doc";
 import type { Dedicacio, Expedient } from "@/types/db";
 
@@ -391,13 +391,19 @@ function DedicacioForm({
   const [pending, startTransition] = useTransition();
 
   const unlinkedActes = useContext(UnlinkedActesContext);
-  const [actaToLink, setActaToLink] = useState<number | "">("");
-  function linkActa() {
-    if (actaToLink === "") return;
-    startTransition(async () => {
-      await linkActaToDedicacioAction(actaToLink, d.id);
-      onClose();
-    });
+  // Linked acta shown inline; selecting one links it immediately.
+  const [linked, setLinked] = useState<{ id: number; num: string | null } | null>(
+    d.acta_id ? { id: d.acta_id, num: d.acta_num ?? null } : null,
+  );
+  function pickActa(id: number) {
+    const a = unlinkedActes.find((x) => x.id === id);
+    setLinked({ id, num: a?.num ?? null });
+    startTransition(() => linkActaToDedicacioAction(id, d.id));
+  }
+  function unlinkActa() {
+    const cur = linked;
+    setLinked(null);
+    if (cur) startTransition(() => unlinkActaFromDedicacioAction(cur.id));
   }
 
   function save() {
@@ -445,20 +451,18 @@ function DedicacioForm({
         </div>
         <div className="sm:col-span-2">
           <label className="label">Acta</label>
-          {d.acta_id ? (
-            <div className="text-sm">
-              Vinculada: <Link href={`/actes/${d.acta_id}`} className="font-mono font-semibold text-[var(--color-accent)] hover:underline">{d.acta_num}</Link>
+          {linked ? (
+            <div className="flex items-center gap-3 text-sm">
+              <span>Vinculada: <Link href={`/actes/${linked.id}`} className="font-mono font-semibold text-[var(--color-accent)] hover:underline">{linked.num ?? `#${linked.id}`}</Link></span>
+              <button type="button" className="text-xs text-red-700 hover:underline" onClick={unlinkActa} disabled={pending}>Desvincular</button>
             </div>
           ) : unlinkedActes.length > 0 ? (
-            <div className="flex gap-2">
-              <select className="input" value={actaToLink === "" ? "" : actaToLink} onChange={(e) => setActaToLink(e.target.value === "" ? "" : Number(e.target.value))}>
-                <option value="">— Vincular una acta existent —</option>
-                {unlinkedActes.map((a) => (
-                  <option key={a.id} value={a.id}>{a.num} · {actaReasonLabel(a.tipus)}{a.projecte ? ` · ${a.projecte}` : ""}</option>
-                ))}
-              </select>
-              <button type="button" className="btn" onClick={linkActa} disabled={pending || actaToLink === ""}>Vincular</button>
-            </div>
+            <select className="input" value="" onChange={(e) => { if (e.target.value) pickActa(Number(e.target.value)); }} disabled={pending}>
+              <option value="">— Vincular una acta existent —</option>
+              {unlinkedActes.map((a) => (
+                <option key={a.id} value={a.id}>{a.num} · {actaReasonLabel(a.tipus)}{a.projecte ? ` · ${a.projecte}` : ""}</option>
+              ))}
+            </select>
           ) : (
             <p className="text-sm text-[var(--color-muted)]">Cap acta lliure per vincular.</p>
           )}

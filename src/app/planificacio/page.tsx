@@ -26,10 +26,14 @@ export default async function PlanificacioPage() {
       order by e.data_inici nulls last, e.num_expedient
     ` as unknown as Promise<PlanItem[]>,
     sql`
-      select d.expedient_id, to_char(d.data, 'YYYY-MM-DD') as data,
-             d.hores::text as hores, d.comentari, e.ciutat
+      select d.id as dedicacio_id, d.expedient_id, to_char(d.data, 'YYYY-MM-DD') as data,
+             d.hores::text as hores, d.comentari, e.ciutat,
+             a.id as acta_id, a.num as acta_num
       from public.dedicacions d
       join public.expedients e on e.id = d.expedient_id
+      left join lateral (
+        select id, num from public.acta where dedicacio_id = d.id order by id limit 1
+      ) a on true
       where e.estat = 'obert' and e.num_expedient not like '00-%' and d.tasca ilike 'Visita direcció d''obres'
     ` as unknown as Promise<Visita[]>,
     sql`

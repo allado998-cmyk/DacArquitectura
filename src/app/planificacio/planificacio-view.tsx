@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { Modal } from "@/components/modal";
 import { formatEur } from "@/lib/format";
@@ -25,10 +26,13 @@ export interface PlanItem {
 }
 export interface Visita {
   expedient_id: number;
+  dedicacio_id?: number;
   data: string;
   hores: string;
   comentari: string | null;
   ciutat: string | null;
+  acta_id?: number | null;
+  acta_num?: string | null;
 }
 export interface Fita {
   id: number;
@@ -404,21 +408,28 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
           </>
         )}
 
-        {/* Visites — on the line */}
+        {/* Visites — on the line (clickable when they have a linked acta) */}
         {vis.map((v, k) => {
           const idx = dayIndex(v.data, start);
           if (idx < 0 || idx > TOTAL - 1) return null;
           const pct = ((idx + 0.5) / TOTAL) * 100;
-          return (
-            <button
-              key={k}
-              type="button"
-              onMouseEnter={() => setTip({ pct, title: "Visita d'obra", lines: [fmtLong(v.data), `${fmtHores(v.hores)}${v.ciutat ? ` · ${v.ciutat}` : ""}`, ...(v.comentari ? [v.comentari] : [])] })}
-              onMouseLeave={() => setTip(null)}
-              className="absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-accent)] transition hover:scale-150"
-              style={{ left: `${pct}%`, boxShadow: VISITA_GLOW }}
-              aria-label="Visita d'obra"
-            />
+          const hasActa = !!v.acta_id;
+          const showTip = () => setTip({
+            pct,
+            title: "Visita d'obra",
+            lines: [
+              fmtLong(v.data),
+              `${fmtHores(v.hores)}${v.ciutat ? ` · ${v.ciutat}` : ""}`,
+              ...(v.comentari ? [v.comentari] : []),
+              ...(hasActa ? [`Clica per obrir l'acta ${v.acta_num ?? ""}`.trim()] : []),
+            ],
+          });
+          const cls = `absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-accent)] transition hover:scale-150${hasActa ? " ring-2 ring-amber-400 cursor-pointer" : ""}`;
+          const common = { onMouseEnter: showTip, onMouseLeave: () => setTip(null), className: cls, style: { left: `${pct}%`, boxShadow: VISITA_GLOW } };
+          return hasActa ? (
+            <Link key={k} href={`/actes/${v.acta_id}`} aria-label={`Obrir acta ${v.acta_num ?? ""}`.trim()} {...common} />
+          ) : (
+            <button key={k} type="button" aria-label="Visita d'obra" {...common} />
           );
         })}
 

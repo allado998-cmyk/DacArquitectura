@@ -207,6 +207,16 @@ export async function linkActaToDedicacioAction(actaId: number, dedicacioId: num
   if (existing.length) return; // already has one
   await sql`update public.acta set dedicacio_id = ${dedicacioId}, updated_at = now() where id = ${actaId}`;
   revalidatePath("/dedicacio");
+  revalidatePath("/planificacio");
+  revalidatePath("/actes");
+}
+
+export async function unlinkActaFromDedicacioAction(actaId: number) {
+  await requireUser();
+  if (!Number.isFinite(actaId)) return;
+  await sql`update public.acta set dedicacio_id = null, updated_at = now() where id = ${actaId}`;
+  revalidatePath("/dedicacio");
+  revalidatePath("/planificacio");
   revalidatePath("/actes");
 }
 

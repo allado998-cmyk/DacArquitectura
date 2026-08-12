@@ -828,10 +828,11 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
   if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", count: senseCat.length, value: senseCatPress });
 
   // Rànquing de projectes per puntuació (vegeu l'explicació al panell).
-  // Només expedients amb pressupost, hores pressupostades i hores fetes.
+  // Només expedients tancats amb pressupost, hores pressupostades i hores fetes.
   const ranking = useMemo(() => {
     const items: RankedProjecte[] = [];
     for (const r of filtered) {
+      if (r.estat !== "tancat") continue;
       const pressupost = parseFloat(r.pressupost) || 0;
       const planned = parseFloat(r.planned_hores ?? "") || 0;
       const fetes = (dedicByExp.get(r.id) ?? []).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
@@ -851,14 +852,16 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
     const rates = items.map((i) => i.rate).sort((a, b) => a - b);
     const mid = Math.floor(rates.length / 2);
     const refRate = rates.length === 0 ? 0 : rates.length % 2 ? rates[mid] : (rates[mid - 1] + rates[mid]) / 2;
+    const refDiff = items.reduce((m, i) => Math.max(m, Math.abs(i.diff)), 0);
     for (const it of items) {
-      const fHores = clamp((it.planned - it.fetes) / it.planned, -1, 1);
+      const fDesviacio = clamp((it.planned - it.fetes) / it.planned, -1, 1);
+      const fEstalvi = refDiff > 0 ? clamp(it.diff / refDiff, -1, 1) : 0;
       const fPreu = refRate > 0 ? clamp((it.rate - refRate) / refRate, -1, 1) : 0;
-      it.score = Math.round(clamp(50 + 25 * fHores + 25 * fPreu, 1, 100));
+      it.score = Math.round(clamp(50 + 15 * fDesviacio + 20 * fEstalvi + 15 * fPreu, 1, 100));
     }
     items.sort((a, b) => b.score - a.score || b.rate - a.rate);
     items.forEach((it, i) => { it.rank = i + 1; });
-    return { items, refRate };
+    return { items, refRate, refDiff };
   }, [filtered, dedicByExp]);
 
   const millors = ranking.items.slice(0, 25);
@@ -883,6 +886,7 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       tipologia: byTipologia.map((g) => ({ label: g.key, count: g.count, money: g.money })),
       ciutat: byCiutat.map((g) => ({ label: g.key, count: g.count, money: g.money })),
       refRate: ranking.refRate,
+      refDiff: ranking.refDiff,
       millors: millors.map(toRankPdfRow),
       pitjors: pitjors.map(toRankPdfRow),
     });
@@ -981,14 +985,17 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       {/* Millors projectes */}
       <ChartCard title="Millors projectes" meta="puntuació 1–100">
         <p className="mb-4 text-xs leading-relaxed text-[var(--color-muted)]">
-          Cada expedient parteix de <strong>50 punts</strong>. S&apos;hi sumen fins a <strong>+25</strong> si
-          s&apos;han fet menys hores de les pressupostades (i es resten fins a <strong>−25</strong> si se
-          n&apos;han fet més), proporcionalment a la desviació. I fins a <strong>±25</strong> més segons el
-          preu per hora feta (pressupost ÷ hores fetes) comparat amb la mediana dels expedients inclosos
-          {ranking.refRate > 0 ? <> ({formatEur(ranking.refRate)}/h)</> : null}. Un 100 és un expedient amb
-          molt pressupost on s&apos;han fet menys hores de les previstes; un 1, moltes hores per poc
-          pressupost. Només s&apos;hi inclouen expedients amb pressupost, hores pressupostades i hores fetes
-          (els oberts encara acumulen hores).
+          Cada expedient parteix de <strong>50 punts</strong> i s&apos;hi apliquen tres ajustos:
+          <strong> ±15</strong> segons la desviació relativa d&apos;hores (fer menys hores de les
+          pressupostades suma, fer-ne més resta); <strong>±20</strong> segons les hores estalviades en
+          valor absolut, comparades amb el màxim estalvi o excés del conjunt
+          {ranking.refDiff > 0 ? <> ({fmtHores(ranking.refDiff)})</> : null}, de manera que estalviar
+          moltes hores pesa més que estalviar-ne poques; i <strong>±15</strong> segons el preu per hora
+          feta (pressupost ÷ hores fetes) comparat amb la mediana dels expedients inclosos
+          {ranking.refRate > 0 ? <> ({formatEur(ranking.refRate)}/h)</> : null}. Un 100 és un expedient
+          amb molt pressupost on s&apos;han estalviat moltes hores; un 1, moltes hores de més per poc
+          pressupost. Només s&apos;hi inclouen expedients <strong>tancats</strong> amb pressupost, hores
+          pressupostades i hores fetes.
         </p>
         {ranking.items.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
@@ -1247,6 +1254,7 @@ interface StatsPdfData {
   tipologia: { label: string; count: number; money: number }[];
   ciutat: { label: string; count: number; money: number }[];
   refRate: number;
+  refDiff: number;
   millors: RankPdfRow[];
   pitjors: RankPdfRow[];
 }
@@ -1294,7 +1302,7 @@ function exportExpedientsStatsPdf(d: StatsPdfData) {
     { label: "Públic", count: d.publics, money: d.pressupostPublic },
   ].filter((x) => x.money > 0 || x.count > 0), d.pressupostTotal);
   const scoreNote = d.millors.length
-    ? `<p style="font-size:10px;color:#666;margin:14px 0 0;">Puntuació 1–100: base 50 punts; fins a ±25 segons la desviació d'hores (menys hores de les pressupostades suma) i fins a ±25 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients amb pressupost, hores pressupostades i hores fetes.</p>`
+    ? `<p style="font-size:10px;color:#666;margin:14px 0 0;">Puntuació 1–100: base 50 punts; ±15 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±20 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); i ±15 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
     : "";
   const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal)
     + scoreNote + rankingPdfTable(`Millors projectes — millors ${d.millors.length}`, d.millors) + rankingPdfTable(`Millors projectes — pitjors ${d.pitjors.length}`, d.pitjors);

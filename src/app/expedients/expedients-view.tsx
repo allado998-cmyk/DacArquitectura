@@ -873,6 +873,15 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
     ? ranking.items.slice(Math.max(25, ranking.items.length - 25)).reverse()
     : [];
 
+  // KPIs del rànquing (sobre tots els expedients inclosos, no només els 25 mostrats)
+  const rankN = ranking.items.length;
+  const rankTotalPlanned = ranking.items.reduce((s, i) => s + i.planned, 0);
+  const rankTotalFetes = ranking.items.reduce((s, i) => s + i.fetes, 0);
+  const rankTotalDiff = rankTotalPlanned - rankTotalFetes;
+  const rankTotalBenefici = ranking.items.reduce((s, i) => s + i.benefici, 0);
+  const rankAvgScore = rankN ? ranking.items.reduce((s, i) => s + i.score, 0) / rankN : 0;
+  const rankAvgDiff = rankN ? rankTotalDiff / rankN : 0;
+
   const filterSummary = [
     fAny && `Any ${fAny}`,
     fEstat && (fEstat === "obert" ? "Oberts" : "Tancats"),
@@ -892,6 +901,13 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       refRate: ranking.refRate,
       refDiff: ranking.refDiff,
       refBenefici: ranking.refBenefici,
+      rankN,
+      rankAvgScore,
+      rankAvgDiff,
+      rankTotalDiff,
+      rankTotalPlanned,
+      rankTotalFetes,
+      rankTotalBenefici,
       millors: millors.map(toRankPdfRow),
       pitjors: pitjors.map(toRankPdfRow),
     });
@@ -988,6 +1004,34 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       </ChartCard>
 
       {/* Millors projectes */}
+      {rankN > 0 && (
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Puntuació mitjana"
+            value={String(Math.round(rankAvgScore))}
+            accent={scoreColor(Math.round(rankAvgScore))}
+            hint={`sobre 100 · ${rankN} expedients tancats`}
+          />
+          <KpiCard
+            label="Diferència mitjana d'hores"
+            value={`${rankAvgDiff > 0 ? "+" : ""}${fmtHores(rankAvgDiff)}`}
+            accent={posNegColor(rankAvgDiff)}
+            hint="pressupostades − fetes, per expedient"
+          />
+          <KpiCard
+            label="Hores estalviades"
+            value={`${rankTotalDiff > 0 ? "+" : ""}${fmtHores(rankTotalDiff)}`}
+            accent={posNegColor(rankTotalDiff)}
+            hint={`${fmtHores(rankTotalPlanned)} press. · ${fmtHores(rankTotalFetes)} fetes`}
+          />
+          <KpiCard
+            label="Benefici total"
+            value={`${rankTotalBenefici > 0 ? "+" : ""}${formatEur(rankTotalBenefici)}`}
+            accent={posNegColor(rankTotalBenefici)}
+            hint="pressupost × % d'hores estalviades"
+          />
+        </div>
+      )}
       <ChartCard title="Millors projectes" meta="puntuació 1–100">
         <p className="mb-4 text-xs leading-relaxed text-[var(--color-muted)]">
           Cada expedient parteix de <strong>50 punts</strong> i s&apos;hi apliquen quatre ajustos:
@@ -1039,6 +1083,10 @@ function scoreColor(score: number) {
   if (score >= 66) return "#15803d";
   if (score >= 33) return "#b45309";
   return "#b91c1c";
+}
+
+function posNegColor(v: number) {
+  return v > 0 ? "#15803d" : v < 0 ? "#b91c1c" : "#9ca3af";
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -1275,6 +1323,13 @@ interface StatsPdfData {
   refRate: number;
   refDiff: number;
   refBenefici: number;
+  rankN: number;
+  rankAvgScore: number;
+  rankAvgDiff: number;
+  rankTotalDiff: number;
+  rankTotalPlanned: number;
+  rankTotalFetes: number;
+  rankTotalBenefici: number;
   millors: RankPdfRow[];
   pitjors: RankPdfRow[];
 }
@@ -1323,10 +1378,21 @@ function exportExpedientsStatsPdf(d: StatsPdfData) {
     { label: "Privat", count: d.privats, money: d.pressupostPrivat },
     { label: "Públic", count: d.publics, money: d.pressupostPublic },
   ].filter((x) => x.money > 0 || x.count > 0), d.pressupostTotal);
-  const scoreNote = d.millors.length
-    ? `<p style="font-size:10px;color:#666;margin:14px 0 0;">Puntuació 1–100: base 50 punts; ±10 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±15 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); ±15 segons el benefici (pressupost × % d'hores estalviades), comparat amb el màxim del conjunt (${eur(d.refBenefici)}); i ±10 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
+  const pn = (v: number) => (v > 0 ? "#15803d" : v < 0 ? "#b91c1c" : "#666");
+  const sgn = (v: number) => (v > 0 ? "+" : "");
+  const rankSection = d.millors.length
+    ? `<h2>Millors projectes</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Puntuació mitjana</div><div class="v">${Math.round(d.rankAvgScore)}</div><div class="l">sobre 100 · ${d.rankN} expedients tancats</div></div>
+        <div class="kpi"><div class="l">Diferència mitjana d'hores</div><div class="v" style="color:${pn(d.rankAvgDiff)};">${sgn(d.rankAvgDiff)}${fmtHores(d.rankAvgDiff)}</div><div class="l">pressupostades − fetes, per expedient</div></div>
+        <div class="kpi"><div class="l">Hores estalviades</div><div class="v" style="color:${pn(d.rankTotalDiff)};">${sgn(d.rankTotalDiff)}${fmtHores(d.rankTotalDiff)}</div><div class="l">${fmtHores(d.rankTotalPlanned)} press. · ${fmtHores(d.rankTotalFetes)} fetes</div></div>
+        <div class="kpi"><div class="l">Benefici total</div><div class="v" style="color:${pn(d.rankTotalBenefici)};">${sgn(d.rankTotalBenefici)}${eur(d.rankTotalBenefici)}</div><div class="l">pressupost × % d'hores estalviades</div></div>
+      </div>
+      <p style="font-size:10px;color:#666;margin:6px 0 0;">Puntuació 1–100: base 50 punts; ±10 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±15 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); ±15 segons el benefici (pressupost × % d'hores estalviades), comparat amb el màxim del conjunt (${eur(d.refBenefici)}); i ±10 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
+      + rankingPdfTable(`Millors ${d.millors.length}`, d.millors)
+      + rankingPdfTable(`Pitjors ${d.pitjors.length}`, d.pitjors)
     : "";
   const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal)
-    + scoreNote + rankingPdfTable(`Millors projectes — millors ${d.millors.length}`, d.millors) + rankingPdfTable(`Millors projectes — pitjors ${d.pitjors.length}`, d.pitjors);
+    + rankSection;
   openPdf("Expedients — Estadístiques", d.filterSummary, inner);
 }

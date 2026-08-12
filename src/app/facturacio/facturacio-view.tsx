@@ -378,15 +378,20 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
 
   function exportPdf() {
     const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
+    // When only properes are on screen (Estat = propera, or emeses all hidden),
+    // export those instead of an empty emeses table.
+    const onlyProperes = visibleEmeses.length === 0 && visibleProperes.length > 0;
+    const pdfRows = onlyProperes ? visibleProperes : visibleEmeses;
+    const pdfSum = onlyProperes ? properesSum : emesesSum;
     const filterParts: string[] = [];
     if (fAny) filterParts.push(`Any ${fAny}`);
     if (fTrim) filterParts.push(`Trimestre T${fTrim}`);
     if (fClient) filterParts.push(fClient);
     if (fEstat) filterParts.push(fEstat.charAt(0).toUpperCase() + fEstat.slice(1));
     if (q) filterParts.push(`"${query.trim()}"`);
-    const filterLine = filterParts.length ? filterParts.join(" · ") : "Totes les factures emeses";
+    const filterLine = filterParts.length ? filterParts.join(" · ") : onlyProperes ? "Propera facturació" : "Totes les factures emeses";
 
-    const body = visibleEmeses.map((f) => {
+    const body = pdfRows.map((f) => {
       const sup = rowSup(f, suplitsByFactura);
       const t = totals(n(f.preu), sup, ivaPctOf(f));
       return `<tr>
@@ -400,17 +405,17 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
         <td class="r">${eur(t.total)}</td>
         <td class="r">${sup ? eur(sup) : "—"}</td>
         <td class="r b">${eur(t.totalFinal)}</td>
-        <td class="c">${f.pagada ? "Pagada" : "Pendent"}</td>
+        <td class="c">${f.estat === "propera" ? "Propera" : f.pagada ? "Pagada" : "Pendent"}</td>
       </tr>`;
     }).join("");
 
     const totalRow = `<tr class="tot">
-      <td colspan="5">Total (${visibleEmeses.length} ${visibleEmeses.length === 1 ? "factura" : "factures"})</td>
-      <td class="r b">${eur(emesesSum.base)}</td>
-      <td class="r muted">${eur(emesesSum.iva)}</td>
-      <td class="r">${eur(emesesSum.total)}</td>
-      <td class="r">${emesesSum.sup ? eur(emesesSum.sup) : "—"}</td>
-      <td class="r b">${eur(emesesSum.totalFinal)}</td>
+      <td colspan="5">Total (${pdfRows.length} ${pdfRows.length === 1 ? "factura" : "factures"})</td>
+      <td class="r b">${eur(pdfSum.base)}</td>
+      <td class="r muted">${eur(pdfSum.iva)}</td>
+      <td class="r">${eur(pdfSum.total)}</td>
+      <td class="r">${pdfSum.sup ? eur(pdfSum.sup) : "—"}</td>
+      <td class="r b">${eur(pdfSum.totalFinal)}</td>
       <td></td>
     </tr>`;
 
@@ -452,7 +457,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
           </thead>
           <tbody>
             ${body || `<tr><td colspan="11" style="padding:14px;color:#888;">Cap factura amb aquests filtres.</td></tr>`}
-            ${visibleEmeses.length ? totalRow : ""}
+            ${pdfRows.length ? totalRow : ""}
           </tbody>
         </table>
         <div class="foot">Generat el ${esc(formatDataCa(new Date().toISOString().slice(0, 10)))} · DACARQUITECTURA</div>
@@ -530,7 +535,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
           </select>
         </div>
         <div className="ml-auto">
-          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF de les factures filtrades (sense properes)">
+          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF de les factures filtrades">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" /></svg>
             PDF
           </button>

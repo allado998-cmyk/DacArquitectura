@@ -1043,7 +1043,11 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
         </div>
       )}
       <ChartCard title="Millors projectes" meta="puntuació 1–100">
-        <p className="mb-4 text-xs leading-relaxed text-[var(--color-muted)]">
+        <details className="mb-4 text-xs text-[var(--color-muted)]">
+          <summary className="cursor-pointer select-none text-sm font-medium text-[var(--color-ink)] hover:text-[var(--color-accent)]">
+            Com es calcula la puntuació?
+          </summary>
+          <p className="mt-2 leading-relaxed">
           Cada expedient parteix de <strong>50 punts</strong> i s&apos;hi apliquen quatre ajustos:
           <strong> ±10</strong> segons la desviació relativa d&apos;hores (fer menys hores de les
           pressupostades suma, fer-ne més resta); <strong>±15</strong> segons les hores estalviades en
@@ -1063,7 +1067,8 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
           s&apos;han estalviat moltes hores; un 1, moltes hores de més per poc pressupost. Només
           s&apos;hi inclouen expedients <strong>tancats</strong> amb pressupost, hores pressupostades i
           hores fetes.
-        </p>
+          </p>
+        </details>
         {ranking.items.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
         ) : (

@@ -771,6 +771,13 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));
 }
 
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
 function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipologies: Tipologia[]; dedicByExp: Map<number, Dedicacio[]> }) {
   const [fAny, setFAny] = useState(String(new Date().getFullYear()));
   const [fEstat, setFEstat] = useState("");
@@ -851,21 +858,23 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
         rank: 0,
       });
     }
-    const rates = items.map((i) => i.rate).sort((a, b) => a - b);
-    const mid = Math.floor(rates.length / 2);
-    const refRate = rates.length === 0 ? 0 : rates.length % 2 ? rates[mid] : (rates[mid - 1] + rates[mid]) / 2;
+    const refRate = medianOf(items.map((i) => i.rate));
+    const refPlanned = medianOf(items.map((i) => i.planned));
     const refDiff = items.reduce((m, i) => Math.max(m, Math.abs(i.diff)), 0);
     const refBenefici = items.reduce((m, i) => Math.max(m, Math.abs(i.benefici)), 0);
     for (const it of items) {
+      // Pes del projecte: els ajustos percentuals compten poc en projectes petits
+      // (errar 1 h en un projecte d'1 h és un 100% però no és greu).
+      const wPes = refPlanned > 0 ? clamp(it.planned / refPlanned, 0, 1) : 1;
       const fDesviacio = clamp((it.planned - it.fetes) / it.planned, -1, 1);
       const fEstalvi = refDiff > 0 ? clamp(it.diff / refDiff, -1, 1) : 0;
       const fBenefici = refBenefici > 0 ? clamp(it.benefici / refBenefici, -1, 1) : 0;
       const fPreu = refRate > 0 ? clamp((it.rate - refRate) / refRate, -1, 1) : 0;
-      it.score = Math.round(clamp(50 + 10 * fDesviacio + 15 * fEstalvi + 15 * fBenefici + 10 * fPreu, 1, 100));
+      it.score = Math.round(clamp(50 + 10 * wPes * fDesviacio + 15 * fEstalvi + 15 * fBenefici + 10 * wPes * fPreu, 1, 100));
     }
     items.sort((a, b) => b.score - a.score || b.rate - a.rate);
     items.forEach((it, i) => { it.rank = i + 1; });
-    return { items, refRate, refDiff, refBenefici };
+    return { items, refRate, refDiff, refBenefici, refPlanned };
   }, [filtered, dedicByExp]);
 
   const millors = ranking.items.slice(0, 25);
@@ -901,6 +910,7 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       refRate: ranking.refRate,
       refDiff: ranking.refDiff,
       refBenefici: ranking.refBenefici,
+      refPlanned: ranking.refPlanned,
       rankN,
       rankAvgScore,
       rankAvgDiff,
@@ -1044,10 +1054,15 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
           {ranking.refBenefici > 0 ? <> ({formatEur(ranking.refBenefici)})</> : null}; i
           <strong> ±10</strong> segons el preu per hora feta (pressupost ÷ hores fetes) comparat amb la
           mediana dels expedients inclosos
-          {ranking.refRate > 0 ? <> ({formatEur(ranking.refRate)}/h)</> : null}. Un 100 és un expedient
-          amb molt pressupost on s&apos;han estalviat moltes hores; un 1, moltes hores de més per poc
-          pressupost. Només s&apos;hi inclouen expedients <strong>tancats</strong> amb pressupost, hores
-          pressupostades i hores fetes.
+          {ranking.refRate > 0 ? <> ({formatEur(ranking.refRate)}/h)</> : null}. Els dos ajustos
+          percentuals (desviació i preu/hora) es ponderen per la mida del projecte — hores
+          pressupostades respecte de la mediana del conjunt
+          {ranking.refPlanned > 0 ? <> ({fmtHores(ranking.refPlanned)})</> : null} — de manera que
+          desviar-se un 100% en un projecte d&apos;1 h gairebé no penalitza, mentre que els projectes
+          grans en hores i pressupost compten del tot. Un 100 és un expedient amb molt pressupost on
+          s&apos;han estalviat moltes hores; un 1, moltes hores de més per poc pressupost. Només
+          s&apos;hi inclouen expedients <strong>tancats</strong> amb pressupost, hores pressupostades i
+          hores fetes.
         </p>
         {ranking.items.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
@@ -1323,6 +1338,7 @@ interface StatsPdfData {
   refRate: number;
   refDiff: number;
   refBenefici: number;
+  refPlanned: number;
   rankN: number;
   rankAvgScore: number;
   rankAvgDiff: number;
@@ -1388,7 +1404,7 @@ function exportExpedientsStatsPdf(d: StatsPdfData) {
         <div class="kpi"><div class="l">Hores estalviades</div><div class="v" style="color:${pn(d.rankTotalDiff)};">${sgn(d.rankTotalDiff)}${fmtHores(d.rankTotalDiff)}</div><div class="l">${fmtHores(d.rankTotalPlanned)} press. · ${fmtHores(d.rankTotalFetes)} fetes</div></div>
         <div class="kpi"><div class="l">Benefici total</div><div class="v" style="color:${pn(d.rankTotalBenefici)};">${sgn(d.rankTotalBenefici)}${eur(d.rankTotalBenefici)}</div><div class="l">pressupost × % d'hores estalviades</div></div>
       </div>
-      <p style="font-size:10px;color:#666;margin:6px 0 0;">Puntuació 1–100: base 50 punts; ±10 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±15 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); ±15 segons el benefici (pressupost × % d'hores estalviades), comparat amb el màxim del conjunt (${eur(d.refBenefici)}); i ±10 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
+      <p style="font-size:10px;color:#666;margin:6px 0 0;">Puntuació 1–100: base 50 punts; ±10 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±15 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); ±15 segons el benefici (pressupost × % d'hores estalviades), comparat amb el màxim del conjunt (${eur(d.refBenefici)}); i ±10 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Els ajustos percentuals (desviació i preu/hora) es ponderen per la mida del projecte (hores pressupostades respecte de la mediana, ${fmtHores(d.refPlanned)}), de manera que desviar-se molt en un projecte petit gairebé no penalitza. Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
       + rankingPdfTable(`Millors ${d.millors.length}`, d.millors)
       + rankingPdfTable(`Pitjors ${d.pitjors.length}`, d.pitjors)
     : "";

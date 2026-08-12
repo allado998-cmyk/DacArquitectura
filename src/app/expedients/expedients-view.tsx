@@ -28,6 +28,15 @@ export interface PropostaOpt {
   descripcio: string | null;
   total: string;
 }
+export interface ExpedientFita {
+  id: number;
+  expedient_id: number;
+  data: string;
+  tipus_id: number;
+  nom: string;
+  forma: string;
+  color: string;
+}
 
 function todayLocal() {
   const d = new Date();
@@ -46,6 +55,7 @@ export function ExpedientsView({
   expedients,
   clients,
   dedicacions,
+  fites,
   tipologies,
   calculs,
   propostes,
@@ -53,6 +63,7 @@ export function ExpedientsView({
   expedients: Expedient[];
   clients: Client[];
   dedicacions: Dedicacio[];
+  fites: ExpedientFita[];
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
@@ -87,6 +98,16 @@ export function ExpedientsView({
     return map;
   }, [dedicacions]);
 
+  const fitesByExp = useMemo(() => {
+    const map = new Map<number, ExpedientFita[]>();
+    for (const f of fites) {
+      const arr = map.get(f.expedient_id) ?? [];
+      arr.push(f);
+      map.set(f.expedient_id, arr);
+    }
+    return map;
+  }, [fites]);
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-6 border-b border-[var(--color-line)]">
@@ -108,7 +129,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} dedicByExp={dedicByExp} />}
     </div>
   );
@@ -178,6 +199,7 @@ function ExpedientsList({
   clientOpts,
   ciutats,
   dedicByExp,
+  fitesByExp,
   tipologies,
   calculs,
   propostes,
@@ -187,6 +209,7 @@ function ExpedientsList({
   clientOpts: ComboOption[];
   ciutats: string[];
   dedicByExp: Map<number, Dedicacio[]>;
+  fitesByExp: Map<number, ExpedientFita[]>;
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
@@ -348,6 +371,7 @@ function ExpedientsList({
       <DedicacioModal
         expedient={detail}
         dedicacions={detail ? dedicByExp.get(detail.id) ?? [] : []}
+        fites={detail ? fitesByExp.get(detail.id) ?? [] : []}
         onClose={() => setDetail(null)}
       />
 
@@ -670,10 +694,12 @@ function IconBtn({
 function DedicacioModal({
   expedient,
   dedicacions,
+  fites,
   onClose,
 }: {
   expedient: Expedient | null;
   dedicacions: Dedicacio[];
+  fites: ExpedientFita[];
   onClose: () => void;
 }) {
   const total = dedicacions.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
@@ -723,6 +749,23 @@ function DedicacioModal({
             ) : null;
           })()}
 
+          {fites.length > 0 && (
+            <>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
+                Fites
+              </h4>
+              <ul className="flex flex-wrap gap-x-6 gap-y-1.5">
+                {fites.map((f) => (
+                  <li key={f.id} className="flex items-center gap-2 text-sm">
+                    <FitaShape forma={f.forma} color={f.color || "#facc15"} />
+                    <span className="font-medium">{f.nom}</span>
+                    <span className="tabular-nums text-[var(--color-muted)]">{fmtDate(f.data)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
             Dedicació vinculada
           </h4>
@@ -756,6 +799,19 @@ function DedicacioModal({
       )}
     </Modal>
   );
+}
+
+// Mateixes formes que el component Shape de planificació, per coherència visual.
+function FitaShape({ forma, color, size = 13 }: { forma: string; color: string; size?: number }) {
+  const s = size;
+  const stroke = "#fff";
+  if (forma === "circle") return <svg width={s} height={s}><circle cx={s / 2} cy={s / 2} r={s / 2 - 1} fill={color} stroke={stroke} /></svg>;
+  if (forma === "square") return <svg width={s} height={s}><rect x={1} y={1} width={s - 2} height={s - 2} rx={1.5} fill={color} stroke={stroke} /></svg>;
+  if (forma === "triangle") return <svg width={s} height={s}><polygon points={`${s / 2},1 ${s - 1},${s - 1} 1,${s - 1}`} fill={color} stroke={stroke} /></svg>;
+  if (forma === "star") return (
+    <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z" fill={color} stroke={stroke} strokeWidth="1" /></svg>
+  );
+  return <svg width={s} height={s}><rect x={s * 0.2} y={s * 0.2} width={s * 0.6} height={s * 0.6} transform={`rotate(45 ${s / 2} ${s / 2})`} fill={color} stroke={stroke} /></svg>;
 }
 
 // ============================================================================

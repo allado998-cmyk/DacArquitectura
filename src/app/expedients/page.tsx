@@ -3,14 +3,14 @@ import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ExpedientsView } from "./expedients-view";
 import type { Expedient, Client, Dedicacio, Tipologia } from "@/types/db";
-import type { CalculOpt, PropostaOpt } from "./expedients-view";
+import type { CalculOpt, PropostaOpt, ExpedientFita } from "./expedients-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExpedientsPage() {
   await requireUser();
 
-  const [expedients, clients, dedicacions, tipologies, calculs, propostes] = await Promise.all([
+  const [expedients, clients, dedicacions, fites, tipologies, calculs, propostes] = await Promise.all([
     sql`
       select e.id, e.num_expedient, e.projecte, e.client_id,
              c.nom as client_nom,
@@ -37,6 +37,13 @@ export default async function ExpedientsPage() {
       where expedient_id is not null
       order by data desc, id desc
     ` as unknown as Promise<Dedicacio[]>,
+    sql`
+      select f.id, f.expedient_id, to_char(f.data, 'YYYY-MM-DD') as data,
+             f.tipus_id, t.nom, t.forma, t.color
+      from public.expedient_fita f
+      join public.fita_tipus t on t.id = f.tipus_id
+      order by f.data, f.id
+    ` as unknown as Promise<ExpedientFita[]>,
     sql`select id, nom, ordre, created_at from public.tipologies order by ordre, nom` as unknown as Promise<Tipologia[]>,
     sql`
       select p.id, p.num_proposta, p.projecte,
@@ -74,6 +81,7 @@ export default async function ExpedientsPage() {
           expedients={expedients}
           clients={clients}
           dedicacions={dedicacions}
+          fites={fites}
           tipologies={tipologies}
           calculs={calculs}
           propostes={propostes}

@@ -109,7 +109,7 @@ export function ExpedientsView({
       </div>
 
       {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
-      {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} />}
+      {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} dedicByExp={dedicByExp} />}
     </div>
   );
 }
@@ -767,7 +767,11 @@ function anyOf(num: string): string {
   return m ? `20${m[1]}` : "—";
 }
 
-function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipologia[] }) {
+function clamp(v: number, lo: number, hi: number) {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipologies: Tipologia[]; dedicByExp: Map<number, Dedicacio[]> }) {
   const [fAny, setFAny] = useState(String(new Date().getFullYear()));
   const [fEstat, setFEstat] = useState("");
   const [fCategoria, setFCategoria] = useState("");
@@ -823,6 +827,45 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
   const senseCatPress = senseCat.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
   if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", count: senseCat.length, value: senseCatPress });
 
+  // Rànquing de projectes per puntuació (vegeu l'explicació al panell).
+  // Només expedients amb pressupost, hores pressupostades i hores fetes.
+  const ranking = useMemo(() => {
+    const items: RankedProjecte[] = [];
+    for (const r of filtered) {
+      const pressupost = parseFloat(r.pressupost) || 0;
+      const planned = parseFloat(r.planned_hores ?? "") || 0;
+      const fetes = (dedicByExp.get(r.id) ?? []).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
+      if (pressupost <= 0 || planned <= 0 || fetes <= 0) continue;
+      items.push({
+        r,
+        pressupost,
+        planned,
+        fetes,
+        rate: pressupost / fetes,
+        pct: Math.round((fetes / planned) * 100),
+        diff: planned - fetes,
+        score: 0,
+        rank: 0,
+      });
+    }
+    const rates = items.map((i) => i.rate).sort((a, b) => a - b);
+    const mid = Math.floor(rates.length / 2);
+    const refRate = rates.length === 0 ? 0 : rates.length % 2 ? rates[mid] : (rates[mid - 1] + rates[mid]) / 2;
+    for (const it of items) {
+      const fHores = clamp((it.planned - it.fetes) / it.planned, -1, 1);
+      const fPreu = refRate > 0 ? clamp((it.rate - refRate) / refRate, -1, 1) : 0;
+      it.score = Math.round(clamp(50 + 25 * fHores + 25 * fPreu, 1, 100));
+    }
+    items.sort((a, b) => b.score - a.score || b.rate - a.rate);
+    items.forEach((it, i) => { it.rank = i + 1; });
+    return { items, refRate };
+  }, [filtered, dedicByExp]);
+
+  const millors = ranking.items.slice(0, 25);
+  const pitjors = ranking.items.length > 25
+    ? ranking.items.slice(Math.max(25, ranking.items.length - 25)).reverse()
+    : [];
+
   const filterSummary = [
     fAny && `Any ${fAny}`,
     fEstat && (fEstat === "obert" ? "Oberts" : "Tancats"),
@@ -839,6 +882,9 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
       cat: catPressupost.map((g) => ({ label: g.label, count: g.count, money: g.value })),
       tipologia: byTipologia.map((g) => ({ label: g.key, count: g.count, money: g.money })),
       ciutat: byCiutat.map((g) => ({ label: g.key, count: g.count, money: g.money })),
+      refRate: ranking.refRate,
+      millors: millors.map(toRankPdfRow),
+      pitjors: pitjors.map(toRankPdfRow),
     });
   }
 
@@ -931,6 +977,106 @@ function StatsPanel({ rows, tipologies }: { rows: Expedient[]; tipologies: Tipol
       <ChartCard title="Expedients per ciutat" meta="nombre">
         <HBarChart bars={byCiutat.map((g) => ({ label: g.key, value: g.count, color: "#6366f1", display: String(g.count) }))} />
       </ChartCard>
+
+      {/* Millors projectes */}
+      <ChartCard title="Millors projectes" meta="puntuació 1–100">
+        <p className="mb-4 text-xs leading-relaxed text-[var(--color-muted)]">
+          Cada expedient parteix de <strong>50 punts</strong>. S&apos;hi sumen fins a <strong>+25</strong> si
+          s&apos;han fet menys hores de les pressupostades (i es resten fins a <strong>−25</strong> si se
+          n&apos;han fet més), proporcionalment a la desviació. I fins a <strong>±25</strong> més segons el
+          preu per hora feta (pressupost ÷ hores fetes) comparat amb la mediana dels expedients inclosos
+          {ranking.refRate > 0 ? <> ({formatEur(ranking.refRate)}/h)</> : null}. Un 100 és un expedient amb
+          molt pressupost on s&apos;han fet menys hores de les previstes; un 1, moltes hores per poc
+          pressupost. Només s&apos;hi inclouen expedients amb pressupost, hores pressupostades i hores fetes
+          (els oberts encara acumulen hores).
+        </p>
+        {ranking.items.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted)]">Sense dades.</p>
+        ) : (
+          <div className="space-y-6">
+            <RankingTable title={`Millors ${millors.length}`} items={millors} />
+            {pitjors.length > 0 && <RankingTable title={`Pitjors ${pitjors.length}`} items={pitjors} />}
+          </div>
+        )}
+      </ChartCard>
+    </div>
+  );
+}
+
+// ============================================================================
+// Millors projectes (rànquing per puntuació)
+// ============================================================================
+
+interface RankedProjecte {
+  r: Expedient;
+  pressupost: number;
+  planned: number; // hores pressupostades (del càlcul vinculat)
+  fetes: number;   // suma de dedicacions
+  rate: number;    // pressupost / hores fetes
+  pct: number;     // fetes / pressupostades
+  diff: number;    // pressupostades − fetes (positiu = bé)
+  score: number;   // 1–100
+  rank: number;    // posició global al rànquing
+}
+
+function scoreColor(score: number) {
+  if (score >= 66) return "#15803d";
+  if (score >= 33) return "#b45309";
+  return "#b91c1c";
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color = scoreColor(score);
+  return (
+    <span
+      className="inline-flex min-w-10 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+      style={{ backgroundColor: `${color}1a`, color }}
+    >
+      {score}
+    </span>
+  );
+}
+
+function RankingTable({ title, items }: { title: string; items: RankedProjecte[] }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
+      <div className="table-wrap">
+        <table className="table-compact w-full">
+          <thead>
+            <tr>
+              <th className="th w-12 text-right">#</th>
+              <th className="th w-24">Núm.</th>
+              <th className="th" style={{ minWidth: "14rem" }}>Projecte</th>
+              <th className="th" style={{ minWidth: "12rem" }}>Client</th>
+              <th className="th w-32 text-right">Hores press.</th>
+              <th className="th w-32 text-right">Hores fetes</th>
+              <th className="th w-16 text-right">%</th>
+              <th className="th w-32 text-right">Preu</th>
+              <th className="th w-32 text-right">Diferència</th>
+              <th className="th w-24 text-center">Puntuació</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <tr key={it.r.id}>
+                <td className="td text-right tabular-nums text-[var(--color-muted)]">{it.rank}</td>
+                <td className="td font-mono text-[var(--color-accent)]">{it.r.num_expedient}</td>
+                <td className="td">{it.r.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td">{it.r.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+                <td className="td text-right tabular-nums">{fmtHores(it.planned)}</td>
+                <td className="td text-right tabular-nums">{fmtHores(it.fetes)}</td>
+                <td className="td text-right tabular-nums">{it.pct}%</td>
+                <td className="td text-right tabular-nums">{formatEur(it.pressupost)}</td>
+                <td className={`td text-right tabular-nums font-medium ${it.diff > 0 ? "text-green-700" : it.diff < 0 ? "text-red-700" : "text-[var(--color-muted)]"}`}>
+                  {it.diff > 0 ? "+" : ""}{fmtHores(it.diff)}
+                </td>
+                <td className="td text-center"><ScoreBadge score={it.score} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1057,6 +1203,34 @@ function exportExpedientsListPdf(rows: Expedient[], filterSummary: string) {
   openPdf("Expedients", filterSummary, table);
 }
 
+interface RankPdfRow {
+  rank: number;
+  num: string;
+  projecte: string | null;
+  client: string | null;
+  planned: number;
+  fetes: number;
+  pct: number;
+  pressupost: number;
+  diff: number;
+  score: number;
+}
+
+function toRankPdfRow(it: RankedProjecte): RankPdfRow {
+  return {
+    rank: it.rank,
+    num: it.r.num_expedient,
+    projecte: it.r.projecte,
+    client: it.r.client_nom,
+    planned: it.planned,
+    fetes: it.fetes,
+    pct: it.pct,
+    pressupost: it.pressupost,
+    diff: it.diff,
+    score: it.score,
+  };
+}
+
 interface StatsPdfData {
   filterSummary: string;
   total: number;
@@ -1072,6 +1246,30 @@ interface StatsPdfData {
   cat: { label: string; count: number; money: number }[];
   tipologia: { label: string; count: number; money: number }[];
   ciutat: { label: string; count: number; money: number }[];
+  refRate: number;
+  millors: RankPdfRow[];
+  pitjors: RankPdfRow[];
+}
+
+function rankingPdfTable(title: string, rowsData: RankPdfRow[]) {
+  if (rowsData.length === 0) return "";
+  const body = rowsData
+    .map((r) => `<tr>
+      <td class="r">${r.rank}</td>
+      <td class="mono">${escHtml(r.num)}</td>
+      <td>${escHtml(r.projecte ?? "—")}</td>
+      <td>${escHtml(r.client ?? "—")}</td>
+      <td class="r">${fmtHores(r.planned)}</td>
+      <td class="r">${fmtHores(r.fetes)}</td>
+      <td class="r">${r.pct}%</td>
+      <td class="r">${eur(r.pressupost)}</td>
+      <td class="r" style="color:${r.diff > 0 ? "#15803d" : r.diff < 0 ? "#b91c1c" : "#666"};font-weight:600;">${r.diff > 0 ? "+" : ""}${fmtHores(r.diff)}</td>
+      <td class="r" style="font-weight:700;">${r.score}</td>
+    </tr>`)
+    .join("");
+  return `<h2>${escHtml(title)}</h2><table><thead><tr>
+      <th class="r">#</th><th>Núm.</th><th>Projecte</th><th>Client</th><th class="r">Hores press.</th><th class="r">Hores fetes</th><th class="r">%</th><th class="r">Preu</th><th class="r">Diferència</th><th class="r">Puntuació</th>
+    </tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function breakdownTable(title: string, rowsData: { label: string; count: number; money: number }[], total: number) {
@@ -1095,6 +1293,10 @@ function exportExpedientsStatsPdf(d: StatsPdfData) {
     { label: "Privat", count: d.privats, money: d.pressupostPrivat },
     { label: "Públic", count: d.publics, money: d.pressupostPublic },
   ].filter((x) => x.money > 0 || x.count > 0), d.pressupostTotal);
-  const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal);
+  const scoreNote = d.millors.length
+    ? `<p style="font-size:10px;color:#666;margin:14px 0 0;">Puntuació 1–100: base 50 punts; fins a ±25 segons la desviació d'hores (menys hores de les pressupostades suma) i fins a ±25 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Només s'hi inclouen expedients amb pressupost, hores pressupostades i hores fetes.</p>`
+    : "";
+  const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal)
+    + scoreNote + rankingPdfTable(`Millors projectes — millors ${d.millors.length}`, d.millors) + rankingPdfTable(`Millors projectes — pitjors ${d.pitjors.length}`, d.pitjors);
   openPdf("Expedients — Estadístiques", d.filterSummary, inner);
 }

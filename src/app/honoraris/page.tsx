@@ -15,6 +15,7 @@ export default async function HonorarisListPage() {
            to_char(p.data, 'YYYY-MM-DD') as data,
            p.projecte,
            p.es_ite,
+           p.contacte_prescriptor,
            c.nom as client_nom,
            (case
              when p.es_ite then

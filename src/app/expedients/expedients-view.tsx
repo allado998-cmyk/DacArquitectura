@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createExpedientAction,
@@ -49,6 +50,14 @@ function fmtDate(iso: string | null) {
 }
 function fmtHores(h: number) {
   return new Intl.NumberFormat("ca-ES", { maximumFractionDigits: 2 }).format(Math.round(h * 100) / 100) + " h";
+}
+// "fa 3 dies" / "avui" / "d'aquí 12 dies", per situar cada fita respecte d'avui.
+function quanFita(iso: string, today: string) {
+  const d = Math.round((Date.parse(iso) - Date.parse(today)) / 86_400_000);
+  if (!Number.isFinite(d)) return { text: "—", passada: false, avui: false };
+  if (d === 0) return { text: "avui", passada: false, avui: true };
+  if (d < 0) return { text: `fa ${-d} ${-d === 1 ? "dia" : "dies"}`, passada: true, avui: false };
+  return { text: `d'aquí ${d} ${d === 1 ? "dia" : "dies"}`, passada: false, avui: false };
 }
 
 export function ExpedientsView({
@@ -749,21 +758,46 @@ function DedicacioModal({
             ) : null;
           })()}
 
-          {fites.length > 0 && (
-            <>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
-                Fites
-              </h4>
-              <ul className="flex flex-wrap gap-x-6 gap-y-1.5">
-                {fites.map((f) => (
-                  <li key={f.id} className="flex items-center gap-2 text-sm">
-                    <FitaShape forma={f.forma} color={f.color || "#facc15"} />
-                    <span className="font-medium">{f.nom}</span>
-                    <span className="tabular-nums text-[var(--color-muted)]">{fmtDate(f.data)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
+            Fites{fites.length > 0 && ` (${fites.length})`}
+          </h4>
+          {fites.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">
+              Encara no hi ha cap fita en aquest expedient. Es creen des de la{" "}
+              <Link href="/planificacio" className="underline">Planificació</Link>
+              {expedient.estat === "tancat" ? ", que només mostra expedients oberts." : "."}
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="th w-28">Data</th>
+                    <th className="th">Fita</th>
+                    <th className="th w-36 text-right">Quan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fites.map((f) => {
+                    const q = quanFita(f.data, todayLocal());
+                    return (
+                      <tr key={f.id}>
+                        <td className="td tabular-nums">{fmtDate(f.data)}</td>
+                        <td className="td">
+                          <span className="flex items-center gap-2">
+                            <FitaShape forma={f.forma} color={f.color || "#facc15"} />
+                            <span className="font-medium">{f.nom}</span>
+                          </span>
+                        </td>
+                        <td className={`td text-right ${q.avui ? "font-semibold text-[var(--color-accent)]" : q.passada ? "text-[var(--color-muted)]" : ""}`}>
+                          {q.text}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
           <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">

@@ -57,6 +57,31 @@ scripts/migrate.mjs                     ← aplicador de migracions
 middleware.ts                           ← redirigeix a /login si no hi ha sessió
 ```
 
+## Compte de demostració
+
+Hi ha un segon usuari, `demo`, pensat per ensenyar l'aplicació a un client.
+És la mateixa app i les mateixes pàgines, però **totes les consultes van a una
+base de dades separada** (`DEMO_DATABASE_URL`) plena de dades fictícies, de
+manera que una demo no pot veure ni tocar les dades reals. Quan la sessió és
+`demo`, la barra de navegació mostra una etiqueta groga **DEMO**.
+
+Com funciona: `lib/db.ts` mira qui hi ha a la sessió abans de cada consulta i
+tria la connexió. Si `DEMO_DATABASE_URL` no està configurada, el login `demo`
+falla amb un error — mai no cau cap a la base de dades real.
+
+### Preparar-la (ja fet un cop; només cal repetir-ho si es vol refrescar)
+
+`.env.demo.local` conté el `DATABASE_URL` de la base de dades `demo`:
+
+```powershell
+npm run db:migrate:demo   # aplica l'esquema
+npm run db:seed:demo      # esborra i regenera les dades fictícies
+```
+
+El seed ancora les dates al dia que s'executa, així que tornar-lo a passar
+posa la Planificació al dia. Es nega a executar-se si el nom de la base de
+dades no conté "demo".
+
 ## Deploy a Vercel
 
 1. Push del repo a GitHub.
@@ -65,6 +90,8 @@ middleware.ts                           ← redirigeix a /login si no hi ha sess
    - `DATABASE_URL` (la mateixa de Neon)
    - `ADRI_PASSWORD`
    - `SESSION_PASSWORD`
+   - `DEMO_DATABASE_URL` (la base de dades `demo` del mateix projecte Neon)
+   - `DEMO_PASSWORD` (contrasenya del compte de demostració)
 4. Deploy.
 5. Després del primer deploy, executar `npm run db:migrate` amb la `DATABASE_URL` de producció (la mateixa connexió de Neon funciona des de qualsevol lloc).
 

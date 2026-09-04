@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/login/actions";
+import { getSession } from "@/lib/auth";
 
-export function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" }) {
+export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" }) {
+  const session = await getSession();
+  const isDemo = session.user === "demo";
+
   return (
     <header className="border-b border-[var(--color-line)] bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-6">
@@ -65,7 +69,15 @@ export function AppNav({ current }: { current?: "honoraris" | "parameters" | "ex
             Notes
           </Link>
         </nav>
-        <form action={logoutAction} className="ml-auto">
+        {isDemo && (
+          <span
+            title="Sessió de demostració — dades fictícies en una base de dades separada"
+            className="ml-auto shrink-0 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700"
+          >
+            Demo
+          </span>
+        )}
+        <form action={logoutAction} className={isDemo ? "shrink-0" : "ml-auto"}>
           <button className="text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)]" type="submit">
             Sortir
           </button>

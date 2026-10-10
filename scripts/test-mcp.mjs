@@ -61,6 +61,8 @@ globalThis.__fakeSql = async (text, params) => {
     db.writes.push({ text: q, params });
     return [];
   }
+  if (q.includes("match_expedients:number")) return params[0] === 7 && (params[1] === null || params[1] === "26") ? [EXPEDIENT] : [];
+  if (q.includes("match_expedients:text")) return params.every((w) => /casa|vila|girona/i.test(w)) ? [EXPEDIENT] : [];
   if (q.includes("from public.expedients e") && q.includes("where e.id = $1")) return params[0] === 7 ? [EXPEDIENT] : [];
   if (q.includes("from public.expedients e") && q.includes("where e.num_expedient = $1")) return params[0] === "26-0007" ? [EXPEDIENT] : [];
   if (q.includes("from public.expedients e")) return [{ ...EXPEDIENT, hores: "12.5" }];
@@ -333,6 +335,28 @@ await test("dac_change previews without writing, then saves once per idempotency
   const other = await rpc("tools/call", { name: "dac_change", arguments: { action: "delete_dedicacio", args: { id: 55 }, confirm: true, idempotency_key: key } });
   assert.equal(other.result.isError, true);
   assert.match(textOf(other), /create_dedicacio/);
+});
+await test("expedient references: short numbers and names resolve, unknown ones explain", async () => {
+  const data = await import("../src/lib/mcp/data.ts");
+  assert.deepEqual(data.parseExpedientRef("26-0120"), { kind: "number", yy: "26", n: 120 });
+  assert.deepEqual(data.parseExpedientRef("26-120"), { kind: "number", yy: "26", n: 120 });
+  assert.deepEqual(data.parseExpedientRef("26 0120"), { kind: "number", yy: "26", n: 120 });
+  assert.deepEqual(data.parseExpedientRef("260120"), { kind: "number", yy: "26", n: 120 });
+  assert.deepEqual(data.parseExpedientRef("exp. 120"), { kind: "number", yy: null, n: 120 });
+  assert.deepEqual(data.parseExpedientRef("120"), { kind: "number", yy: null, n: 120 });
+  assert.deepEqual(data.parseExpedientRef("Casa Vila"), { kind: "text", text: "Casa Vila" });
+  const viaShort = await data.resolveExpedient({ expedient_num: "26-7" });
+  assert.equal(viaShort.expedient?.id, 7);
+  const viaName = await data.resolveExpedient({ expedient_num: "casa vila" });
+  assert.equal(viaName.expedient?.id, 7);
+  const none = await data.resolveExpedient({ expedient_num: "Torre Eiffel" });
+  assert.equal(none.expedient, null);
+  assert.match(none.error, /No s'ha trobat cap expedient per «Torre Eiffel»/);
+});
+await test("a read that cannot resolve its reference comes back as an error", async () => {
+  const r = await rpc("tools/call", { name: "dac_read", arguments: { action: "get_expedient", args: { num: "Torre Eiffel" } } });
+  assert.equal(r.result.isError, true);
+  assert.match(textOf(r), /Torre Eiffel/);
 });
 await test("a preview with errors cannot be confirmed", async () => {
   db.writes.length = 0;

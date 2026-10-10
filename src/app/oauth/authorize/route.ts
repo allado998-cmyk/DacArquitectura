@@ -3,7 +3,7 @@
 // the client with an authorization code.
 import { getSession, isAppUser, passwordFor, type AppUser } from "@/lib/auth";
 import { resolveClient, type ResolvedClient } from "@/lib/mcp/clients";
-import { insertCode } from "@/lib/mcp/oauth-db";
+import { challengeAlreadyUsed, insertCode } from "@/lib/mcp/oauth-db";
 import { isAllowedRedirectUri, publicOrigin, randomToken, SCOPE } from "@/lib/mcp/oauth-core";
 
 export const runtime = "nodejs";
@@ -125,7 +125,7 @@ Cada canvi es previsualitza i només es desa quan el confirmes al xat.</p>`;
 
   if (sessionUser && !opts.forceLogin) {
     return html(`${intro}
-<form method="post" action="/oauth/authorize">${hidden(p)}<input type="hidden" name="mode" value="session">
+<form method="post" action="/oauth/authorize" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Connectant…';">${hidden(p)}<input type="hidden" name="mode" value="session">
 <div class="who">Sessió iniciada com a <strong>${esc(sessionUser)}</strong>${sessionUser === "demo" ? " (dades de demostració)" : ""}</div>
 ${err}
 <button type="submit">Autoritzar</button></form>
@@ -133,12 +133,21 @@ ${err}
   }
 
   return html(`${intro}
-<form method="post" action="/oauth/authorize">${hidden(p)}<input type="hidden" name="mode" value="password">
+<form method="post" action="/oauth/authorize" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Connectant…';">${hidden(p)}<input type="hidden" name="mode" value="password">
 <label for="usuari">Usuari</label><input id="usuari" type="text" name="usuari" autocomplete="username" required autofocus>
 <label for="password">Contrasenya</label><input id="password" type="password" name="password" autocomplete="current-password" required>
 ${err}
 <button type="submit">Entrar i autoritzar</button></form>
 <p class="muted">${cancel}</p>`);
+}
+
+// Shown when a sign-in page that was already completed is submitted or
+// reloaded: the client finished that sign-in, so a second code would only make
+// it report an error.
+function alreadyConnectedPage(client: ResolvedClient): Response {
+  const who = client.name ?? "L'aplicació";
+  return html(`<img src="/logo.jpg" alt="DAC arquitectura"><h1>Ja està connectat</h1>
+<p>${esc(who)} ja té accés a DacArquitectura. Pots tancar aquesta pestanya i tornar al xat.</p>`);
 }
 
 export async function GET(req: Request): Promise<Response> {
@@ -149,6 +158,7 @@ export async function GET(req: Request): Promise<Response> {
   p.redirect_uri = checked.redirectUri;
   const bad = checkRequest(p, checked.redirectUri);
   if (bad) return bad;
+  if (await challengeAlreadyUsed(checked.client.id, p.code_challenge)) return alreadyConnectedPage(checked.client);
 
   let sessionUser: AppUser | undefined;
   try {
@@ -187,6 +197,7 @@ export async function POST(req: Request): Promise<Response> {
   p.redirect_uri = checked.redirectUri;
   const bad = checkRequest(p, checked.redirectUri);
   if (bad) return bad;
+  if (await challengeAlreadyUsed(checked.client.id, p.code_challenge)) return alreadyConnectedPage(checked.client);
 
   let usuari: AppUser | undefined;
   const mode = String(form.get("mode") ?? "");

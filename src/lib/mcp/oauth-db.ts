@@ -47,6 +47,17 @@ export async function insertCode(row: {
     values (${sha256(row.code)}, ${row.client_id}, ${row.redirect_uri}, ${row.code_challenge}, ${row.usuari}, ${row.scope}, ${row.resource},
             now() + make_interval(secs => ${CODE_TTL_S}))
   `;
+  await db()`delete from public.mcp_oauth_code where created_at < now() - interval '2 days'`;
+}
+
+// True when this sign-in (same client and PKCE challenge) already produced a
+// code that the client exchanged: the page was submitted a second time.
+export async function challengeAlreadyUsed(clientId: string, codeChallenge: string): Promise<boolean> {
+  const rows = (await db()`
+    select 1 from public.mcp_oauth_code
+    where client_id = ${clientId} and code_challenge = ${codeChallenge} and used_at is not null limit 1
+  `) as unknown[];
+  return rows.length > 0;
 }
 
 export interface CodeRow {
@@ -59,10 +70,12 @@ export interface CodeRow {
   expired: boolean;
 }
 
-// Single use: the row is deleted as it is read.
+// Single use: the row is marked used as it is read, and a used code is never
+// returned again.
 export async function consumeCode(code: string): Promise<CodeRow | null> {
   const rows = (await db()`
-    delete from public.mcp_oauth_code where code_hash = ${sha256(code)}
+    update public.mcp_oauth_code set used_at = now()
+    where code_hash = ${sha256(code)} and used_at is null
     returning client_id, redirect_uri, code_challenge, usuari, scope, resource, (expires_at < now()) as expired
   `) as CodeRow[];
   return rows[0] ?? null;

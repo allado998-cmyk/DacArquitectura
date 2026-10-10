@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 import { createExpedientAction, updateExpedientAction, type ExpedientPatch } from "@/app/expedients/actions";
 import { todayIso } from "@/lib/format";
 import { id, isoDate, money, num, registerAction, round2, shortText, type Plan } from "../core";
-import { expedientLabel, findExpedient, lastInsertedId, resolveClient, findTipologia, type ExpedientRow } from "../data";
+import { expedientLabel, findExpedient, lastInsertedId, matchExpedients, parseExpedientRef, resolveClient, resolveExpedient, findTipologia, type ExpedientRow } from "../data";
 import { callAction } from "../shared";
 
 const CATEGORIA = z.enum(["re", "co", "ed", "rec", "do"]);
@@ -28,7 +28,10 @@ registerAction({
     limit: z.number().int().min(1).max(500).default(100),
   }),
   async run(a) {
-    const like = a.q ? `%${a.q.trim()}%` : null;
+    // A number in any usual form ("120", "26-120") narrows to those expedients.
+    const byNumber = a.q && parseExpedientRef(a.q).kind === "number" ? (await matchExpedients(a.q, 50)).map((c) => c.id) : null;
+    const like = a.q && !byNumber?.length ? `%${a.q.trim()}%` : null;
+    const ids = byNumber?.length ? byNumber : null;
     const rows = (await sql`
       select e.id, e.num_expedient, e.projecte, e.client_id, c.nom as client_nom, e.ciutat, e.estat, e.categoria,
              t.nom as tipologia_nom, e.tipus, e.direccio_obres, e.web, e.pressupost::text as pressupost,
@@ -42,8 +45,8 @@ registerAction({
         and (${a.categoria ?? null}::text is null or e.categoria = ${a.categoria ?? null})
         and (${a.tipus ?? null}::text is null or e.tipus = ${a.tipus ?? null})
         and (${a.client_id ?? null}::bigint is null or e.client_id = ${a.client_id ?? null})
-        and (${like}::text is null or e.num_expedient ilike ${like} or coalesce(e.projecte,'') ilike ${like}
-             or coalesce(c.nom,'') ilike ${like} or coalesce(e.ciutat,'') ilike ${like})
+        and (${ids}::bigint[] is null or e.id = any(${ids}::bigint[]))
+        and (${like}::text is null or public.dac_fold(concat_ws(' ', e.num_expedient, e.projecte, c.nom, e.ciutat)) like public.dac_fold(${like}))
       order by e.num_expedient desc
       limit ${a.limit}
     `) as Record<string, unknown>[];
@@ -56,10 +59,11 @@ registerAction({
   name: "get_expedient",
   domain: "expedients",
   description: "Fitxa completa d'un expedient (per id o número): dades, dedicacions, fites, factures i actes.",
-  schema: z.object({ id: id.optional(), num: shortText.optional().describe('Número, p. ex. "26-0012"') }).refine((v) => v.id || v.num, "Cal id o num"),
+  schema: z.object({ id: id.optional(), num: shortText.optional().describe('Número ("26-0120", "120") o part del nom del projecte o client') }).refine((v) => v.id || v.num, "Cal id o num"),
   async run(a) {
-    const e = await findExpedient({ id: a.id ?? null, num: a.num ?? null });
-    if (!e) return { error: "Expedient no trobat" };
+    const r = await resolveExpedient({ expedient_id: a.id ?? null, expedient_num: a.num ?? null });
+    if (!r.expedient) return { error: r.error ?? "Expedient no trobat." };
+    const e = r.expedient;
     const [dedicacions, fites, factures, actes, hores] = await Promise.all([
       sql`select id, to_char(data,'YYYY-MM-DD') as data, hores::text as hores, tasca, comentari
           from public.dedicacions where expedient_id = ${e.id} order by data desc, id desc limit 100`,
@@ -194,8 +198,9 @@ registerAction({
   notes: ["Per tancar: estat=tancat (+ data_tancament opcional, per defecte avui).", "Per desvincular un client o tipologia passa null."],
   schema: patchSchema.extend({ id: id.optional(), num: shortText.optional() }).refine((v) => v.id || v.num, "Cal id o num"),
   async plan(a): Promise<Plan> {
-    const e = await findExpedient({ id: a.id ?? null, num: a.num ?? null });
-    if (!e) return { summary: "Modificar expedient", errors: ["Expedient no trobat."] };
+    const r = await resolveExpedient({ expedient_id: a.id ?? null, expedient_num: a.num ?? null });
+    if (!r.expedient) return { summary: "Modificar expedient", errors: [r.error ?? "Expedient no trobat."] };
+    const e = r.expedient;
     const { id: _id, num: _num, ...patch } = a;
     void _id;
     void _num;
@@ -204,7 +209,7 @@ registerAction({
     return { summary: `Modificar ${expedientLabel(e)}: ${Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined).join(", ")}.`, details: { expedient_id: e.id, abans: pickCurrent(e, patch), despres: changes }, errors, warnings };
   },
   async commit(a, plan) {
-    const e = await findExpedient({ id: a.id ?? null, num: a.num ?? null });
+    const e = (await resolveExpedient({ expedient_id: a.id ?? null, expedient_num: a.num ?? null })).expedient;
     if (!e) throw new Error("Expedient no trobat.");
     const { id: _id, num: _num, ...patch } = a;
     void _id;

@@ -52,7 +52,7 @@ L'app no tenia cap proveïdor d'identitat (només iron-session amb dos usuaris, 
 - `/.well-known/oauth-protected-resource` (i la variant `/api/mcp`) diu que el recurs està protegit per aquest mateix origen.
 - `/.well-known/oauth-authorization-server` publica els endpoints, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]` i `client_id_metadata_document_supported: true`.
 - `POST /oauth/register`: registre dinàmic. Només clients públics amb PKCE; les `redirect_uris` han de ser `https` (o `http://localhost` per a eines locals).
-- `GET /oauth/authorize`: pantalla d'inici de sessió i consentiment. Si ja hi ha sessió al navegador, només cal prémer **Autoritzar**. El codi dura 10 minuts i és d'un sol ús.
+- `GET /oauth/authorize`: pantalla d'inici de sessió i consentiment. Si ja hi ha sessió al navegador, només cal prémer **Autoritzar**. El codi dura 10 minuts i és d'un sol ús (es marca `used_at`, no s'esborra). El botó es desactiva en clicar-lo, i si una pàgina ja completada (mateix client i mateix repte PKCE) es torna a enviar, mostra «Ja està connectat» en lloc de donar un codi nou: un segon codi fa que Claude mostri «La autorización con este conector falló» tot i que la connexió funciona.
 - `POST /oauth/token`: `authorization_code` (amb verificació PKCE) i `refresh_token`. Token d'accés de 30 dies; refresh d'un any, **no es rota** (un reintent perdut no pot deixar el client fora).
 - `POST /oauth/revoke`: revocació. Des de `/ai` també es poden revocar totes les connexions d'un client.
 
@@ -74,6 +74,17 @@ Cada acció de canvi té `plan()` (només llegeix: resol referències, valida, d
 2. `confirm=true` + `idempotency_key` → es reclama la clau a `mcp_usage` (única per usuari). Clau repetida: retorna el resultat guardat («JA FET») sense escriure. Clau en curs: demana reintentar. Clau d'una altra acció: error. Després torna a planificar (per si les dades han canviat) i només escriu si no hi ha errors.
 
 Les accions que la web implementa com a «substituir tota la fila» (expedients, factures, actes, capçalera d'honoraris) es fusionen amb la fila actual abans de cridar-les, perquè un canvi parcial no esborri res.
+
+## Trobar expedients i actes
+
+La gent no diu «26-0120»: diu «el 120», «26-120» o «la reforma del carrer Major». Allà on una acció rep `expedient_num` (i `num` a `get_expedient`), `resolveExpedient` (`data.ts`) accepta:
+
+- el número exacte; un número curt (`26-120`, `26 0120`, `260120`, `exp. 120`, `120`), que es compara pel comptador final, únic entre anys;
+- paraules del projecte, el client o la ciutat, totes presents, sense accents ni majúscules (`public.dac_fold`, migració 0041; «col·legi» = «collegi»).
+
+Si hi ha una sola coincidència es fa servir; si n'hi ha diverses, l'error les llista perquè l'assistent pregunti. `cerca` i `list_expedients` fan servir la mateixa lògica. `get_acta` accepta `AC-26-015`, `26-15` o `15`.
+
+Una lectura que no troba la referència torna com a error (no com a dades), i `mcp_usage` guarda els arguments de cada lectura i de cada `cerca` (estat `not_found` quan no troba res), per poder veure què es va demanar.
 
 ## Pressupost d'eines
 

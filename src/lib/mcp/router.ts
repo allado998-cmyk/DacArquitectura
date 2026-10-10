@@ -6,7 +6,8 @@ import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { sql } from "@/lib/db";
 import { actionDetail, actionMenu, actionNames, errorResult, getAction, textResult, type ToolText } from "./core";
-import { asUser, guard, GuardError, runChange, runRead } from "./shared";
+import { asUser, guard, GuardError, logUsage, runChange, runRead } from "./shared";
+import { matchExpedients } from "./data";
 import { addFitxerSchema } from "./tools/actes";
 
 async function safe(ctx: ServerContext, fn: (a: ReturnType<typeof guard>) => Promise<ToolText>): Promise<ToolText> {
@@ -32,22 +33,29 @@ export function registerRouter(server: McpServer): void {
     async ({ q }, ctx) =>
       safe(ctx, (a) =>
         asUser(a, async () => {
+          // Accent-insensitive "contains", plus expedient numbers in any usual form.
           const like = `%${q.trim()}%`;
-          const [expedients, clients, contactes, propostes, factures, actes] = await Promise.all([
-            sql`select e.id, e.num_expedient, e.projecte, c.nom as client_nom, e.ciutat, e.estat
-                from public.expedients e left join public.clients c on c.id = e.client_id
-                where e.num_expedient ilike ${like} or coalesce(e.projecte,'') ilike ${like} or coalesce(c.nom,'') ilike ${like} or coalesce(e.ciutat,'') ilike ${like}
-                order by e.num_expedient desc limit 15`,
-            sql`select id, nom, nif, ciutat from public.clients where nom ilike ${like} or coalesce(nif,'') ilike ${like} order by nom limit 10`,
+          const [byRef, clients, contactes, propostes, factures, actes] = await Promise.all([
+            matchExpedients(q, 15),
+            sql`select id, nom, nif, ciutat from public.clients
+                where public.dac_fold(concat_ws(' ', nom, nif, ciutat)) like public.dac_fold(${like}) order by nom limit 10`,
             sql`select k.id, k.nom, k.telefon, k.mail, c.nom as client_nom from public.client_contactes k left join public.clients c on c.id = k.client_id
-                where coalesce(k.nom,'') ilike ${like} or coalesce(k.mail,'') ilike ${like} or coalesce(k.telefon,'') ilike ${like} order by k.nom limit 10`,
+                where public.dac_fold(concat_ws(' ', k.nom, k.mail, k.telefon)) like public.dac_fold(${like}) order by k.nom limit 10`,
             sql`select d.id, d.num, d.descripcio, d.estat, c.nom as client_nom from public.proposta_doc d left join public.clients c on c.id = d.client_id
-                where d.num ilike ${like} or coalesce(d.descripcio,'') ilike ${like} or coalesce(c.nom,'') ilike ${like} order by d.num desc limit 10`,
+                where public.dac_fold(concat_ws(' ', d.num, d.descripcio, c.nom, d.adreca)) like public.dac_fold(${like}) order by d.num desc limit 10`,
             sql`select f.id, f.num, f.estat, f.concepte, c.nom as client_nom, f.preu::text as base, f.pagada from public.factura f left join public.clients c on c.id = f.client_id
-                where coalesce(f.num,'') ilike ${like} or coalesce(f.concepte,'') ilike ${like} or coalesce(c.nom,'') ilike ${like} order by f.num desc nulls last limit 10`,
-            sql`select a.id, a.num, a.tipus, to_char(a.data,'YYYY-MM-DD') as data, a.projecte from public.acta a
-                where coalesce(a.num,'') ilike ${like} or coalesce(a.projecte,'') ilike ${like} or coalesce(a.client,'') ilike ${like} order by a.data desc nulls last limit 10`,
+                where public.dac_fold(concat_ws(' ', f.num, f.concepte, c.nom)) like public.dac_fold(${like}) order by f.num desc nulls last limit 10`,
+            sql`select a.id, a.num, a.tipus, to_char(a.data,'YYYY-MM-DD') as data, e.num_expedient, a.projecte from public.acta a
+                left join public.expedients e on e.id = a.expedient_id
+                where public.dac_fold(concat_ws(' ', a.num, e.num_expedient, a.projecte, a.client, a.lloc)) like public.dac_fold(${like}) order by a.data desc nulls last limit 10`,
           ]);
+          const expedients = byRef.map((e) => ({ id: e.id, num_expedient: e.num_expedient, projecte: e.projecte, client_nom: e.client_nom, estat: e.estat }));
+          const counts = { expedients: expedients.length, clients: (clients as unknown[]).length, contactes: (contactes as unknown[]).length, propostes: (propostes as unknown[]).length, factures: (factures as unknown[]).length, actes: (actes as unknown[]).length };
+          void logUsage(a, "cerca", null, "done", { q, counts });
+          const total = Object.values(counts).reduce((s, n) => s + n, 0);
+          if (total === 0) {
+            return textResult(`Cap resultat per «${q}». Prova amb menys paraules, només el número de l'expedient (p. ex. "120") o una part del nom.`, { q, counts });
+          }
           return textResult(`Resultats per «${q}»`, { expedients, clients, contactes, propostes, factures, actes });
         }),
       ),

@@ -58,7 +58,7 @@ export function idFromRedirect(url: string | undefined): number | null {
 // Rows go to the acting user's database (the demo account logs to the demo
 // database), so these must run inside asUser().
 
-async function logUsage(a: ActionCtx, tool: string, action: string | null, status: string, result?: unknown) {
+export async function logUsage(a: ActionCtx, tool: string, action: string | null, status: string, result?: unknown) {
   try {
     await sql`
       insert into public.mcp_usage (usuari, client_id, tool, action, status, result)
@@ -109,13 +109,21 @@ export async function runRead(def: ReadAction, rawArgs: unknown, a: ActionCtx): 
   if (!parsed.success) {
     return errorResult(`Arguments invàlids per a ${def.name}. Consulta dac_actions(action="${def.name}").`, parsed.error.issues);
   }
+  // The args are logged (shortened) so a lookup that found nothing can be
+  // diagnosed later from mcp_usage.
+  const args = JSON.stringify(parsed.data).slice(0, 500);
   return asUser(a, async () => {
     try {
       const data = await def.run(parsed.data, a);
-      void logUsage(a, "dac_read", def.name, "done");
+      const notFound = data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : null;
+      if (notFound) {
+        void logUsage(a, "dac_read", def.name, "not_found", { args, error: notFound });
+        return errorResult(notFound);
+      }
+      void logUsage(a, "dac_read", def.name, "done", { args });
       return textResult(`OK ${def.name}`, data);
     } catch (e) {
-      void logUsage(a, "dac_read", def.name, "failed", { error: String(e) });
+      void logUsage(a, "dac_read", def.name, "failed", { args, error: String(e) });
       throw e;
     }
   });

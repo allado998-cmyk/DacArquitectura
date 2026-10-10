@@ -84,6 +84,27 @@ async function getActa(ref: { id?: number | null; num?: string | null }): Promis
   return rows[0] ?? null;
 }
 
+// "AC-26-015", "26-15", "26/015" or just "15" (the latest years first).
+async function resolveActaRef(raw: string): Promise<{ row: ActaRow | null; error?: string }> {
+  const s = raw.trim();
+  const exact = await getActa({ num: s.toUpperCase() });
+  if (exact) return { row: exact };
+  let m = /^(?:ac\s*-?\s*)?(\d{2})\s*[-/.\s]\s*(\d{1,3})$/i.exec(s);
+  if (m) {
+    const row = await getActa({ num: `AC-${m[1]}-${m[2].padStart(3, "0")}` });
+    return row ? { row } : { row: null, error: `No hi ha cap acta AC-${m[1]}-${m[2].padStart(3, "0")}.` };
+  }
+  m = /^(?:ac\s*-?\s*|acta\s*)?(\d{1,3})$/i.exec(s);
+  if (m) {
+    const rows = (await sql`
+      select a.id, a.num, to_char(a.data,'YYYY-MM-DD') as data, a.projecte from public.acta a
+      where a.num like ${`AC-%-${m[1].padStart(3, "0")}`} order by a.num desc limit 10`) as { id: number; num: string; data: string | null; projecte: string | null }[];
+    if (rows.length === 1) return { row: await getActa({ id: rows[0].id }) };
+    if (rows.length > 1) return { row: null, error: `Hi ha ${rows.length} actes amb el número ${m[1]}: ${rows.map((r) => `${r.num} (${r.data ?? "sense data"}) id ${r.id}`).join("; ")}. Pregunta quina és.` };
+  }
+  return { row: null, error: `No s'ha trobat cap acta «${s}». Fes servir list_actes per buscar-la.` };
+}
+
 const approxBytes = (chars: number) => Math.round(chars * 0.75);
 
 function actaLabel(a: { id: number; num: string | null; tipus: string; data: string | null; projecte?: string | null }): string {
@@ -471,10 +492,14 @@ registerAction({
   domain: "actes",
   description:
     "Contingut complet d'una acta (per id o número AC-YY-NNN): dades, assistents, temes per categoria amb responsables, propera visita, signatures i fitxers. Cada element de llista porta el seu index.",
-  schema: z.object({ id: id.optional(), num: shortText.optional() }).refine((v) => v.id || v.num, "Cal id o num"),
+  schema: z.object({ id: id.optional(), num: shortText.optional().describe('"AC-26-015", "26-15" o "15"') }).refine((v) => v.id || v.num, "Cal id o num"),
   async run(a) {
-    const row = await getActa({ id: a.id ?? null, num: a.num ?? null });
-    return row ? { acta: describeActa(row) } : { error: "Acta no trobada." };
+    if (a.id) {
+      const row = await getActa({ id: a.id });
+      return row ? { acta: describeActa(row) } : { error: `No hi ha cap acta amb id ${a.id}.` };
+    }
+    const r = await resolveActaRef(a.num ?? "");
+    return r.row ? { acta: describeActa(r.row) } : { error: r.error ?? "Acta no trobada." };
   },
 });
 

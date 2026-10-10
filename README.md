@@ -82,6 +82,18 @@ El seed ancora les dates al dia que s'executa, així que tornar-lo a passar
 posa la Planificació al dia. Es nega a executar-se si el nom de la base de
 dades no conté "demo".
 
+## Plugin de ChatGPT i Claude
+
+L'aplicació exposa un servidor MCP a `/api/mcp` amb OAuth propi, de manera que
+ChatGPT i Claude poden consultar i modificar expedients, dedicació, actes,
+honoraris, propostes, factures i notes en nom de l'usuari. Cada canvi es
+previsualitza al xat i només es desa quan l'usuari ho confirma.
+
+- Guia d'usuari (passos per connectar-lo i connexions actives): pàgina `/ai`.
+- Com està fet, fitxers i trampes: [docs/mcp.md](docs/mcp.md).
+- Tests sense base de dades: `npm run test:mcp`.
+- Variable opcional `APP_URL` per fixar l'origen públic si cal.
+
 ## Deploy a Vercel
 
 1. Push del repo a GitHub.

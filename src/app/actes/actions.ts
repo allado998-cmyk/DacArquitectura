@@ -176,7 +176,7 @@ export async function addActaFotoAction(id: number, dataUrl: string) {
 export async function removeActaFotoAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
-  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
 }
 export async function addActaDocAction(id: number, doc: ActaDoc) {
   await requireUser();
@@ -186,7 +186,7 @@ export async function addActaDocAction(id: number, doc: ActaDoc) {
 export async function removeActaDocAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
-  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
 }
 export async function addActaAudioAction(id: number, audio: ActaDoc) {
   await requireUser();
@@ -196,7 +196,7 @@ export async function addActaAudioAction(id: number, audio: ActaDoc) {
 export async function removeActaAudioAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
-  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) - ${index}, updated_at = now() where id = ${id}`;
+  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
 }
 
 // Link an existing (unlinked) acta to a dedicació — one dedicació = one acta.

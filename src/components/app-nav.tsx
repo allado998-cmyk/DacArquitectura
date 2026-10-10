@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/login/actions";
 import { getSession } from "@/lib/auth";
 
-export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" }) {
+export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" | "ai" }) {
   const session = await getSession();
   const isDemo = session.user === "demo";
 
@@ -67,6 +67,12 @@ export async function AppNav({ current }: { current?: "honoraris" | "parameters"
             className={`px-3 py-1.5 rounded-md ${current === "notes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Notes
+          </Link>
+          <Link
+            href="/ai"
+            className={`px-3 py-1.5 rounded-md ${current === "ai" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            IA
           </Link>
         </nav>
         {isDemo && (

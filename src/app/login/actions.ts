@@ -1,15 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getSession, type AppUser } from "@/lib/auth";
+import { getSession, isAppUser, passwordFor } from "@/lib/auth";
 
 // "demo" is a sandbox account: same app, separate database with fake data.
-function passwordFor(usuari: string): string | undefined {
-  if (usuari === "adri") return process.env.ADRI_PASSWORD;
-  if (usuari === "demo") return process.env.DEMO_PASSWORD;
-  return undefined;
-}
-
 export async function loginAction(formData: FormData): Promise<{ error?: string }> {
   const usuari = String(formData.get("usuari") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -20,12 +14,12 @@ export async function loginAction(formData: FormData): Promise<{ error?: string 
   }
 
   const expected = passwordFor(usuari);
-  if (!expected || password !== expected) {
+  if (!isAppUser(usuari) || !expected || password !== expected) {
     return { error: "Usuari o contrasenya incorrectes." };
   }
 
   const session = await getSession();
-  session.user = usuari as AppUser;
+  session.user = usuari;
   await session.save();
 
   redirect(next.startsWith("/") ? next : "/honoraris");

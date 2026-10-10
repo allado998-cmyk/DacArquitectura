@@ -124,7 +124,7 @@ function temaResponsablesInitials(t: ActaTema): string {
     : (t.responsable ? t.responsable.split(" & ").map((s) => s.trim()).filter(Boolean) : []);
   return list.map(nameInitials).filter(Boolean).join(" & ");
 }
-function actaSignatures(a: Acta): ActaSignatura[] {
+export function actaSignatures(a: Acta): ActaSignatura[] {
   if (a.signatures && a.signatures.length) return a.signatures;
   const out: ActaSignatura[] = [];
   if (a.sig_do != null) out.push({ titol: "Director d'obra", persona: a.sig_do ?? "" });

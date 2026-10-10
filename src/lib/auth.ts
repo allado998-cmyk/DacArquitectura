@@ -1,11 +1,25 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getIronSession, type SessionOptions } from "iron-session";
+import { getActingUser } from "@/lib/acting-user";
 
 // "adri" is the real account; "demo" is a read/write sandbox account that is
 // routed to a separate database (see lib/db.ts) so client demos never touch
 // real data.
 export type AppUser = "adri" | "demo";
+
+export const APP_USERS: readonly AppUser[] = ["adri", "demo"];
+
+export function isAppUser(value: unknown): value is AppUser {
+  return typeof value === "string" && (APP_USERS as readonly string[]).includes(value);
+}
+
+// Shared by the login form and the plugin's OAuth authorize page.
+export function passwordFor(usuari: string): string | undefined {
+  if (usuari === "adri") return process.env.ADRI_PASSWORD;
+  if (usuari === "demo") return process.env.DEMO_PASSWORD;
+  return undefined;
+}
 
 export interface SessionData {
   user?: AppUser;
@@ -29,6 +43,11 @@ export async function getSession() {
 }
 
 export async function requireUser(): Promise<AppUser> {
+  // A plugin (MCP) call names its user through the verified OAuth token, never
+  // through cookies — those would belong to OpenAI's or Anthropic's servers.
+  const acting = getActingUser();
+  if (acting) return acting;
+
   const session = await getSession();
   if (!session.user) redirect("/login");
   return session.user;
@@ -41,6 +60,9 @@ export async function requireUser(): Promise<AppUser> {
 const demoByCookie = new Map<string, boolean>();
 
 export async function isDemoSession(): Promise<boolean> {
+  const acting = getActingUser();
+  if (acting) return acting === "demo";
+
   let raw: string | undefined;
   try {
     raw = (await cookies()).get(sessionOptions.cookieName)?.value;

@@ -53,6 +53,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Notes</h2>
             <p className="text-sm text-[var(--color-muted)]">Bloc de notes lliure.</p>
           </Link>
+          <Link href="/ai" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Assistent d&apos;IA</h2>
+            <p className="text-sm text-[var(--color-muted)]">Connecta ChatGPT o Claude a l&apos;aplicació.</p>
+          </Link>
         </div>
       </main>
     </>

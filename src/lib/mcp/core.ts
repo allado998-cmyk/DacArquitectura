@@ -9,6 +9,8 @@ export type ActionKind = "read" | "change";
 export interface ActionCtx {
   user: AppUser;
   clientId: string;
+  // Public origin of the site (for links the assistant hands to the user).
+  origin?: string;
 }
 
 export interface Plan {

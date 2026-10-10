@@ -79,8 +79,9 @@ export default async function AiPage() {
               responsables (n&apos;hi ha prou amb les inicials), propera visita i signatures. També es pot partir d&apos;una acta anterior.
             </li>
             <li>
-              <strong>Fotos, PDF i àudios</strong> d&apos;una acta: a ChatGPT (web o escriptori) adjunta&apos;ls al xat; l&apos;app de mòbil de ChatGPT i Claude
-              no passen fitxers al plugin, així que allà cal un enllaç públic. Les fotos es redueixen com a la web.
+              <strong>Fotos, PDF i àudios</strong> d&apos;una acta: demana a l&apos;assistent «vull pujar fotos a l&apos;acta…» i et donarà un enllaç privat.
+              Obre&apos;l al mòbil o a l&apos;ordinador, fes o tria les fotos i s&apos;afegeixen a l&apos;acta, reduïdes com a la web. No cal iniciar sessió:
+              l&apos;enllaç només serveix per a aquella acta i caduca en 24 hores. A ChatGPT web o d&apos;escriptori també pots adjuntar-les directament al xat.
             </li>
             <li>Tot passa pel mateix codi que fa servir la web, amb el teu usuari. El compte <strong>demo</strong> treballa sobre la base de dades de demostració.</li>
             <li>No es poden esborrar expedients, clients, factures, propostes ni actes des del xat.</li>

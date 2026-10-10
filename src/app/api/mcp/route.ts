@@ -5,7 +5,7 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { registerAll, SERVER_INSTRUCTIONS, SERVER_NAME, SERVER_VERSION } from "@/lib/mcp";
 import { findLiveToken, touchToken } from "@/lib/mcp/oauth-db";
-import { SCOPE } from "@/lib/mcp/oauth-core";
+import { publicOrigin, SCOPE } from "@/lib/mcp/oauth-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ async function verifyToken(req: Request, bearer?: string): Promise<AuthInfo | un
     clientId: row.client_id,
     scopes: [row.scope ?? SCOPE],
     expiresAt: Math.floor(row.expires_at_s),
-    extra: { usuari: row.usuari, clientName: row.client_name },
+    extra: { usuari: row.usuari, clientName: row.client_name, origin: publicOrigin(req) },
   };
 }
 

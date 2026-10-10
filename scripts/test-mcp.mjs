@@ -233,9 +233,25 @@ await test("downloads refuse non-https, IP literals and local hosts", async () =
   }
 });
 
+console.log("upload links");
+await test("an upload link names one user and one acta; tampered links and login cookies are refused", async () => {
+  const ul = await import("../src/lib/upload-link.ts");
+  const { sealData } = await import("iron-session");
+  const { sessionOptions } = await import("../src/lib/auth.ts");
+  const t = await ul.createActaUploadToken("demo", 42);
+  assert.deepEqual(await ul.readActaUploadToken(t), { user: "demo", actaId: 42 });
+  const flipped = t.slice(0, 40) + (t[40] === "A" ? "B" : "A") + t.slice(41);
+  assert.equal(await ul.readActaUploadToken(flipped), null);
+  assert.equal(await ul.readActaUploadToken("garbage"), null);
+  const cookie = await sealData({ user: "adri" }, { password: sessionOptions.password });
+  assert.equal(await ul.readActaUploadToken(cookie), null, "a login cookie is not an upload link");
+  assert.match(ul.actaUploadUrl("https://x.example/", t), /^https:\/\/x\.example\/pujar\/Fe26/);
+});
+
 console.log("shared");
 await test("guard takes the user only from the verified token", () => {
-  assert.deepEqual(shared.guard({ http: { authInfo: { token: "t", clientId: "c1", scopes: [], extra: { usuari: "demo" } } } }), { user: "demo", clientId: "c1" });
+  assert.deepEqual(shared.guard({ http: { authInfo: { token: "t", clientId: "c1", scopes: [], extra: { usuari: "demo" } } } }), { user: "demo", clientId: "c1", origin: undefined });
+  assert.equal(shared.guard({ http: { authInfo: { token: "t", clientId: "c1", scopes: [], extra: { usuari: "adri", origin: "https://x.example" } } } }).origin, "https://x.example");
   assert.throws(() => shared.guard({ http: { authInfo: { token: "t", clientId: "c1", scopes: [], extra: { usuari: "root" } } } }), shared.GuardError);
   assert.throws(() => shared.guard({}), shared.GuardError);
 });

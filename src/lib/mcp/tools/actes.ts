@@ -41,6 +41,7 @@ import {
   type TemaInput,
 } from "../acta-plan";
 import { mb, prepareFile, type MediaKind } from "../media";
+import { actaUploadUrl, createActaUploadToken, UPLOAD_LINK_TTL_S } from "@/lib/upload-link";
 import type { Acta, ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
 
 // Reading an acta ----------------------------------------------------------------
@@ -531,13 +532,46 @@ registerAction({
   },
 });
 
+registerAction({
+  kind: "read",
+  name: "acta_enllac_fotos",
+  domain: "actes",
+  description:
+    "Enllaç privat (24 h) perquè l'usuari pugi fotos, PDF o àudios a una acta des del mòbil o l'ordinador. És la manera d'afegir fotos des de Claude i des de l'app mòbil de ChatGPT.",
+  notes: [
+    "Dona l'enllaç a l'usuari tal qual; no cal que iniciï sessió. Només permet afegir fitxers a aquesta acta.",
+    "Quan l'usuari digui que ja ha pujat les fotos, comprova-ho amb get_acta (llista fotografies).",
+  ],
+  schema: z.object({ id: id.optional(), num: shortText.optional().describe('"AC-26-015", "26-15" o "15"') }).refine((v) => v.id || v.num, "Cal id o num"),
+  async run(a, ctx) {
+    let row: ActaRow | null;
+    if (a.id) row = await getActa({ id: a.id });
+    else {
+      const r = await resolveActaRef(a.num ?? "");
+      if (!r.row) return { error: r.error ?? "Acta no trobada." };
+      row = r.row;
+    }
+    if (!row) return { error: `No hi ha cap acta amb id ${a.id}.` };
+    const origin = ctx.origin ?? process.env.APP_URL;
+    if (!origin) return { error: "No es pot generar l'enllaç: falta l'adreça pública del lloc (APP_URL)." };
+    const token = await createActaUploadToken(ctx.user, row.id);
+    return {
+      acta: actaLabel(row),
+      enllac: actaUploadUrl(origin, token),
+      caduca_en_hores: UPLOAD_LINK_TTL_S / 3600,
+      fotografies_actuals: row.fotos_chars.length,
+      per_a_l_assistent: "Dona aquest enllaç a l'usuari tal qual. Quan digui que ja ha acabat, comprova les fotos amb get_acta.",
+    };
+  },
+});
+
 // Changes ------------------------------------------------------------------------------
 
 const FIELD_NOTES = [
   "tipus (motiu): visita | reunio | coordinacio | altres.",
   "Temes: categoria pendent | executat | tractat, titol, text i responsables (noms o inicials d'assistents, p. ex. \"DL\"; es resolen al nom complet).",
   "Llistes (assistents, temes, signatures): passa la llista sencera per substituir-la, o bé afegir_*, modificar_* [{index, …camps}] i treure_* [index]. Els index són els de get_acta.",
-  "Fotos, PDF i àudios: eina acta_afegir_fitxer (o acció add_acta_fitxer amb url).",
+  "Fotos, PDF i àudios: acta_enllac_fotos (enllaç perquè l'usuari les pugi; funciona a tot arreu) o l'eina acta_afegir_fitxer (fitxer adjunt a ChatGPT web/escriptori, o url pública).",
 ];
 
 registerAction({
@@ -766,13 +800,13 @@ function sourceOf(a: AddFitxer): { url: string } | { error: string } {
   if (a.fitxer) {
     if (!a.fitxer.download_url) {
       return {
-        error: `El fitxer no ha arribat (${a.fitxer.file_id}). L'app de ChatGPT del mòbil no passa els fitxers a les eines: fes-ho des de ChatGPT web o d'escriptori, o passa un enllaç https.`,
+        error: `El fitxer no ha arribat (${a.fitxer.file_id}). L'app de ChatGPT del mòbil no passa els fitxers a les eines: fes servir dac_read acta_enllac_fotos i dona a l'usuari l'enllaç per pujar-los.`,
       };
     }
     return { url: a.fitxer.download_url };
   }
   if (a.url) return { url: a.url.trim() };
-  return { error: "Cal adjuntar el fitxer (fitxer) o passar-ne un enllaç https públic (url). A Claude, les fotos del xat no arriben a les eines: cal un enllaç." };
+  return { error: "No ha arribat cap fitxer. A Claude i a l'app mòbil de ChatGPT les fotos del xat no arriben a les eines: fes servir dac_read acta_enllac_fotos i dona a l'usuari l'enllaç per pujar-les." };
 }
 
 registerAction({
@@ -782,6 +816,7 @@ registerAction({
   description: "Afegeix una foto, un PDF o un àudio a una acta, des d'un fitxer adjunt a ChatGPT o d'un enllaç https públic.",
   notes: [
     "Per a fitxers adjunts al xat de ChatGPT fes servir l'eina acta_afegir_fitxer (passa el fitxer a «fitxer»). Aquí només funciona amb url.",
+    "Si l'usuari té les fotos al mòbil o fa servir Claude, fes servir acta_enllac_fotos: li dona un enllaç per pujar-les ell mateix.",
     "Les fotos es redueixen a 1600 px en JPEG com fa la web; apareixen al final del document. Els àudios no s'imprimeixen.",
   ],
   schema: addFitxerSchema,

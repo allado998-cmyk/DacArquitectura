@@ -6,8 +6,9 @@ const PUBLIC_PATHS = ["/login"];
 
 // The ChatGPT / Claude plugin: the MCP endpoint, OAuth discovery and the OAuth
 // endpoints must never be redirected to /login (the clients would break). They
-// carry their own authentication (Bearer tokens, PKCE).
-const PUBLIC_PREFIXES = ["/api/mcp", "/.well-known/", "/oauth/"];
+// carry their own authentication (Bearer tokens, PKCE). /pujar/<token> is the
+// acta upload page; its sealed token is the credential (src/lib/upload-link.ts).
+const PUBLIC_PREFIXES = ["/api/mcp", "/.well-known/", "/oauth/", "/pujar/"];
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;

@@ -22,7 +22,8 @@ export function guard(ctx: ServerContext): ActionCtx {
   const info = ctx.http?.authInfo;
   const usuari = info?.extra?.usuari;
   if (!info || !isAppUser(usuari)) throw new GuardError("Sessió no vàlida: torna a connectar el plugin.");
-  return { user: usuari, clientId: info.clientId };
+  const origin = typeof info.extra?.origin === "string" ? info.extra.origin : undefined;
+  return { user: usuari, clientId: info.clientId, origin };
 }
 
 export function asUser<T>(a: ActionCtx, fn: () => Promise<T>): Promise<T> {

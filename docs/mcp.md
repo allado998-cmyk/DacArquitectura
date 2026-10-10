@@ -104,6 +104,14 @@ Tot el que es pot fer a l'editor d'una acta es pot fer des del xat:
 
 ### Fotos, PDF i àudios
 
+**La via principal és l'enllaç de pujada.** Claude no passa mai les imatges del xat a les eines, i les apps de mòbil de ChatGPT tampoc. Per això `acta_enllac_fotos` (lectura) retorna un enllaç `/pujar/<token>`:
+
+- El token és un segell d'iron-session (mateix secret que la cookie de sessió, `src/lib/upload-link.ts`) amb `{usuari, acta}` i 24 h de vida. No es pot fer servir com a cookie ni a l'inrevés, i no dona accés a res més que a afegir fitxers a aquella acta.
+- La pàgina (`src/app/pujar/[token]/`) és pública al middleware i funciona sense iniciar sessió. Mostra l'acta, un botó gran «Fer o triar fotos» i botons per a PDF i àudio. Les fotos es redueixen al navegador igual que a l'editor (1600 px, JPEG 0,72) i es pugen una a una a `POST /pujar/<token>/upload`.
+- El servidor torna a comprovar el tipus pels primers bytes, converteix a JPEG amb `sharp` el que no ho sigui o passi d'1,2 MB, i desa amb les mateixes accions de l'editor, com l'usuari del token (el demo va a la base de dades demo). Límit per fitxer: uns 3 MB codificats, per sota dels 4,5 MB que Vercel accepta per petició.
+
+A ChatGPT web o d'escriptori també funciona l'eina directa:
+
 `acta_afegir_fitxer` és una eina visible pròpia perquè ChatGPT només omple els fitxers adjunts en arguments de primer nivell marcats a `_meta["openai/fileParams"]`. ChatGPT envia `{download_url, file_id, mime_type, file_name}`; les apps de mòbil envien un text `chat_upload…` i l'eina explica que cal fer-ho des de la web o l'escriptori. Qualsevol client pot passar `url` (enllaç https públic); a Claude és l'única manera, perquè no passa imatges del xat a les eines.
 
 - Baixada: només https, sense credencials ni port, domini que no resolgui a adreces privades (es comprova a cada redirecció, màxim 3), 20 s i 25 MB.

@@ -127,7 +127,7 @@ export function registerRouter(server: McpServer): void {
     {
       title: "Afegir foto o fitxer a una acta",
       description:
-        "Afegeix a una acta una foto, un PDF o un àudio adjuntat al xat (fitxer) o des d'un enllaç https públic (url). Igual que dac_change: primer confirm=false (previsualització), després confirm=true amb la idempotency_key suggerida.",
+        "Afegeix a una acta una foto, un PDF o un àudio adjuntat al xat de ChatGPT (fitxer) o des d'un enllaç https públic (url). Si el fitxer no arriba (Claude, app mòbil), fes servir dac_read acta_enllac_fotos per donar a l'usuari un enllaç de pujada. Igual que dac_change: primer confirm=false, després confirm=true amb la idempotency_key suggerida.",
       inputSchema: addFitxerSchema.extend({
         confirm: z.boolean().default(false),
         idempotency_key: z.string().min(6).max(128).optional(),

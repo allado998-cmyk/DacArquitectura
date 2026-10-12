@@ -185,6 +185,10 @@ export interface Expedient {
   data_inici: string | null; // ISO date, planning start
   data_final: string | null; // ISO date, forecast end (not the close date)
   data_tancament: string | null; // ISO date, set when closed
+  adreca: string | null; // street address of the works
+  maps_url: string | null; // Google Maps link (or "lat, lng")
+  lat: number | null; // filled in from maps_url or by geocoding adreca
+  lng: number | null;
   created_at: string;
   updated_at: string;
 }

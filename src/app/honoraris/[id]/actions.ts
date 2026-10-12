@@ -110,6 +110,21 @@ export async function updateDespesaDirectaLineAction(
   revalidatePath(`/honoraris/${propostaId}`);
 }
 
+// Line prices are frozen when a line is added, so editing the catalogue does
+// not change existing càlculs. This applies the current Base de Dades €/hora
+// to every Despesa Directa line of one càlcul, on request.
+export async function applyCatalogPreuHoraAction(propostaId: number) {
+  await requireUser();
+  if (!Number.isFinite(propostaId)) return;
+  await sql`
+    update public.proposta_despesa_directa_line l
+    set preu_hora = c.preu_hora_default
+    from public.concepte_despesa_directa c
+    where c.id = l.concepte_id and l.proposta_id = ${propostaId}
+  `;
+  revalidatePath(`/honoraris/${propostaId}`);
+}
+
 export async function deleteDespesaDirectaLineAction(propostaId: number, lineId: number) {
   await requireUser();
   await sql`delete from public.proposta_despesa_directa_line where id = ${lineId} and proposta_id = ${propostaId}`;

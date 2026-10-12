@@ -136,7 +136,23 @@ export function actaSignatures(a: Acta): ActaSignatura[] {
 
 export interface RenderedDoc { name: string; pages: string[] }
 
-export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg", renderedDocs?: RenderedDoc[]): string {
+export interface FotoSize { w: number; h: number }
+
+// Landscape photos are printed at most 15 cm wide, so two of them fit on one
+// A4 page; portrait photos keep the previous size (one per page).
+const WIDE_FOTO_CM = 15;
+const PX_PER_CM = 96 / 2.54;
+function fotoImg(src: string, size: FotoSize | undefined): string {
+  if (size && size.w > 0 && size.h > 0 && size.w >= size.h) {
+    const wPx = Math.round(WIDE_FOTO_CM * PX_PER_CM);
+    const hPx = Math.round((wPx * size.h) / size.w);
+    const hCm = ((WIDE_FOTO_CM * size.h) / size.w).toFixed(2);
+    return `<img src="${src}" width="${wPx}" height="${hPx}" style="width:${WIDE_FOTO_CM}cm;height:${hCm}cm;max-width:100%;" />`;
+  }
+  return `<img src="${src}" width="640" style="max-width:100%;height:auto;" />`;
+}
+
+export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg", renderedDocs?: RenderedDoc[], fotoSizes?: FotoSize[]): string {
   const t = TXT[lang];
   const grey = "#7a7a72";
   const bd = "1px solid #c9c9c9";
@@ -225,10 +241,11 @@ export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.j
   // ignores empty height divs, so it needs real content + mso break type).
   const pageBreakEl = `<div style="page-break-before:always;break-before:page;mso-break-type:page-break;height:0;line-height:0;font-size:1px;">&nbsp;</div>`;
 
-  // Fotografies — start on a new page; each image one by one, full width.
+  // Fotografies — start on a new page; one under another, landscape ones at
+  // 15 cm wide so two fit per page (see fotoImg).
   const fotos = a.fotografies ?? [];
   const fotosSection = fotos.length
-    ? `${pageBreakEl}${bar(t.fotografies)}${fotos.map((src) => `<div style="margin-top:10px;page-break-inside:avoid;text-align:center;"><img src="${src}" width="640" style="max-width:100%;height:auto;" /></div>`).join("")}`
+    ? `${pageBreakEl}${bar(t.fotografies)}${fotos.map((src, i) => `<div style="margin-top:8px;page-break-inside:avoid;text-align:center;">${fotoImg(src, fotoSizes?.[i])}</div>`).join("")}`
     : "";
 
   // Documents adjunts — start on a new page. If the PDFs have been rasterised,
@@ -318,6 +335,19 @@ async function rasterizePdf(dataUrl: string, scale = 1.6): Promise<string[]> {
   }
 }
 
+function imageSize(src: string): Promise<FotoSize | undefined> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve(undefined);
+    img.src = src;
+  });
+}
+
+async function fotoSizesOf(a: Acta): Promise<(FotoSize | undefined)[]> {
+  return Promise.all((a.fotografies ?? []).map(imageSize));
+}
+
 async function renderActaDocs(a: Acta): Promise<RenderedDoc[]> {
   const out: RenderedDoc[] = [];
   for (const d of a.documents ?? []) {
@@ -326,16 +356,17 @@ async function renderActaDocs(a: Acta): Promise<RenderedDoc[]> {
   return out;
 }
 
-export async function openActaPdf(a: Acta, lang: ActaLang = "ca") {
+export async function openActaPdf(a: Acta, lang: ActaLang = "ca", fileName?: string) {
   // Open the window synchronously (within the click) to dodge popup blockers.
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
   w.document.write("<!DOCTYPE html><html><body style='font-family:sans-serif;padding:24px;color:#555;'>Generant document…</body></html>");
   const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
-  const renderedDocs = await renderActaDocs(a);
-  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>
+  const [renderedDocs, sizes] = await Promise.all([renderActaDocs(a), fotoSizesOf(a)]);
+  // The title is what the browser proposes as the file name when saving as PDF.
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName ?? a.num ?? "Acta")}</title>
     <style>@page { size: A4 portrait; margin: 1.3cm; } *{-webkit-print-color-adjust:exact;print-color-adjust:exact;} body{margin:0;}</style>
-    </head><body>${buildActaHtml(a, lang, logo, renderedDocs)}</body></html>`;
+    </head><body>${buildActaHtml(a, lang, logo, renderedDocs, sizes as FotoSize[])}</body></html>`;
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -359,16 +390,16 @@ async function logoDataUri(): Promise<string> {
   }
 }
 
-export async function downloadActaWord(a: Acta, lang: ActaLang = "ca") {
+export async function downloadActaWord(a: Acta, lang: ActaLang = "ca", fileName?: string) {
   const logo = await logoDataUri();
-  const renderedDocs = await renderActaDocs(a);
+  const [renderedDocs, sizes] = await Promise.all([renderActaDocs(a), fotoSizesOf(a)]);
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo, renderedDocs)}</body></html>`;
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName ?? a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo, renderedDocs, sizes as FotoSize[])}</body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${a.num ?? "acta"}.doc`;
+  link.download = `${fileName ?? a.num ?? "acta"}.doc`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

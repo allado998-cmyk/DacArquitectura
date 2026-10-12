@@ -26,6 +26,7 @@ import type {
 import { formatEur } from "@/lib/format";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { buildPropostaHtml, buildWordDoc, DOC_FONT, FIXED_EXCLUSIONS, FIXED_INCLUSIONS, PROFESSIONAL, type DocData, type Lang } from "@/lib/proposta-doc";
+import { propostaFileName } from "@/lib/file-names";
 
 export interface CalculOption {
   id: number;
@@ -93,6 +94,10 @@ export function PropostaEditView({
     sub: c.client_nom ?? undefined,
   }));
 
+  function escTitle(t: string) {
+    return t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  }
+
   function logoUrl() {
     return typeof window !== "undefined" ? `${window.location.origin}/logo.jpg` : "/logo.jpg";
   }
@@ -103,7 +108,7 @@ export function PropostaEditView({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Proposta_${doc.num}_${lang}.doc`;
+    a.download = `${propostaFileName(doc.num, data.descripcio)}.doc`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -113,7 +118,7 @@ export function PropostaEditView({
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
     w.document.write(
-      `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${doc.num}</title>` +
+      `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${escTitle(propostaFileName(doc.num, data.descripcio))}</title>` +
         `<style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}body,table,td,th,tr,div,span,p,strong,em,ul,li{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${body}</body></html>`,
     );
     w.document.close();

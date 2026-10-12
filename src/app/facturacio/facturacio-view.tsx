@@ -22,6 +22,7 @@ import { ChartCard, GradientDonut, HBarChart, KpiCard, lighten } from "@/compone
 import { CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
 import { openStatsPdf } from "@/lib/pdf";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
+import { facturaFileName } from "@/lib/file-names";
 
 export interface ClientOpt { id: number; nom: string; nif: string | null; carrer: string | null; ciutat: string | null; codi_postal: string | null }
 export interface ExpedientOpt { id: number; num_expedient: string; projecte: string | null; pressupost: string }
@@ -796,14 +797,17 @@ function FacturaForm({
     // Force Century Gothic everywhere; print-color-adjust keeps the grey section
     // stripes (and any fills) when the user saves to PDF.
     const headStyle = `<style>@page{size:A4;margin:1.6cm;}html,body{margin:0;}body,table,td,th,tr,div,span,p,strong,em{font-family:${FACTURA_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-    const doc = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>Factura ${esc(num || String(factura.id))}</title>${headStyle}</head><body>${body}</body></html>`;
+    // "FE72.01-08 Model de Factura-<número>-<concepte>". The title is what the
+    // browser proposes as the file name when saving as PDF.
+    const fileName = facturaFileName(num, concepte);
+    const doc = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${headStyle}</head><body>${body}</body></html>`;
 
     if (mode === "word") {
       const blob = new Blob(["﻿", doc], { type: "application/msword" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Factura_${(num || String(factura.id)).replace(/[^\w-]/g, "")}_${lang}.doc`;
+      a.download = `${fileName}.doc`;
       a.click();
       URL.revokeObjectURL(url);
       return;

@@ -98,6 +98,17 @@ export async function deleteClientContacteAction(id: number) {
   revalidatePath("/parameters");
 }
 
+// Saves the order of a client's contacts (ids in the new order).
+export async function reorderClientContactesAction(clientId: number, ids: number[]) {
+  await requireUser();
+  if (!Number.isFinite(clientId) || !Array.isArray(ids)) return;
+  for (let i = 0; i < ids.length; i++) {
+    if (!Number.isFinite(ids[i])) continue;
+    await sql`update public.client_contactes set ordre = ${(i + 1) * 10} where id = ${ids[i]} and client_id = ${clientId}`;
+  }
+  revalidatePath("/parameters");
+}
+
 // Standalone contact (no client required).
 export async function createContacteAction(data: { nom: string; telefon: string; mail: string; comentari?: string; clientId?: number | null }) {
   await requireUser();

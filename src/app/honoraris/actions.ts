@@ -56,6 +56,39 @@ export async function deletePropostaAction(formData: FormData) {
   redirect("/honoraris");
 }
 
+// Copies a càlcul (header, ITE fields and every line) with a new number and
+// today's date, then opens the copy.
+export async function duplicatePropostaAction(formData: FormData) {
+  await requireUser();
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id)) return;
+  const num = await nextNumProposta();
+  const rows = (await sql`
+    insert into public.propostes
+      (num_proposta, data, client_id, contacte_prescriptor, preu_hora_default, despeses_indirectes, benefici,
+       total_honoraris_override, projecte, despeses_indirectes_pct, benefici_pct, es_ite,
+       ut_habitatges, ut_locals_200, ut_locals_400, ut_locals_600, ut_locals_800, ut_locals_1000,
+       ite_descompte_pct, ite_iva_pct, ite_comissio_activa, ite_comissio_pct)
+    select ${num}, current_date, client_id, contacte_prescriptor, preu_hora_default, despeses_indirectes, benefici,
+       total_honoraris_override, projecte, despeses_indirectes_pct, benefici_pct, es_ite,
+       ut_habitatges, ut_locals_200, ut_locals_400, ut_locals_600, ut_locals_800, ut_locals_1000,
+       ite_descompte_pct, ite_iva_pct, ite_comissio_activa, ite_comissio_pct
+    from public.propostes where id = ${id}
+    returning id
+  `) as { id: number }[];
+  const newId = rows[0]?.id;
+  if (!newId) return;
+  await sql`
+    insert into public.proposta_despesa_directa_line (proposta_id, concepte_id, hores, preu_hora, ordre)
+    select ${newId}, concepte_id, hores, preu_hora, ordre from public.proposta_despesa_directa_line where proposta_id = ${id}
+  `;
+  await sql`
+    insert into public.proposta_altra_despesa_line (proposta_id, concepte_id, unitats, preu_unitat, ordre)
+    select ${newId}, concepte_id, unitats, preu_unitat, ordre from public.proposta_altra_despesa_line where proposta_id = ${id}
+  `;
+  redirect(`/honoraris/${newId}`);
+}
+
 // A "càlcul ITE" — uses the Relació d'entitats table instead of despeses.
 export async function createIteAction() {
   await requireUser();

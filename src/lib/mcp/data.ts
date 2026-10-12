@@ -13,6 +13,7 @@ const EXPEDIENT_COLS = `
   to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
   to_char(e.data_final, 'YYYY-MM-DD') as data_final,
   to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,
+  e.adreca, e.maps_url, e.lat, e.lng,
   e.created_at, e.updated_at`;
 
 export async function findExpedient(ref: { id?: number | null; num?: string | null }): Promise<ExpedientRow | null> {

@@ -13,6 +13,7 @@ import {
   updateTascaAction,
   deleteClientAction,
   deleteClientContacteAction,
+  reorderClientContactesAction,
   deleteConcepteAltraAction,
   deleteConcepteDirectaAction,
   deleteTascaAction,
@@ -686,20 +687,53 @@ function ClientForm({
 
 function ClientContactesSection({ client, contactes, onDeleted }: { client: Client; contactes: ClientContacte[]; onDeleted: () => void }) {
   const [, startTransition] = useTransition();
+  // Local order while a reorder is being saved; reset whenever the server
+  // sends the list again (it comes back sorted by the saved order).
+  const [order, setOrder] = useState<number[] | null>(null);
+  const idsKey = contactes.map((c) => c.id).join(",");
+  useEffect(() => setOrder(null), [idsKey]);
+  const list = order
+    ? [...order.map((id) => contactes.find((c) => c.id === id)).filter((c): c is ClientContacte => !!c), ...contactes.filter((c) => !order.includes(c.id))]
+    : contactes;
+
+  function saveOrder(next: ClientContacte[]) {
+    const ids = next.map((c) => c.id);
+    setOrder(ids);
+    startTransition(() => reorderClientContactesAction(client.id, ids));
+  }
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    saveOrder(next);
+  }
+  function sortAZ() {
+    saveOrder([...list].sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "ca", { sensitivity: "base" })));
+  }
+
   return (
     <div className="border-t border-[var(--color-line)] pt-5">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
-        <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => startTransition(() => addClientContacteAction(client.id))}>
-          + Afegir contacte
-        </button>
+        <div className="flex items-center gap-1">
+          {list.length > 1 && (
+            <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={sortAZ} title="Ordenar els contactes per nom">
+              Ordenar A–Z
+            </button>
+          )}
+          <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => startTransition(() => addClientContacteAction(client.id))}>
+            + Afegir contacte
+          </button>
+        </div>
       </div>
-      {contactes.length === 0 ? (
+      {list.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">Cap contacte encara.</p>
       ) : (
         <div className="space-y-2">
-          {contactes.map((ct) => (
-            <ContacteRow key={ct.id} row={ct} />
+          {list.length > 1 && <p className="text-xs text-[var(--color-muted)]">Fes servir les fletxes per canviar l&apos;ordre.</p>}
+          {list.map((ct, i) => (
+            <ContacteRow key={ct.id} row={ct} onUp={i > 0 ? () => move(i, -1) : undefined} onDown={i < list.length - 1 ? () => move(i, 1) : undefined} />
           ))}
         </div>
       )}
@@ -731,7 +765,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function ContacteRow({ row }: { row: ClientContacte }) {
+function ContacteRow({ row, onUp, onDown }: { row: ClientContacte; onUp?: () => void; onDown?: () => void }) {
   const [nom, setNom] = useState(row.nom ?? "");
   const [telefon, setTelefon] = useState(row.telefon ?? "");
   const [mail, setMail] = useState(row.mail ?? "");
@@ -749,9 +783,11 @@ function ContacteRow({ row }: { row: ClientContacte }) {
       <input className="input sm:col-span-3" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
       <input className="input sm:col-span-2" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
       <input className="input sm:col-span-3" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-3" placeholder="Comentari (opcional)" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} />
-      <div className="sm:col-span-1 text-right">
-        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }}>
+      <input className="input sm:col-span-2" placeholder="Comentari (opcional)" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} />
+      <div className="sm:col-span-2 flex items-center justify-end gap-1">
+        <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={onUp} disabled={!onUp} title="Pujar" aria-label="Pujar">↑</button>
+        <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={onDown} disabled={!onDown} title="Baixar" aria-label="Baixar">↓</button>
+        <button type="button" className="ml-1 text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }} aria-label="Eliminar">
           ✕
         </button>
       </div>

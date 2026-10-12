@@ -82,6 +82,16 @@ El seed ancora les dates al dia que s'executa, així que tornar-lo a passar
 posa la Planificació al dia. Es nega a executar-se si el nom de la base de
 dades no conté "demo".
 
+## Mapa d'obres (Expedients → Mapa)
+
+Cada expedient pot tenir una **adreça** i un **enllaç de Google Maps**. En desar,
+l'app en treu les coordenades (`src/lib/geo.ts`): primer de l'enllaç (també
+els curts `maps.app.goo.gl`, o coordenades escrites «41.98, 2.82») i, si no
+n'hi ha, buscant l'adreça + ciutat a OpenStreetMap (Nominatim, sense clau).
+La pestanya **Mapa** mostra els expedients situats amb un punt de color per
+categoria (mapa d'OpenStreetMap amb Leaflet) i llista els que encara no tenen
+ubicació. Columnes: `adreca`, `maps_url`, `lat`, `lng` (migració 0042).
+
 ## Plugin de ChatGPT i Claude
 
 L'aplicació exposa un servidor MCP a `/api/mcp` amb OAuth propi, de manera que

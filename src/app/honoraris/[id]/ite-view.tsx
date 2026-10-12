@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { updateIteAction, updatePropostaAction, type IteUpdate } from "./actions";
+import { duplicatePropostaAction } from "../actions";
 import { formatEur } from "@/lib/format";
 import type { Client, IteTarifa, Proposta } from "@/types/db";
 
@@ -88,7 +89,13 @@ export function IteView({ proposta, clients, tarifa, preuHoraIte }: { proposta: 
           <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Tots els càlculs</Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Càlcul ITE {proposta.num_proposta}</h1>
         </div>
-        <span className="rounded-full bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-accent)]">ITE</span>
+        <div className="flex items-center gap-3">
+          <form action={duplicatePropostaAction}>
+            <input type="hidden" name="id" value={proposta.id} />
+            <button type="submit" className="btn-ghost" title="Crea un càlcul nou amb les mateixes dades">Duplicar</button>
+          </form>
+          <span className="rounded-full bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-accent)]">ITE</span>
+        </div>
       </div>
 
       {/* Header */}

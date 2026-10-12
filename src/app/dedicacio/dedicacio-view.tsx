@@ -810,14 +810,9 @@ function StatsTab({
       </div>
 
       {/* Categoria + Client */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Hores per categoria">
-          <HBarChart bars={catRows.map((r) => ({ label: r.label, value: r.hores, color: r.color, display: fmtHores(r.hores) }))} />
-        </ChartCard>
-        <ChartCard title="Hores per client">
-          <HBarChart bars={clientRows.map((r) => ({ label: r.label, value: r.hores, color: "#6366f1", display: fmtHores(r.hores) }))} />
-        </ChartCard>
-      </div>
+      <ChartCard title="Hores per categoria">
+        <HBarChart bars={catRows.map((r) => ({ label: r.label, value: r.hores, color: r.color, display: fmtHores(r.hores) }))} />
+      </ChartCard>
 
       {/* Evolució */}
       <ChartCard title="Evolució" meta={agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes"}>

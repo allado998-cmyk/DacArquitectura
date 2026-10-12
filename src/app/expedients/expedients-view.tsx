@@ -14,8 +14,17 @@ import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/l
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
+import { googleMapsHref } from "@/lib/geo";
+import dynamic from "next/dynamic";
+import type { MapPoint } from "./expedients-map";
 
-type Tab = "llista" | "estadistiques";
+// Leaflet needs the browser; load the map only on the client.
+const ExpedientsMap = dynamic(() => import("./expedients-map").then((m) => m.ExpedientsMap), {
+  ssr: false,
+  loading: () => <div className="h-[65vh] min-h-[360px] w-full animate-pulse rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)]" />,
+});
+
+type Tab = "llista" | "estadistiques" | "mapa";
 
 export interface CalculOpt {
   id: number;
@@ -126,6 +135,9 @@ export function ExpedientsView({
         <TabBtn current={tab} value="estadistiques" onClick={setTab}>
           Estadístiques
         </TabBtn>
+        <TabBtn current={tab} value="mapa" onClick={setTab}>
+          Mapa
+        </TabBtn>
 
         {tab === "llista" && (
           <button
@@ -140,6 +152,7 @@ export function ExpedientsView({
 
       {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} dedicByExp={dedicByExp} />}
+      {tab === "mapa" && <MapPanel rows={expedients} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
     </div>
   );
 }
@@ -404,7 +417,21 @@ function ExpedientRow({
       <td className="td font-mono text-[var(--color-accent)]">{row.num_expedient}</td>
       <td className="td">{row.projecte ?? <span className="text-[var(--color-muted)]">—</span>}</td>
       <td className="td">{row.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-      <td className="td">{row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}</td>
+      <td className="td">
+        {row.ciutat ?? <span className="text-[var(--color-muted)]">—</span>}
+        {row.lat != null && (
+          <a
+            href={googleMapsHref(row) ?? "#"}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-1.5 text-xs"
+            title={row.adreca ? `${row.adreca} — obrir a Google Maps` : "Obrir a Google Maps"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            📍
+          </a>
+        )}
+      </td>
       <td className="td"><CategoriaBadge code={row.categoria} /></td>
       <td className="td"><TipologiaBadge nom={row.tipologia_nom} /></td>
       <td className="td"><Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} /></td>
@@ -501,6 +528,9 @@ function ExpedientForm({
   const [dataInici, setDataInici] = useState(row.data_inici ?? "");
   const [dataFinal, setDataFinal] = useState(row.data_final ?? "");
   const [dataTancament, setDataTancament] = useState(row.data_tancament ?? "");
+  const [adreca, setAdreca] = useState(row.adreca ?? "");
+  const [mapsUrl, setMapsUrl] = useState(row.maps_url ?? "");
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const calculOpts: ComboOption[] = calculs.map((c) => ({
@@ -539,9 +569,15 @@ function ExpedientForm({
       data_inici: dataInici,
       data_final: dataFinal,
       data_tancament: dataTancament,
+      adreca,
+      maps_url: mapsUrl,
     };
     startTransition(async () => {
-      await updateExpedientAction(row.id, patch);
+      const r = await updateExpedientAction(row.id, patch);
+      if (r?.geo === "not_found") {
+        setGeoMsg("Desat, però no s'ha pogut situar al mapa. Revisa l'adreça o enganxa l'enllaç de Google Maps.");
+        return;
+      }
       onClose();
     });
   }
@@ -567,6 +603,36 @@ function ExpedientForm({
           <datalist id="ciutats-list">
             {ciutats.map((c) => <option key={c} value={c} />)}
           </datalist>
+        </div>
+        <div className="sm:col-span-2 rounded-lg border border-[var(--color-line)] p-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Adreça de l&apos;obra</label>
+              <input className="input" value={adreca} onChange={(e) => setAdreca(e.target.value)} placeholder="Carrer, número" />
+            </div>
+            <div>
+              <label className="label">Enllaç de Google Maps</label>
+              <input className="input" value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} placeholder="https://maps.app.goo.gl/…" />
+            </div>
+          </div>
+          <p className="text-xs text-[var(--color-muted)]">
+            Per situar l&apos;obra al mapa: a Google Maps, «Compartir» → «Copiar l&apos;enllaç» i enganxa&apos;l aquí (també valen coordenades, p. ex.
+            41.98, 2.82). Si no hi ha enllaç, se situa per l&apos;adreça i la ciutat.
+          </p>
+          <p className="text-xs">
+            {row.lat != null ? (
+              <>
+                <span className="text-green-700">📍 Situat al mapa.</span>{" "}
+                <a href={googleMapsHref(row) ?? "#"} target="_blank" rel="noreferrer" className="text-[var(--color-accent)] hover:underline">
+                  Obrir a Google Maps
+                </a>
+              </>
+            ) : row.adreca || row.maps_url ? (
+              <span className="text-amber-700">⚠ No s&apos;ha pogut situar al mapa amb les dades actuals.</span>
+            ) : (
+              <span className="text-[var(--color-muted)]">Encara no surt al mapa.</span>
+            )}
+          </p>
         </div>
         <div>
           <label className="label">Categoria</label>
@@ -665,10 +731,177 @@ function ExpedientForm({
           <input type="date" className="input" value={dataTancament} onChange={(e) => setDataTancament(e.target.value)} />
         </div>
       </div>
+      {geoMsg && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{geoMsg}</p>}
       <div className="flex items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
-        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>{geoMsg ? "Tancar" : "Cancel·lar"}</button>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Mapa — obres amb ubicació, pins de colors per categoria
+// ============================================================================
+
+function MapPanel({
+  rows,
+  clientOpts,
+  ciutats,
+  tipologies,
+  calculs,
+  propostes,
+}: {
+  rows: Expedient[];
+  clientOpts: ComboOption[];
+  ciutats: string[];
+  tipologies: Tipologia[];
+  calculs: CalculOpt[];
+  propostes: PropostaOpt[];
+}) {
+  const [fEstat, setFEstat] = useState<"obert" | "tancat" | "">("obert");
+  const [fCategoria, setFCategoria] = useState("");
+  const [fDO, setFDO] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (fEstat && r.estat !== fEstat) return false;
+        if (fCategoria && r.categoria !== fCategoria) return false;
+        if (fDO && !r.direccio_obres) return false;
+        if (q) {
+          const hay = `${r.num_expedient} ${r.projecte ?? ""} ${r.client_nom ?? ""} ${r.ciutat ?? ""} ${r.adreca ?? ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      }),
+    [rows, fEstat, fCategoria, fDO, q],
+  );
+  const located = filtered.filter((r) => r.lat != null && r.lng != null);
+  const notLocated = filtered.filter((r) => r.lat == null || r.lng == null);
+  const pointsKey = located.map((r) => `${r.id}:${r.lat}:${r.lng}:${r.categoria}:${r.projecte}`).join("|");
+  const points: MapPoint[] = useMemo(
+    () =>
+      located.map((r) => ({
+        id: r.id,
+        lat: r.lat as number,
+        lng: r.lng as number,
+        color: (r.categoria && CATEGORY_BY_CODE[r.categoria]?.color) || "#64748b",
+        title: `${r.num_expedient} · ${r.projecte ?? "Sense projecte"}`,
+      })),
+    // Rebuild only when what the markers show changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pointsKey],
+  );
+  const selected = rows.find((r) => r.id === selectedId) ?? null;
+  const editing = rows.find((r) => r.id === editingId) ?? null;
+  const selectedHref = selected ? googleMapsHref(selected) : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="label">Estat</label>
+          <select className="input" value={fEstat} onChange={(e) => setFEstat(e.target.value as typeof fEstat)}>
+            <option value="obert">Oberts</option>
+            <option value="tancat">Tancats</option>
+            <option value="">Tots</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Categoria</label>
+          <select className="input" value={fCategoria} onChange={(e) => setFCategoria(e.target.value)}>
+            <option value="">Totes</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input type="checkbox" checked={fDO} onChange={(e) => setFDO(e.target.checked)} /> Només direcció d&apos;obres
+        </label>
+        <div className="min-w-[14rem] flex-1">
+          <label className="label">Cercar</label>
+          <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Número, projecte, client, adreça…" />
+        </div>
+        <div className="pb-2 text-sm text-[var(--color-muted)]">
+          {located.length} al mapa{notLocated.length > 0 ? ` · ${notLocated.length} sense ubicació` : ""}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--color-muted)]">
+        {CATEGORIES.map((c) => (
+          <span key={c.code} className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: c.color }} /> {c.label}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+        <ExpedientsMap points={points} selectedId={selectedId} onSelect={setSelectedId} />
+
+        <div className="space-y-4">
+          {selected ? (
+            <div className="card space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-mono text-sm text-[var(--color-accent)]">{selected.num_expedient}</div>
+                  <div className="font-semibold leading-snug">{selected.projecte ?? "Sense projecte"}</div>
+                </div>
+                <button type="button" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]" onClick={() => setSelectedId(null)} aria-label="Tancar">
+                  ✕
+                </button>
+              </div>
+              {selected.client_nom && <div className="text-sm">{selected.client_nom}</div>}
+              <div className="text-sm text-[var(--color-muted)]">{[selected.adreca, selected.ciutat].filter(Boolean).join(", ") || "—"}</div>
+              <div className="flex flex-wrap gap-1.5">
+                <CategoriaBadge code={selected.categoria} />
+                <Badge swatch={ESTAT[selected.estat]} label={ESTAT[selected.estat].label} dot />
+                {selected.direccio_obres && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">Direcció d&apos;obres</span>}
+              </div>
+              {(selected.data_inici || selected.data_final) && (
+                <div className="text-xs text-[var(--color-muted)]">
+                  {fmtDate(selected.data_inici) ?? "—"} → {fmtDate(selected.data_final) ?? "—"}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button type="button" className="btn-primary text-sm" onClick={() => setEditingId(selected.id)}>
+                  Editar
+                </button>
+                {selectedHref && (
+                  <a className="btn-ghost text-sm" href={selectedHref} target="_blank" rel="noreferrer">
+                    Google Maps
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="card text-sm text-[var(--color-muted)]">Clica un punt del mapa per veure l&apos;expedient.</div>
+          )}
+
+          {notLocated.length > 0 && (
+            <div className="card">
+              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Sense ubicació ({notLocated.length})</h4>
+              <p className="mb-2 text-xs text-[var(--color-muted)]">Afegeix-hi l&apos;adreça o l&apos;enllaç de Google Maps perquè surtin al mapa.</p>
+              <ul className="max-h-72 space-y-1 overflow-auto text-sm">
+                {notLocated.map((r) => (
+                  <li key={r.id}>
+                    <button type="button" className="w-full truncate text-left hover:underline" onClick={() => setEditingId(r.id)}>
+                      <span className="font-mono text-[var(--color-accent)]">{r.num_expedient}</span> {r.projecte ?? "Sense projecte"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ExpedientEditModal row={editing} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={() => setEditingId(null)} />
     </div>
   );
 }

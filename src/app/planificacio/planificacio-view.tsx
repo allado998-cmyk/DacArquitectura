@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Modal } from "@/components/modal";
 import { formatEur } from "@/lib/format";
 import { updateExpedientDatesAction } from "@/app/expedients/actions";
@@ -116,6 +116,28 @@ function hc(v: string | number | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : v ?? 0;
   return new Intl.NumberFormat("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0) + "h";
 }
+// Search: accent-insensitive text, or an expedient number in short form
+// ("120", "26-120", "26 0120"). Matches are highlighted, never filtered out.
+function fold(s: string) {
+  return s.normalize("NFD").replace(/\p{M}/gu, "").replace(/·/g, "").toLowerCase();
+}
+function matchesSearch(it: PlanItem, q: string): boolean {
+  const t = q.trim();
+  if (!t) return false;
+  const m = /^(?:(\d{2})\s*[-/.\s]\s*)?(\d{1,4})$/.exec(t);
+  if (m) {
+    const [yy, n] = it.num_expedient.split("-");
+    if (parseInt(n ?? "", 10) === parseInt(m[2], 10) && (!m[1] || m[1] === yy)) return true;
+  }
+  const hay = fold([it.num_expedient, it.projecte, it.client_nom, it.ciutat, it.tipologia_nom].filter(Boolean).join(" "));
+  return fold(t)
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => hay.includes(w));
+}
+const HL_BG = "#fef9c3";
+const HL_RING = "#f59e0b";
+
 function itemColor(it: PlanItem) {
   if (it.categoria === "do") return COLOR_DO;
   if (it.direccio_obres) return COLOR_DIR;
@@ -150,6 +172,7 @@ export function PlanificacioView({
   const [tab, setTab] = useState<TabKey>("tots");
   const [weekOffset, setWeekOffset] = useState(0);
   const [editing, setEditing] = useState<PlanItem | null>(null);
+  const [cerca, setCerca] = useState("");
 
   const start = useMemo(() => addDays(today, -BACK_DAYS + weekOffset * 7), [today, weekOffset]);
   const days = useMemo(() => Array.from({ length: TOTAL }, (_, i) => addDays(start, i)), [start]);
@@ -184,6 +207,23 @@ export function PlanificacioView({
     return true;
   });
 
+  const matchIds = useMemo(() => new Set(items.filter((it) => matchesSearch(it, cerca)).map((it) => it.id)), [items, cerca]);
+  const shownMatches = shown.filter((it) => matchIds.has(it.id));
+  const hiddenMatches = matchIds.size - shownMatches.length;
+  const firstMatchId = shownMatches[0]?.id ?? null;
+
+  // Bring the first match into view (desktop gantt or mobile list, whichever is visible).
+  useEffect(() => {
+    if (firstMatchId == null) return;
+    for (const prefix of ["plan-d-", "plan-m-"]) {
+      const el = document.getElementById(prefix + firstMatchId);
+      if (el && el.offsetParent !== null) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        break;
+      }
+    }
+  }, [firstMatchId]);
+
   const monthSegments: { label: string; span: number }[] = [];
   for (const iso of days) {
     const { m, y } = parts(iso);
@@ -201,6 +241,28 @@ export function PlanificacioView({
           <TabBtn active={tab === "resta"} onClick={() => setTab("resta")}>Projectes ({counts.resta})</TabBtn>
           <TabBtn active={tab === "do"} onClick={() => setTab("do")}>Direcció d&apos;obres ({counts.do})</TabBtn>
           <TabBtn active={tab === "docencia"} onClick={() => setTab("docencia")}>Docència ({counts.docencia})</TabBtn>
+        </div>
+        <div className="flex min-w-[16rem] flex-1 items-center gap-2 sm:max-w-sm">
+          <div className="relative flex-1">
+            <input
+              className="input pr-8"
+              placeholder="Buscar expedient (número, projecte, client…)"
+              value={cerca}
+              onChange={(e) => setCerca(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") setCerca(""); }}
+            />
+            {cerca && (
+              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-ink)]" onClick={() => setCerca("")} aria-label="Esborrar cerca">✕</button>
+            )}
+          </div>
+          {cerca.trim() && (
+            <span className="shrink-0 text-xs text-[var(--color-muted)]">
+              {shownMatches.length === 0 ? "Cap" : shownMatches.length}
+              {hiddenMatches > 0 && (
+                <> · <button type="button" className="underline" onClick={() => setTab("tots")}>{hiddenMatches} en altres pestanyes</button></>
+              )}
+            </span>
+          )}
         </div>
         <div className="hidden items-center gap-1 sm:flex">
           <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setWeekOffset((w) => w - 1)} title="Setmana anterior">‹</button>
@@ -223,7 +285,7 @@ export function PlanificacioView({
         {shown.length === 0 ? (
           <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
         ) : (
-          shown.map((it) => <MobileRow key={it.id} it={it} today={today} visites={visitCountByExp.get(it.id) ?? 0} onOpen={() => setEditing(it)} />)
+          shown.map((it) => <MobileRow key={it.id} it={it} today={today} visites={visitCountByExp.get(it.id) ?? 0} highlight={matchIds.has(it.id)} onOpen={() => setEditing(it)} />)
         )}
       </div>
 
@@ -261,7 +323,7 @@ export function PlanificacioView({
           <div className="px-3 py-6 text-sm text-[var(--color-muted)]">Cap expedient en aquesta vista.</div>
         ) : (
           shown.map((it) => (
-            <GanttRow key={it.id} it={it} vis={visitsByExp.get(it.id) ?? []} fites={fitesByExp.get(it.id) ?? []} days={days} start={start} todayIdx={todayIdx} onOpen={() => setEditing(it)} />
+            <GanttRow key={it.id} it={it} vis={visitsByExp.get(it.id) ?? []} fites={fitesByExp.get(it.id) ?? []} days={days} start={start} todayIdx={todayIdx} highlight={matchIds.has(it.id)} onOpen={() => setEditing(it)} />
           ))
         )}
       </div>
@@ -278,7 +340,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return <button type="button" onClick={onClick} className={`rounded-md px-3 py-1.5 ${active ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}>{children}</button>;
 }
 
-function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string; visites: number; onOpen: () => void }) {
+function MobileRow({ it, today, visites, highlight, onOpen }: { it: PlanItem; today: string; visites: number; highlight: boolean; onOpen: () => void }) {
   const color = itemColor(it);
   const pH = parseFloat(it.planned_hores) || 0;
   const hPct = pH > 0 ? Math.round(((parseFloat(it.actual_hores) || 0) / pH) * 100) : null;
@@ -290,7 +352,13 @@ function MobileRow({ it, today, visites, onOpen }: { it: PlanItem; today: string
     pct = span <= 0 ? (elapsed >= 0 ? 100 : 0) : Math.max(0, Math.min(100, (elapsed / span) * 100));
   }
   return (
-    <button type="button" onClick={onOpen} className="block w-full rounded-xl border border-[var(--color-line)] bg-white p-3 text-left shadow-sm">
+    <button
+      type="button"
+      id={`plan-m-${it.id}`}
+      onClick={onOpen}
+      className="block w-full rounded-xl border border-[var(--color-line)] bg-white p-3 text-left shadow-sm"
+      style={highlight ? { backgroundColor: HL_BG, boxShadow: `0 0 0 2px ${HL_RING}` } : undefined}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-sm"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
         {!hasDates && <span className="shrink-0 text-amber-600">⚠</span>}
@@ -316,7 +384,7 @@ interface Tip {
   lines: string[];
 }
 
-function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanItem; vis: Visita[]; fites: Fita[]; days: string[]; start: string; todayIdx: number; onOpen: () => void }) {
+function GanttRow({ it, vis, fites, days, start, todayIdx, highlight, onOpen }: { it: PlanItem; vis: Visita[]; fites: Fita[]; days: string[]; start: string; todayIdx: number; highlight: boolean; onOpen: () => void }) {
   const [tip, setTip] = useState<Tip | null>(null);
   const missing = !it.data_inici || !it.data_final;
   const color = itemColor(it);
@@ -337,8 +405,12 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
   }
 
   return (
-    <div className="flex items-stretch border-b border-[var(--color-line)] last:border-b-0">
-      <div className="group relative shrink-0" style={{ width: LABEL_W }}>
+    <div
+      id={`plan-d-${it.id}`}
+      className="relative flex items-stretch border-b border-[var(--color-line)] last:border-b-0"
+      style={highlight ? { boxShadow: `inset 0 0 0 2px ${HL_RING}`, zIndex: 1 } : undefined}
+    >
+      <div className="group relative shrink-0" style={{ width: LABEL_W, backgroundColor: highlight ? HL_BG : undefined }}>
         <button type="button" onClick={onOpen} className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left hover:bg-[var(--color-paper)]">
           {missing && <span className="shrink-0 text-amber-600" title="Sense dates de planificació">⚠</span>}
           <span className="truncate text-xs"><span className="font-mono text-[var(--color-accent)]">{it.num_expedient}</span> {it.projecte ?? <span className="text-[var(--color-muted)]">Sense projecte</span>}</span>
@@ -353,7 +425,7 @@ function GanttRow({ it, vis, fites, days, start, todayIdx, onOpen }: { it: PlanI
       </div>
       <div
         className="flex shrink-0 flex-col justify-center border-l border-[var(--color-line)] px-2"
-        style={{ width: HOURS_W }}
+        style={{ width: HOURS_W, backgroundColor: highlight ? HL_BG : undefined }}
         title={`Fetes ${fmtHores(actual)} / Planificades ${planned > 0 ? fmtHores(planned) : "—"}`}
       >
         {planned > 0 ? (

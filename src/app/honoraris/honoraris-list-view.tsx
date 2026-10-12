@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { deletePropostaAction } from "./actions";
+import { deletePropostaAction, duplicatePropostaAction } from "./actions";
 import { formatDataCa, formatEur } from "@/lib/format";
 import { openListPdf, openStatsPdf } from "@/lib/pdf";
 import { ChartCard, HBarChart, KpiCard, VBarChart } from "@/components/charts";
@@ -195,6 +195,10 @@ function CalculsList({ rows, onCount }: { rows: PropostaListRow[]; onCount: (n: 
                 <td className="td text-right tabular-nums">{formatEur(r.total)}</td>
                 <td className="td text-center whitespace-nowrap">
                   <Link href={`/honoraris/${r.id}`} className="text-[var(--color-accent)] hover:underline mr-3">Obrir</Link>
+                  <form action={duplicatePropostaAction} className="inline">
+                    <input type="hidden" name="id" value={r.id} />
+                    <button type="submit" className="text-[var(--color-accent)] hover:underline text-sm mr-3">Duplicar</button>
+                  </form>
                   <form action={deletePropostaAction} className="inline" onSubmit={(e) => { if (!confirm("Eliminar aquest càlcul?")) e.preventDefault(); }}>
                     <input type="hidden" name="id" value={r.id} />
                     <button type="submit" className="text-red-700 hover:underline text-sm">Eliminar</button>

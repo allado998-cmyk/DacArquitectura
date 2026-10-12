@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { updateActaAction, deleteActaAction, createActaContacteAction, addActaFotoAction, removeActaFotoAction, addActaDocAction, removeActaDocAction, addActaAudioAction, removeActaAudioAction, type ActaPatch } from "../actions";
 import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat, type ActaLang } from "@/lib/acta-doc";
 import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
+import { actaFileName } from "@/lib/file-names";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
@@ -147,6 +148,12 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       signatures, fotografies: fotos, documents: docs,
       expedient_id: expedientId === "" ? null : expedientId,
     };
+  }
+
+  // "FE75.01-02 Acta de Projecte-<expedient>-<acta nº>-<YYMMDD>"
+  function exportFileName(): string {
+    const exp = expedientId === "" ? null : expedients.find((e) => e.id === expedientId);
+    return actaFileName({ expedientNum: exp?.num_expedient, referencia, actaNum, data });
   }
 
   // Media uploads. Images are downscaled client-side, and each file is stored
@@ -292,8 +299,8 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
               </button>
             ))}
           </div>
-          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await downloadActaWord(liveActa(), docLang); } finally { setGenerating(false); } }}>Word</button>
-          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await openActaPdf(liveActa(), docLang); } finally { setGenerating(false); } }}>{generating ? "Generant…" : "PDF / Imprimir"}</button>
+          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await downloadActaWord(liveActa(), docLang, exportFileName()); } finally { setGenerating(false); } }}>Word</button>
+          <button type="button" className="btn-ghost disabled:opacity-50" disabled={generating} onClick={async () => { setGenerating(true); try { await openActaPdf(liveActa(), docLang, exportFileName()); } finally { setGenerating(false); } }}>{generating ? "Generant…" : "PDF / Imprimir"}</button>
         </div>
       </div>
 

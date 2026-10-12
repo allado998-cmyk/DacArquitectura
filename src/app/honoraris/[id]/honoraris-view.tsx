@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   addAltraDespesaLineAction,
   addDespesaDirectaLineAction,
+  applyCatalogPreuHoraAction,
   deleteAltraDespesaLineAction,
   deleteDespesaDirectaLineAction,
   updateAltraDespesaLineAction,
@@ -12,6 +13,7 @@ import {
   updatePropostaAction,
 } from "./actions";
 import { formatEur } from "@/lib/format";
+import { duplicatePropostaAction } from "../actions";
 import type {
   Client,
   ConcepteAltraDespesa,
@@ -136,12 +138,28 @@ export function HonorarisView({
             concepte_id: concepteId,
             concepte_nom: concepte.nom,
             hores: "0",
-            preu_hora: proposta.preu_hora_default,
+            preu_hora: concepte.preu_hora_default,
             ordre: (prev[prev.length - 1]?.ordre ?? 0) + 10,
           },
         ]);
       }
     });
+  }
+
+  // Current Base de Dades €/hora per concept, to flag lines priced differently.
+  const catalogPreu = useMemo(() => new Map(conceptesDirectes.map((c) => [c.id, n(c.preu_hora_default)])), [conceptesDirectes]);
+  const linesAmbPreuDiferent = linesDirectes.filter((l) => {
+    const cat = catalogPreu.get(l.concepte_id);
+    return cat != null && Math.abs(cat - n(l.preu_hora)) > 0.0001;
+  });
+
+  function applyCatalogPreus() {
+    if (!confirm(`Posar el preu/hora actual de la Base de Dades a ${linesAmbPreuDiferent.length} línia(es)?`)) return;
+    setLinesDirectes((prev) => prev.map((l) => {
+      const cat = catalogPreu.get(l.concepte_id);
+      return cat != null ? { ...l, preu_hora: String(cat) } : l;
+    }));
+    startTransition(() => applyCatalogPreuHoraAction(proposta.id));
   }
 
   function updateDirectaLocal(lineId: number, patch: Partial<PropostaDespesaDirectaLine>) {
@@ -211,6 +229,10 @@ export function HonorarisView({
           <Link href="/honoraris" className="text-sm text-[var(--color-muted)] hover:underline">← Tots els càlculs</Link>
           <h1 className="text-2xl font-semibold tracking-tight mt-1">Càlcul {proposta.num_proposta}</h1>
         </div>
+        <form action={duplicatePropostaAction}>
+          <input type="hidden" name="id" value={proposta.id} />
+          <button type="submit" className="btn-ghost" title="Crea un càlcul nou amb les mateixes dades i línies">Duplicar</button>
+        </form>
       </div>
 
       {/* ============ Header ============ */}
@@ -283,7 +305,14 @@ export function HonorarisView({
 
       {/* ============ Despeses Directes ============ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Despeses Directes</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Despeses Directes</h2>
+          {linesAmbPreuDiferent.length > 0 && (
+            <button type="button" className="btn-ghost text-sm" onClick={applyCatalogPreus} title="Els preus de les línies es guarden en afegir-les; això hi posa els preus actuals de la Base de Dades">
+              Aplicar preus/hora de la Base de Dades ({linesAmbPreuDiferent.length})
+            </button>
+          )}
+        </div>
         <div className="table-wrap">
           <table className="w-full">
             <thead>
@@ -312,8 +341,10 @@ export function HonorarisView({
                         onChange={(e) => {
                           const newId = Number(e.target.value);
                           const c = conceptesDirectes.find((x) => x.id === newId);
-                          updateDirectaLocal(l.id, { concepte_id: newId, concepte_nom: c?.nom });
-                          persistDirecta(l.id, { concepte_id: newId });
+                          if (c) {
+                            updateDirectaLocal(l.id, { concepte_id: newId, concepte_nom: c.nom, preu_hora: c.preu_hora_default });
+                            persistDirecta(l.id, { concepte_id: newId, preu_hora: n(c.preu_hora_default) });
+                          }
                         }}
                       >
                         {conceptesDirectes.map((c) => (
@@ -342,6 +373,12 @@ export function HonorarisView({
                         onChange={(e) => updateDirectaLocal(l.id, { preu_hora: e.target.value })}
                         onBlur={() => persistDirecta(l.id, { preu_hora: n(l.preu_hora) })}
                       />
+                      {(() => {
+                        const cat = catalogPreu.get(l.concepte_id);
+                        return cat != null && Math.abs(cat - n(l.preu_hora)) > 0.0001 ? (
+                          <div className="mt-0.5 text-right text-[11px] text-amber-700" title="Preu actual d'aquest concepte a la Base de Dades">BD: {formatEur(cat)}</div>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="td text-right font-mono">{formatEur(total)}</td>
                     <td className="td text-right">

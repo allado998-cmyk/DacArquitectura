@@ -101,6 +101,8 @@ const patchSchema = z.object({
   data_inici: isoDate.nullable().optional(),
   data_final: isoDate.nullable().optional(),
   data_tancament: isoDate.nullable().optional(),
+  adreca: shortText.nullable().optional().describe("Adreça de l'obra (carrer i número); se situa al mapa"),
+  maps_url: z.string().max(2000).nullable().optional().describe("Enllaç de Google Maps de l'obra, o coordenades \"41.98, 2.82\""),
 });
 type Patch = z.infer<typeof patchSchema>;
 
@@ -125,6 +127,9 @@ function toActionPatch(e: ExpedientRow, p: Patch): ExpedientPatch {
     data_inici: has("data_inici") ? (p.data_inici ?? "") : (e.data_inici ?? ""),
     data_final: has("data_final") ? (p.data_final ?? "") : (e.data_final ?? ""),
     data_tancament: has("data_tancament") ? (p.data_tancament ?? "") : (e.data_tancament ?? ""),
+    // Left undefined = keep what is stored (the action re-locates on change).
+    adreca: has("adreca") ? (p.adreca ?? "") : undefined,
+    maps_url: has("maps_url") ? (p.maps_url ?? "") : undefined,
   };
 }
 
@@ -184,7 +189,8 @@ registerAction({
     const e = newId ? await findExpedient({ id: newId }) : null;
     if (!e) throw new Error("No s'ha pogut crear l'expedient.");
     const patch = applyDefaults(a, (plan.details ?? {}) as Record<string, unknown>);
-    await callAction(() => updateExpedientAction(e.id, toActionPatch(e, patch)));
+    const r = await callAction(() => updateExpedientAction(e.id, toActionPatch(e, patch)));
+    if (r.value?.geo === "not_found") (plan.warnings ??= []).push("No s'ha pogut situar al mapa: revisa l'adreça o passa un enllaç de Google Maps.");
     const saved = await findExpedient({ id: e.id });
     return { id: e.id, num_expedient: e.num_expedient, label: expedientLabel(saved), url: `/expedients` };
   },
@@ -215,9 +221,15 @@ registerAction({
     void _id;
     void _num;
     const details = (plan.details ?? {}) as { despres?: Record<string, unknown> };
-    await callAction(() => updateExpedientAction(e.id, toActionPatch(e, applyDefaults(patch, details.despres ?? {}))));
+    const r = await callAction(() => updateExpedientAction(e.id, toActionPatch(e, applyDefaults(patch, details.despres ?? {}))));
     const saved = await findExpedient({ id: e.id });
-    return { id: e.id, label: expedientLabel(saved), estat: saved?.estat, pressupost: saved ? round2(num(saved.pressupost)) : null };
+    return {
+      id: e.id,
+      label: expedientLabel(saved),
+      estat: saved?.estat,
+      pressupost: saved ? round2(num(saved.pressupost)) : null,
+      mapa: r.value?.geo === "ok" ? "situat al mapa" : r.value?.geo === "not_found" ? "no s'ha pogut situar al mapa" : undefined,
+    };
   },
 });
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { locate } from "@/lib/geo";
 
 const ESTATS = ["obert", "tancat"];
 const CATEGORIES = ["re", "co", "ed", "rec", "do"];
@@ -49,7 +50,13 @@ export interface ExpedientPatch {
   data_inici: string; // "" means none
   data_final: string; // "" means none
   data_tancament: string; // "" means none
+  // Location of the works. Left out (undefined) = keep what is stored.
+  adreca?: string;
+  maps_url?: string; // Google Maps link, or "lat, lng"
 }
+
+// "ok": on the map; "none": no address nor link; "not_found": given but could not be located.
+export type GeoStatus = "ok" | "none" | "not_found";
 
 function dateOrNull(v: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
@@ -84,7 +91,7 @@ async function propostaSubtotal(docId: number): Promise<number> {
   return rows[0]?.total ?? 0;
 }
 
-export async function updateExpedientAction(id: number, data: ExpedientPatch) {
+export async function updateExpedientAction(id: number, data: ExpedientPatch): Promise<{ geo: GeoStatus } | undefined> {
   await requireUser();
 
   const num = data.num_expedient.trim();
@@ -105,6 +112,33 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
   if (origen === "calcul" && calculId) effective = await calculTotal(calculId);
   else if (origen === "proposta" && propostaDocId) effective = await propostaSubtotal(propostaDocId);
 
+  // Location: re-locate only when the address, link or city changed, or when a
+  // previous attempt found nothing.
+  const prevRows = (await sql`select adreca, maps_url, ciutat, lat, lng from public.expedients where id = ${id}`) as {
+    adreca: string | null;
+    maps_url: string | null;
+    ciutat: string | null;
+    lat: number | null;
+    lng: number | null;
+  }[];
+  const prev = prevRows[0];
+  const adreca = data.adreca === undefined ? (prev?.adreca ?? null) : data.adreca.trim() || null;
+  const mapsUrl = data.maps_url === undefined ? (prev?.maps_url ?? null) : data.maps_url.trim() || null;
+  const ciutat = data.ciutat.trim() || null;
+  let lat = prev?.lat ?? null;
+  let lng = prev?.lng ?? null;
+  let geo: GeoStatus = "ok";
+  if (!adreca && !mapsUrl) {
+    lat = null;
+    lng = null;
+    geo = "none";
+  } else if (adreca !== (prev?.adreca ?? null) || mapsUrl !== (prev?.maps_url ?? null) || (!mapsUrl && ciutat !== (prev?.ciutat ?? null)) || lat == null) {
+    const found = await locate({ mapsUrl, adreca, ciutat });
+    lat = found?.lat ?? null;
+    lng = found?.lng ?? null;
+    geo = found ? "ok" : "not_found";
+  }
+
   await sql`
     update public.expedients set
       num_expedient = ${num},
@@ -123,11 +157,16 @@ export async function updateExpedientAction(id: number, data: ExpedientPatch) {
       proposta_doc_id = ${propostaDocId},
       data_inici = ${dateOrNull(data.data_inici)}::date,
       data_final = ${dateOrNull(data.data_final)}::date,
-      data_tancament = ${dateOrNull(data.data_tancament)}::date
+      data_tancament = ${dateOrNull(data.data_tancament)}::date,
+      adreca = ${adreca},
+      maps_url = ${mapsUrl},
+      lat = ${lat},
+      lng = ${lng}
     where id = ${id}
   `;
   revalidatePath("/expedients");
   revalidatePath("/planificacio");
+  return { geo };
 }
 
 // Focused update for the Planificació planner (only the planning dates).

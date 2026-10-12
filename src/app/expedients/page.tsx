@@ -23,6 +23,7 @@ export default async function ExpedientsPage() {
              to_char(e.data_inici, 'YYYY-MM-DD') as data_inici,
              to_char(e.data_final, 'YYYY-MM-DD') as data_final,
              to_char(e.data_tancament, 'YYYY-MM-DD') as data_tancament,
+             e.adreca, e.maps_url, e.lat, e.lng,
              e.created_at, e.updated_at
       from public.expedients e
       left join public.clients c on c.id = e.client_id

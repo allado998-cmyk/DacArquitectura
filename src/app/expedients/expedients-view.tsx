@@ -16,7 +16,7 @@ import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
 import { googleMapsHref } from "@/lib/geo";
 import dynamic from "next/dynamic";
-import type { MapPoint } from "./expedients-map";
+import type { MapGroup } from "./expedients-map";
 
 // Leaflet needs the browser; load the map only on the client.
 const ExpedientsMap = dynamic(() => import("./expedients-map").then((m) => m.ExpedientsMap), {
@@ -763,13 +763,14 @@ function MapPanel({
   const [fCategoria, setFCategoria] = useState("");
   const [fDO, setFDO] = useState(false);
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
       rows.filter((r) => {
+        if (r.lat == null || r.lng == null) return false;
         if (fEstat && r.estat !== fEstat) return false;
         if (fCategoria && r.categoria !== fCategoria) return false;
         if (fDO && !r.direccio_obres) return false;
@@ -781,25 +782,11 @@ function MapPanel({
       }),
     [rows, fEstat, fCategoria, fDO, q],
   );
-  const located = filtered.filter((r) => r.lat != null && r.lng != null);
-  const notLocated = filtered.filter((r) => r.lat == null || r.lng == null);
-  const pointsKey = located.map((r) => `${r.id}:${r.lat}:${r.lng}:${r.categoria}:${r.projecte}`).join("|");
-  const points: MapPoint[] = useMemo(
-    () =>
-      located.map((r) => ({
-        id: r.id,
-        lat: r.lat as number,
-        lng: r.lng as number,
-        color: (r.categoria && CATEGORY_BY_CODE[r.categoria]?.color) || "#64748b",
-        title: `${r.num_expedient} · ${r.projecte ?? "Sense projecte"}`,
-      })),
-    // Rebuild only when what the markers show changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pointsKey],
-  );
-  const selected = rows.find((r) => r.id === selectedId) ?? null;
+  // Expedients within ~25 m share one pin.
+  const groups: MapGroup[] = useMemo(() => groupByLocation(filtered), [filtered]);
+  const selectedGroup = groups.find((g) => g.key === selectedKey) ?? null;
+  const selectedRows = selectedGroup ? selectedGroup.ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is Expedient => !!r) : [];
   const editing = rows.find((r) => r.id === editingId) ?? null;
-  const selectedHref = selected ? googleMapsHref(selected) : null;
 
   return (
     <div className="space-y-4">
@@ -829,7 +816,7 @@ function MapPanel({
           <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Número, projecte, client, adreça…" />
         </div>
         <div className="pb-2 text-sm text-[var(--color-muted)]">
-          {located.length} al mapa{notLocated.length > 0 ? ` · ${notLocated.length} sense ubicació` : ""}
+          {filtered.length} al mapa{groups.length < filtered.length ? ` · ${groups.length} ubicacions` : ""}
         </div>
       </div>
 
@@ -839,64 +826,31 @@ function MapPanel({
             <span className="inline-block h-3 w-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: c.color }} /> {c.label}
           </span>
         ))}
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 text-[9px] font-bold text-white">2</span> Diversos expedients al mateix lloc
+        </span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <ExpedientsMap points={points} selectedId={selectedId} onSelect={setSelectedId} />
+      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+        <ExpedientsMap groups={groups} selectedKey={selectedKey} onSelect={setSelectedKey} />
 
-        <div className="space-y-4">
-          {selected ? (
-            <div className="card space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-mono text-sm text-[var(--color-accent)]">{selected.num_expedient}</div>
-                  <div className="font-semibold leading-snug">{selected.projecte ?? "Sense projecte"}</div>
-                </div>
-                <button type="button" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]" onClick={() => setSelectedId(null)} aria-label="Tancar">
-                  ✕
-                </button>
-              </div>
-              {selected.client_nom && <div className="text-sm">{selected.client_nom}</div>}
-              <div className="text-sm text-[var(--color-muted)]">{[selected.adreca, selected.ciutat].filter(Boolean).join(", ") || "—"}</div>
-              <div className="flex flex-wrap gap-1.5">
-                <CategoriaBadge code={selected.categoria} />
-                <Badge swatch={ESTAT[selected.estat]} label={ESTAT[selected.estat].label} dot />
-                {selected.direccio_obres && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">Direcció d&apos;obres</span>}
-              </div>
-              {(selected.data_inici || selected.data_final) && (
-                <div className="text-xs text-[var(--color-muted)]">
-                  {fmtDate(selected.data_inici) ?? "—"} → {fmtDate(selected.data_final) ?? "—"}
+        <div className="space-y-3 lg:max-h-[70vh] lg:overflow-auto lg:pr-1">
+          {selectedRows.length === 0 ? (
+            <div className="card text-sm text-[var(--color-muted)]">Clica un punt del mapa per veure els expedients d&apos;aquell lloc.</div>
+          ) : (
+            <>
+              {selectedRows.length > 1 && (
+                <div className="flex items-center justify-between px-1 text-sm">
+                  <span className="font-medium">{selectedRows.length} expedients en aquest lloc</span>
+                  <button type="button" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]" onClick={() => setSelectedKey(null)} aria-label="Tancar">
+                    ✕
+                  </button>
                 </div>
               )}
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button type="button" className="btn-primary text-sm" onClick={() => setEditingId(selected.id)}>
-                  Editar
-                </button>
-                {selectedHref && (
-                  <a className="btn-ghost text-sm" href={selectedHref} target="_blank" rel="noreferrer">
-                    Google Maps
-                  </a>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="card text-sm text-[var(--color-muted)]">Clica un punt del mapa per veure l&apos;expedient.</div>
-          )}
-
-          {notLocated.length > 0 && (
-            <div className="card">
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Sense ubicació ({notLocated.length})</h4>
-              <p className="mb-2 text-xs text-[var(--color-muted)]">Afegeix-hi l&apos;adreça o l&apos;enllaç de Google Maps perquè surtin al mapa.</p>
-              <ul className="max-h-72 space-y-1 overflow-auto text-sm">
-                {notLocated.map((r) => (
-                  <li key={r.id}>
-                    <button type="button" className="w-full truncate text-left hover:underline" onClick={() => setEditingId(r.id)}>
-                      <span className="font-mono text-[var(--color-accent)]">{r.num_expedient}</span> {r.projecte ?? "Sense projecte"}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {selectedRows.map((r) => (
+                <MapCard key={r.id} row={r} onEdit={() => setEditingId(r.id)} onClose={selectedRows.length === 1 ? () => setSelectedKey(null) : undefined} />
+              ))}
+            </>
           )}
         </div>
       </div>
@@ -904,6 +858,80 @@ function MapPanel({
       <ExpedientEditModal row={editing} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} onClose={() => setEditingId(null)} />
     </div>
   );
+}
+
+function MapCard({ row, onEdit, onClose }: { row: Expedient; onEdit: () => void; onClose?: () => void }) {
+  const href = googleMapsHref(row);
+  return (
+    <div className="card space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-mono text-sm text-[var(--color-accent)]">{row.num_expedient}</div>
+          <div className="font-semibold leading-snug">{row.projecte ?? "Sense projecte"}</div>
+        </div>
+        {onClose && (
+          <button type="button" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]" onClick={onClose} aria-label="Tancar">
+            ✕
+          </button>
+        )}
+      </div>
+      {row.client_nom && <div className="text-sm">{row.client_nom}</div>}
+      <div className="text-sm text-[var(--color-muted)]">{[row.adreca, row.ciutat].filter(Boolean).join(", ") || "—"}</div>
+      <div className="flex flex-wrap gap-1.5">
+        <CategoriaBadge code={row.categoria} />
+        {row.tipologia_nom && <TipologiaBadge nom={row.tipologia_nom} />}
+        <Badge swatch={TIPUS[row.tipus]} label={TIPUS[row.tipus].label} />
+        <Badge swatch={ESTAT[row.estat]} label={ESTAT[row.estat].label} dot />
+        {row.direccio_obres && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">Direcció d&apos;obres</span>}
+      </div>
+      {(row.data_inici || row.data_final) && (
+        <div className="text-xs text-[var(--color-muted)]">
+          {fmtDate(row.data_inici) ?? "—"} → {fmtDate(row.data_final) ?? "—"}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button type="button" className="btn-primary text-sm" onClick={onEdit}>
+          Editar
+        </button>
+        {href && (
+          <a className="btn-ghost text-sm" href={href} target="_blank" rel="noreferrer">
+            Google Maps
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function escTip(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+}
+
+// Greedy grouping: an expedient joins the first group whose first pin is
+// within ~25 m (same building, or the same link pasted twice).
+function groupByLocation(rows: Expedient[]): MapGroup[] {
+  const R = 6371000;
+  const dist = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+    const dLat = ((bLat - aLat) * Math.PI) / 180;
+    const dLng = ((bLng - aLng) * Math.PI) / 180;
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  };
+  const sorted = [...rows].sort((a, b) => b.num_expedient.localeCompare(a.num_expedient));
+  const groups: { lat: number; lng: number; rows: Expedient[] }[] = [];
+  for (const r of sorted) {
+    const g = groups.find((x) => dist(x.lat, x.lng, r.lat as number, r.lng as number) <= 25);
+    if (g) g.rows.push(r);
+    else groups.push({ lat: r.lat as number, lng: r.lng as number, rows: [r] });
+  }
+  return groups.map((g) => ({
+    key: g.rows.map((r) => r.id).sort((a, b) => a - b).join("-"),
+    lat: g.lat,
+    lng: g.lng,
+    ids: g.rows.map((r) => r.id),
+    colors: g.rows.map((r) => (r.categoria && CATEGORY_BY_CODE[r.categoria]?.color) || "#64748b"),
+    title: g.rows.map((r) => `<b>${escTip(r.num_expedient)}</b> ${escTip(r.projecte ?? "Sense projecte")}`).join("<br>"),
+  }));
 }
 
 function IconBtn({

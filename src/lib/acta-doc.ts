@@ -138,18 +138,28 @@ export interface RenderedDoc { name: string; pages: string[] }
 
 export interface FotoSize { w: number; h: number }
 
-// Landscape photos are printed at most 15 cm wide, so two of them fit on one
-// A4 page; portrait photos keep the previous size (one per page).
-const WIDE_FOTO_CM = 15;
+// Every photo is printed 15 cm wide (two landscape ones fit on one A4 page).
+// Very tall images are limited to 22 cm high so they never overflow a page;
+// their width shrinks in proportion.
+const FOTO_W_CM = 15;
+const FOTO_MAX_H_CM = 22;
 const PX_PER_CM = 96 / 2.54;
 function fotoImg(src: string, size: FotoSize | undefined): string {
-  if (size && size.w > 0 && size.h > 0 && size.w >= size.h) {
-    const wPx = Math.round(WIDE_FOTO_CM * PX_PER_CM);
-    const hPx = Math.round((wPx * size.h) / size.w);
-    const hCm = ((WIDE_FOTO_CM * size.h) / size.w).toFixed(2);
-    return `<img src="${src}" width="${wPx}" height="${hPx}" style="width:${WIDE_FOTO_CM}cm;height:${hCm}cm;max-width:100%;" />`;
+  let wCm = FOTO_W_CM;
+  let hCm: number | null = null;
+  if (size && size.w > 0 && size.h > 0) {
+    hCm = (wCm * size.h) / size.w;
+    if (hCm > FOTO_MAX_H_CM) {
+      wCm = (FOTO_MAX_H_CM * size.w) / size.h;
+      hCm = FOTO_MAX_H_CM;
+    }
   }
-  return `<img src="${src}" width="640" style="max-width:100%;height:auto;" />`;
+  const wPx = Math.round(wCm * PX_PER_CM);
+  if (hCm == null) {
+    return `<img src="${src}" width="${wPx}" style="width:${wCm}cm;max-width:100%;height:auto;" />`;
+  }
+  const hPx = Math.round(hCm * PX_PER_CM);
+  return `<img src="${src}" width="${wPx}" height="${hPx}" style="width:${wCm.toFixed(2)}cm;height:${hCm.toFixed(2)}cm;max-width:100%;" />`;
 }
 
 export function buildActaHtml(a: Acta, lang: ActaLang = "ca", logoUrl = "/logo.jpg", renderedDocs?: RenderedDoc[], fotoSizes?: FotoSize[]): string {

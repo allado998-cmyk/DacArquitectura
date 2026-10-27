@@ -1,0 +1,290 @@
+{
+ "key": "t",
+ "title": "Perfils T",
+ "legend": [
+  {
+   "sym": "A",
+   "desc": "Área de la sección"
+  },
+  {
+   "sym": "Ix",
+   "desc": "Momento de inercia de media sección, respecto al eje X"
+  },
+  {
+   "sym": "Wx",
+   "desc": "Ix : (b – z). Módulo resistente de la sección, respecto al eje X"
+  },
+  {
+   "sym": "ix",
+   "desc": "√(Ix : A). Radio de giro de la sección, respecto a X"
+  },
+  {
+   "sym": "Iy",
+   "desc": "Momento de inercia de la sección, respecto a Y"
+  },
+  {
+   "sym": "Wy",
+   "desc": "2Iy : b Módulo resistente de la sección, respecto a Y."
+  },
+  {
+   "sym": "iy",
+   "desc": "√(Iy : A). Radio de giro, de la secc., respecto a Y"
+  },
+  {
+   "sym": "u",
+   "desc": "Perímetro de la sección"
+  },
+  {
+   "sym": "p",
+   "desc": "Peso por m"
+  },
+  {
+   "sym": "It",
+   "desc": "Módulo de torsión de la sección"
+  }
+ ],
+ "columns": [
+  {
+   "key": "b",
+   "label": "b",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tw",
+   "label": "e=r",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r1",
+   "label": "r1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r2",
+   "label": "r2",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "u",
+   "label": "u",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "z",
+   "label": "z",
+   "unit": "cm",
+   "group": "Posición del centro"
+  },
+  {
+   "key": "A",
+   "label": "A",
+   "unit": "cm²",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ix",
+   "label": "Ix",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wx",
+   "label": "Wx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "ix",
+   "label": "ix",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Iy",
+   "label": "Iy",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wy",
+   "label": "Wy",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "iy",
+   "label": "iy",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "It",
+   "label": "It",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "w",
+   "label": "w",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "a",
+   "label": "a",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "p",
+   "label": "p",
+   "unit": "kp/m",
+   "group": "Peso"
+  }
+ ],
+ "rows": [
+  {
+   "name": "T 40.5",
+   "v": [
+    40,
+    5,
+    2.5,
+    1,
+    153,
+    1.12,
+    3.77,
+    5.28,
+    1.84,
+    1.18,
+    2.58,
+    1.29,
+    0.83,
+    0.35,
+    21,
+    6.4,
+    2.96
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "T 50.6",
+   "v": [
+    50,
+    6,
+    3,
+    1.5,
+    191,
+    1.39,
+    5.66,
+    12.1,
+    3.36,
+    1.46,
+    6.06,
+    2.42,
+    1.03,
+    0.757,
+    30,
+    6.4,
+    4.44
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "T 60.7",
+   "v": [
+    60,
+    7,
+    3.5,
+    2,
+    229,
+    1.66,
+    7.94,
+    23.8,
+    5.48,
+    1.73,
+    12.2,
+    4.07,
+    1.24,
+    1.45,
+    34,
+    8.4,
+    6.23
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "T 70.8",
+   "v": [
+    70,
+    8,
+    4,
+    2,
+    268,
+    1.94,
+    10.6,
+    44.5,
+    8.79,
+    2.05,
+    22.1,
+    6.32,
+    1.44,
+    2.52,
+    38,
+    11,
+    8.32
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "T 80.9",
+   "v": [
+    80,
+    9,
+    4.5,
+    2,
+    307,
+    2.22,
+    13.6,
+    73.7,
+    12.8,
+    2.33,
+    37,
+    9.25,
+    1.65,
+    4.11,
+    45,
+    11,
+    10.7
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "T 100.11",
+   "v": [
+    100,
+    11,
+    5.5,
+    3,
+    383,
+    2.74,
+    20.9,
+    179,
+    24.6,
+    2.92,
+    88.3,
+    17.7,
+    2.05,
+    9.38,
+    60,
+    13,
+    16.4
+   ],
+   "avail": "C"
+  }
+ ]
+}

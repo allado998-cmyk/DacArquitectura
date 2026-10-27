@@ -85,6 +85,29 @@ export interface Acta {
   updated_at?: string;
 }
 
+// Càlculs estructurals (justificacions de càlcul); `dades` shape per tipus in src/lib/calculs.
+export interface CalculEstructural {
+  id: number;
+  num: string | null; // CE-YY-NNN
+  tipus: "paret" | "biga" | "pilar" | "soldadura";
+  expedient_id: number | null;
+  client_id: number | null;
+  referencia: string | null; // "Referència DAC"
+  projecte: string | null;
+  adreca: string | null;
+  ciutat: string | null;
+  client: string | null;
+  arquitecte: string | null;
+  situacio: string | null; // e.g. "Planta baixa"
+  element: string | null; // "Referència element"
+  data: string | null; // ISO date
+  versio: string | null;
+  dades: Record<string, unknown>;
+  expedient_num?: string | null; // joined
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ClientContacte {
   id: number;
   client_id: number | null;

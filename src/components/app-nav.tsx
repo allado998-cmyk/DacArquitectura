@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/login/actions";
 import { getSession } from "@/lib/auth";
 
-export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" | "ai" }) {
+export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" | "calculs" | "ai" }) {
   const session = await getSession();
   const isDemo = session.user === "demo";
 
@@ -37,6 +37,12 @@ export async function AppNav({ current }: { current?: "honoraris" | "parameters"
             className={`px-3 py-1.5 rounded-md ${current === "actes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Actes
+          </Link>
+          <Link
+            href="/calculs"
+            className={`px-3 py-1.5 rounded-md ${current === "calculs" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            Càlculs
           </Link>
           <Link
             href="/honoraris"

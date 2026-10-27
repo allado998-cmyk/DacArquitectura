@@ -1,0 +1,682 @@
+{
+ "key": "ipe",
+ "title": "Perfils IPE",
+ "legend": [
+  {
+   "sym": "A",
+   "desc": "Área de la sección"
+  },
+  {
+   "sym": "Sx",
+   "desc": "Momento estático de media sección, respecto a X"
+  },
+  {
+   "sym": "Ix",
+   "desc": "Momento de inercia de la sección, respecto a X"
+  },
+  {
+   "sym": "Wx",
+   "desc": "2·Ix : h. Módulo resistente de la sección, respecto a X"
+  },
+  {
+   "sym": "ix",
+   "desc": "√(Ix : A). Radio de giro de la sección, respecto a X"
+  },
+  {
+   "sym": "Iy",
+   "desc": "Momento de inercia de la sección, respecto a Y"
+  },
+  {
+   "sym": "Wy",
+   "desc": "2·Iy : b. Módulo resistente de la sección, respecto a Y"
+  },
+  {
+   "sym": "iy",
+   "desc": "√(Iy : A). Radio de giro de la sección, respecto a Y"
+  },
+  {
+   "sym": "It",
+   "desc": "Módulo de torsión de la sección"
+  },
+  {
+   "sym": "Ia",
+   "desc": "Módulo de alabeo de la sección"
+  },
+  {
+   "sym": "u",
+   "desc": "Perímetro de la sección"
+  },
+  {
+   "sym": "a",
+   "desc": "Diámetro del agujero del roblón normal"
+  },
+  {
+   "sym": "w",
+   "desc": "Gramil, distancia entre ejes de agujeros"
+  },
+  {
+   "sym": "h1",
+   "desc": "Altura de la parte plana del alma"
+  },
+  {
+   "sym": "p",
+   "desc": "Peso por m"
+  }
+ ],
+ "columns": [
+  {
+   "key": "h",
+   "label": "h",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "b",
+   "label": "b",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tw",
+   "label": "e",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tf",
+   "label": "e1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r1",
+   "label": "r1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "h1",
+   "label": "h1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "u",
+   "label": "u",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "A",
+   "label": "A",
+   "unit": "cm²",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Sx",
+   "label": "Sx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ix",
+   "label": "Ix",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wx",
+   "label": "Wx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "ix",
+   "label": "ix",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Iy",
+   "label": "Iy",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wy",
+   "label": "Wy",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "iy",
+   "label": "iy",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "It",
+   "label": "It",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ia",
+   "label": "Ia",
+   "unit": "cm⁶",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "w",
+   "label": "w",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "a",
+   "label": "a",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "e2",
+   "label": "e2",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "p",
+   "label": "p",
+   "unit": "kp/m",
+   "group": "Peso"
+  }
+ ],
+ "rows": [
+  {
+   "name": "IPE 80",
+   "v": [
+    80,
+    46,
+    3.8,
+    5.2,
+    5,
+    60,
+    328,
+    7.64,
+    11.6,
+    80.1,
+    20,
+    3.24,
+    8.49,
+    3.69,
+    1.05,
+    0.721,
+    118,
+    null,
+    null,
+    3.8,
+    6
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "IPE 100",
+   "v": [
+    100,
+    55,
+    4.1,
+    5.7,
+    7,
+    75,
+    400,
+    10.3,
+    19.7,
+    171,
+    34.2,
+    4.07,
+    15.9,
+    5.79,
+    1.24,
+    1.14,
+    351,
+    null,
+    null,
+    4.1,
+    8.1
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "IPE 120",
+   "v": [
+    120,
+    64,
+    4.4,
+    6.3,
+    7,
+    93,
+    475,
+    13.2,
+    30.4,
+    318,
+    53,
+    4.9,
+    27.7,
+    8.65,
+    1.45,
+    1.77,
+    890,
+    35,
+    null,
+    4.4,
+    10.4
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "IPE 140",
+   "v": [
+    140,
+    73,
+    4.7,
+    6.9,
+    7,
+    112,
+    551,
+    16.4,
+    44.2,
+    541,
+    77.3,
+    5.74,
+    44.9,
+    12.3,
+    1.65,
+    2.63,
+    1981,
+    40,
+    11,
+    4.7,
+    12.9
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "IPE 160",
+   "v": [
+    160,
+    82,
+    5,
+    7.4,
+    9,
+    127,
+    623,
+    20.1,
+    61.9,
+    869,
+    109,
+    6.58,
+    68.3,
+    16.7,
+    1.84,
+    3.64,
+    3959,
+    44,
+    13,
+    5,
+    15.8
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 180",
+   "v": [
+    180,
+    91,
+    5.3,
+    8,
+    9,
+    146,
+    698,
+    23.9,
+    83.2,
+    1320,
+    146,
+    7.42,
+    101,
+    22.2,
+    2.05,
+    5.06,
+    7431,
+    48,
+    13,
+    5.3,
+    18.8
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 200",
+   "v": [
+    200,
+    100,
+    5.6,
+    8.5,
+    12,
+    159,
+    788,
+    28.5,
+    110,
+    1940,
+    194,
+    8.26,
+    142,
+    28.5,
+    2.24,
+    6.67,
+    12990,
+    52,
+    13,
+    5.6,
+    22.4
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 220",
+   "v": [
+    220,
+    110,
+    5.9,
+    9.2,
+    12,
+    178,
+    848,
+    33.4,
+    143,
+    2770,
+    252,
+    9.11,
+    205,
+    37.3,
+    2.48,
+    9.15,
+    22670,
+    58,
+    17,
+    5.9,
+    26.2
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 240",
+   "v": [
+    240,
+    120,
+    6.2,
+    9.8,
+    15,
+    190,
+    922,
+    39.1,
+    183,
+    3890,
+    324,
+    9.97,
+    284,
+    47.3,
+    2.69,
+    12,
+    37390,
+    65,
+    17,
+    6.2,
+    30.7
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 270",
+   "v": [
+    270,
+    135,
+    6.6,
+    10.2,
+    15,
+    220,
+    1040,
+    45.9,
+    242,
+    5790,
+    429,
+    11.2,
+    420,
+    62.2,
+    3.02,
+    15.4,
+    70580,
+    72,
+    21,
+    6.6,
+    36.1
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 300",
+   "v": [
+    300,
+    150,
+    7.1,
+    10.7,
+    15,
+    249,
+    1160,
+    53.8,
+    314,
+    8360,
+    557,
+    12.5,
+    604,
+    80.5,
+    3.35,
+    20.1,
+    125900,
+    80,
+    23,
+    7.1,
+    42.2
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 330",
+   "v": [
+    330,
+    160,
+    7.5,
+    11.5,
+    18,
+    271,
+    1250,
+    62.6,
+    402,
+    11770,
+    713,
+    13.7,
+    788,
+    98.5,
+    3.55,
+    26.5,
+    199100,
+    85,
+    25,
+    7.5,
+    49.1
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 360",
+   "v": [
+    360,
+    170,
+    8,
+    12.7,
+    18,
+    299,
+    1350,
+    72.7,
+    510,
+    16270,
+    904,
+    15,
+    1040,
+    123,
+    3.79,
+    37.3,
+    313600,
+    90,
+    25,
+    8,
+    57.1
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 400",
+   "v": [
+    400,
+    180,
+    8.6,
+    13.5,
+    21,
+    331,
+    1470,
+    84.5,
+    654,
+    23130,
+    1160,
+    16.5,
+    1320,
+    146,
+    3.95,
+    48.3,
+    490000,
+    95,
+    28,
+    8.6,
+    66.3
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 450",
+   "v": [
+    450,
+    190,
+    9.4,
+    14.6,
+    21,
+    379,
+    1610,
+    98.8,
+    851,
+    33740,
+    1500,
+    18.5,
+    1680,
+    176,
+    4.12,
+    65.9,
+    791000,
+    100,
+    28,
+    9.4,
+    77.6
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 500",
+   "v": [
+    500,
+    200,
+    10.2,
+    16,
+    21,
+    426,
+    1740,
+    116,
+    1100,
+    48200,
+    1930,
+    20.4,
+    2140,
+    214,
+    4.31,
+    91.8,
+    1249000,
+    110,
+    28,
+    10.2,
+    90.7
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "IPE 550",
+   "v": [
+    550,
+    210,
+    11.1,
+    17.2,
+    24,
+    468,
+    1880,
+    134,
+    1390,
+    67120,
+    2440,
+    22.3,
+    2670,
+    254,
+    4.45,
+    122,
+    1884000,
+    115,
+    28,
+    11.1,
+    106
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "IPE 600",
+   "v": [
+    600,
+    220,
+    12,
+    19,
+    24,
+    514,
+    2010,
+    155,
+    1760,
+    92080,
+    3070,
+    24.3,
+    3390,
+    308,
+    4.66,
+    172,
+    2846000,
+    120,
+    28,
+    12,
+    122
+   ],
+   "avail": "C"
+  }
+ ]
+}

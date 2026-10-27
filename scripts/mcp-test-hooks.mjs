@@ -1,6 +1,8 @@
-// Module hooks for scripts/test-mcp.mjs: resolve the "@/..." alias to src/,
-// load .ts files with Node's built-in type stripping, and swap the modules
-// that need a running Next.js app or a database for small stubs.
+// Module hooks for scripts/test-mcp.mjs and scripts/test-calculs.mjs: resolve
+// the "@/..." alias to src/, load .ts files with Node's built-in type
+// stripping, load .json imports (which src/ imports without an `type: "json"`
+// attribute), and swap the modules that need a running Next.js app or a
+// database for small stubs.
 import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -68,6 +70,10 @@ export async function load(url, context, nextLoad) {
   if (url.startsWith("file:") && /\.tsx?$/.test(url)) {
     const source = await readFile(fileURLToPath(url), "utf8");
     return { format: "module-typescript", source, shortCircuit: true };
+  }
+  if (url.startsWith("file:") && url.endsWith(".json") && url.includes("/src/")) {
+    const source = await readFile(fileURLToPath(url), "utf8");
+    return { format: "module", source: `export default ${source};`, shortCircuit: true };
   }
   return nextLoad(url, context);
 }

@@ -1,0 +1,174 @@
+{
+ "key": "soldadura",
+ "title": "Valors límit de la gola d'una soldadura en angle",
+ "rows": [
+  {
+   "tMin": 4,
+   "tMax": 4.2,
+   "aMax": 2.5,
+   "aMin": 2.5
+  },
+  {
+   "tMin": 4.3,
+   "tMax": 4.9,
+   "aMax": 3,
+   "aMin": 2.5
+  },
+  {
+   "tMin": 5,
+   "tMax": 5.6,
+   "aMax": 3.5,
+   "aMin": 2.5
+  },
+  {
+   "tMin": 5.7,
+   "tMax": 6.3,
+   "aMax": 4,
+   "aMin": 2.5
+  },
+  {
+   "tMin": 6.4,
+   "tMax": 7,
+   "aMax": 4.5,
+   "aMin": 2.5
+  },
+  {
+   "tMin": 7.1,
+   "tMax": 7.7,
+   "aMax": 5,
+   "aMin": 3
+  },
+  {
+   "tMin": 7.8,
+   "tMax": 8.4,
+   "aMax": 5.5,
+   "aMin": 3
+  },
+  {
+   "tMin": 8.5,
+   "tMax": 9.1,
+   "aMax": 6,
+   "aMin": 3.5
+  },
+  {
+   "tMin": 9.2,
+   "tMax": 9.9,
+   "aMax": 6.5,
+   "aMin": 3.5
+  },
+  {
+   "tMin": 10,
+   "tMax": 10.6,
+   "aMax": 7,
+   "aMin": 4
+  },
+  {
+   "tMin": 10.7,
+   "tMax": 11.3,
+   "aMax": 7.5,
+   "aMin": 4
+  },
+  {
+   "tMin": 11.4,
+   "tMax": 12,
+   "aMax": 8,
+   "aMin": 4
+  },
+  {
+   "tMin": 12.1,
+   "tMax": 12.7,
+   "aMax": 8.5,
+   "aMin": 4.5
+  },
+  {
+   "tMin": 12.8,
+   "tMax": 13.4,
+   "aMax": 9,
+   "aMin": 4.5
+  },
+  {
+   "tMin": 13.5,
+   "tMax": 14.1,
+   "aMax": 9.5,
+   "aMin": 5
+  },
+  {
+   "tMin": 14.2,
+   "tMax": 15.5,
+   "aMax": 10,
+   "aMin": 5
+  },
+  {
+   "tMin": 15.6,
+   "tMax": 16.9,
+   "aMax": 11,
+   "aMin": 5.5
+  },
+  {
+   "tMin": 17,
+   "tMax": 18.3,
+   "aMax": 12,
+   "aMin": 5.5
+  },
+  {
+   "tMin": 18.4,
+   "tMax": 19.7,
+   "aMax": 13,
+   "aMin": 6
+  },
+  {
+   "tMin": 19.8,
+   "tMax": 21.2,
+   "aMax": 14,
+   "aMin": 6
+  },
+  {
+   "tMin": 21.3,
+   "tMax": 22.6,
+   "aMax": 15,
+   "aMin": 6.5
+  },
+  {
+   "tMin": 22.7,
+   "tMax": 24,
+   "aMax": 16,
+   "aMin": 6.5
+  },
+  {
+   "tMin": 24.1,
+   "tMax": 25.4,
+   "aMax": 17,
+   "aMin": 7
+  },
+  {
+   "tMin": 25.5,
+   "tMax": 26.8,
+   "aMax": 18,
+   "aMin": 7
+  },
+  {
+   "tMin": 26.9,
+   "tMax": 28.2,
+   "aMax": 19,
+   "aMin": 7.5
+  },
+  {
+   "tMin": 28.3,
+   "tMax": 31.1,
+   "aMax": 20,
+   "aMin": 7.5
+  },
+  {
+   "tMin": 31.2,
+   "tMax": 33.9,
+   "aMax": 22,
+   "aMin": 8
+  },
+  {
+   "tMin": 34,
+   "tMax": 36,
+   "aMax": 24,
+   "aMin": 8
+  }
+ ]
+}

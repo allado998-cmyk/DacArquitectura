@@ -1,0 +1,524 @@
+{
+ "key": "upn",
+ "title": "Perfils UPN",
+ "legend": [
+  {
+   "sym": "A",
+   "desc": "Área de la sección"
+  },
+  {
+   "sym": "Sx",
+   "desc": "Momento estático de media sección, respecto a X"
+  },
+  {
+   "sym": "Ix",
+   "desc": "Momento de inercia de la sección, respecto a X"
+  },
+  {
+   "sym": "Wx",
+   "desc": "2·Ix : h. Módulo resistente de la sección, respecto a X"
+  },
+  {
+   "sym": "ix",
+   "desc": "√(Ix : A). Radio de giro de la sección, respecto a X"
+  },
+  {
+   "sym": "Iy",
+   "desc": "Momento de inercia de la sección, respecto a Y"
+  },
+  {
+   "sym": "Wy",
+   "desc": "Iy : (b – c). Mínimo módulo resistente de la sección, respecto a Y"
+  },
+  {
+   "sym": "iy",
+   "desc": "√(Iy : A). Radio de giro de la sección, respecto a Y"
+  },
+  {
+   "sym": "It",
+   "desc": "Módulo de torsión de la sección"
+  },
+  {
+   "sym": "c",
+   "desc": "Posición del eje Y"
+  },
+  {
+   "sym": "m",
+   "desc": "Distancia al centro de esfuerzos cortantes"
+  },
+  {
+   "sym": "a",
+   "desc": "Diámetro del agujero del roblón normal"
+  },
+  {
+   "sym": "w",
+   "desc": "Gramil, distancia entre ejes de agujeros"
+  },
+  {
+   "sym": "h1",
+   "desc": "Altura de la parte plana del alma"
+  },
+  {
+   "sym": "p",
+   "desc": "Peso por m"
+  },
+  {
+   "sym": "u",
+   "desc": "Perímetro"
+  }
+ ],
+ "columns": [
+  {
+   "key": "h",
+   "label": "h",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "b",
+   "label": "b",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tw",
+   "label": "e",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tf",
+   "label": "e1=r",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r1",
+   "label": "r1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "h1",
+   "label": "h1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "u",
+   "label": "u",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "A",
+   "label": "A",
+   "unit": "cm²",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Sx",
+   "label": "Sx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ix",
+   "label": "Ix",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wx",
+   "label": "Wx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "ix",
+   "label": "ix",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Iy",
+   "label": "Iy",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wy",
+   "label": "Wy",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "iy",
+   "label": "iy",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "It",
+   "label": "It",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "c",
+   "label": "c",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "m",
+   "label": "m",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "w",
+   "label": "w",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "a",
+   "label": "a",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "p",
+   "label": "p",
+   "unit": "kp/m",
+   "group": "Peso"
+  }
+ ],
+ "rows": [
+  {
+   "name": "UPN 80",
+   "v": [
+    80,
+    45,
+    6,
+    8,
+    4,
+    46,
+    312,
+    11,
+    15.9,
+    106,
+    26.5,
+    3.1,
+    19.4,
+    6.36,
+    1.33,
+    2.24,
+    1.45,
+    2.67,
+    25,
+    13,
+    8.64
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "UPN 100",
+   "v": [
+    100,
+    50,
+    6,
+    8.5,
+    4.5,
+    64,
+    372,
+    13.5,
+    24.5,
+    206,
+    41.2,
+    3.91,
+    29.3,
+    8.49,
+    1.47,
+    2.96,
+    1.55,
+    2.93,
+    30,
+    13,
+    10.6
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 120",
+   "v": [
+    120,
+    55,
+    7,
+    9,
+    4.5,
+    82,
+    434,
+    17,
+    36.3,
+    364,
+    60.7,
+    4.62,
+    43.2,
+    11.1,
+    1.59,
+    4.3,
+    1.6,
+    3.03,
+    30,
+    17,
+    13.4
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 140",
+   "v": [
+    140,
+    60,
+    7,
+    10,
+    5,
+    98,
+    489,
+    20.4,
+    51.4,
+    605,
+    86.4,
+    5.45,
+    62.7,
+    14.8,
+    1.75,
+    6.02,
+    1.75,
+    3.37,
+    35,
+    17,
+    16
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 160",
+   "v": [
+    160,
+    65,
+    7.5,
+    10.5,
+    5.5,
+    115,
+    546,
+    24,
+    68.8,
+    925,
+    116,
+    6.21,
+    85.3,
+    18.3,
+    1.89,
+    7.81,
+    1.84,
+    3.56,
+    35,
+    21,
+    18.8
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 180",
+   "v": [
+    180,
+    70,
+    8,
+    11,
+    5.5,
+    133,
+    611,
+    28,
+    89.6,
+    1350,
+    150,
+    6.95,
+    114,
+    22.4,
+    2.02,
+    9.98,
+    1.92,
+    3.75,
+    40,
+    21,
+    22
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 200",
+   "v": [
+    200,
+    75,
+    8.5,
+    11.5,
+    6,
+    151,
+    661,
+    32.2,
+    114,
+    1910,
+    191,
+    7.7,
+    148,
+    27,
+    2.14,
+    12.6,
+    2.01,
+    3.94,
+    40,
+    23,
+    25.3
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 220",
+   "v": [
+    220,
+    80,
+    9,
+    12.5,
+    6.5,
+    167,
+    718,
+    37.4,
+    146,
+    2690,
+    245,
+    8.48,
+    197,
+    33.6,
+    2.3,
+    17,
+    2.14,
+    4.2,
+    45,
+    23,
+    29.4
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 240",
+   "v": [
+    240,
+    85,
+    9.5,
+    13,
+    6.5,
+    184,
+    775,
+    42.3,
+    179,
+    3600,
+    300,
+    9.22,
+    248,
+    39.6,
+    2.42,
+    20.8,
+    2.23,
+    4.39,
+    45,
+    25,
+    33.2
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 260",
+   "v": [
+    260,
+    90,
+    10,
+    14,
+    7,
+    200,
+    834,
+    48.3,
+    221,
+    4820,
+    371,
+    9.99,
+    317,
+    47.7,
+    2.56,
+    23.7,
+    2.36,
+    4.66,
+    50,
+    25,
+    37.9
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 280",
+   "v": [
+    280,
+    95,
+    10,
+    15,
+    7.5,
+    216,
+    890,
+    53.3,
+    266,
+    6280,
+    448,
+    10.9,
+    399,
+    57.2,
+    2.74,
+    33.2,
+    2.53,
+    5.02,
+    50,
+    25,
+    41.8
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "UPN 300",
+   "v": [
+    300,
+    100,
+    10,
+    16,
+    8,
+    232,
+    950,
+    58.8,
+    316,
+    8030,
+    535,
+    11.7,
+    495,
+    67.8,
+    2.9,
+    40.6,
+    2.7,
+    5.41,
+    55,
+    25,
+    46.2
+   ],
+   "avail": "P"
+  }
+ ]
+}

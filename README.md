@@ -92,6 +92,38 @@ La pestanya **Mapa** mostra els expedients situats amb un punt de color per
 categoria (mapa d'OpenStreetMap amb Leaflet) i llista els que encara no tenen
 ubicació. Columnes: `adreca`, `maps_url`, `lat`, `lng` (migració 0042).
 
+## Càlculs (justificacions de càlcul)
+
+La pàgina **Càlculs** substitueix els fulls de càlcul de l'estudi. Cada càlcul
+es desa (taula `calcul_estructural`, migració 0043), recalcula en viu i
+s'exporta com a informe de justificació en **Word** i **PDF**.
+
+- **Estintolament paret de càrrega**: estat de càrregues ponderat, comprovació
+  del perfil (E.L.S. i E.L.U.), recolzament als extrems (A connectors, B daus,
+  C brancals) i esnelles. Cada opció es pot treure del càlcul i de l'informe.
+- **Recolzament biga**: daus de formigó i connectors a partir de l'esforç tallant.
+- **Base pilar estintolament**: tensió sota la base amb repartiment a 60°.
+- **Compatibilitat soldadures**: gola compatible entre ala i ànima de dos perfils
+  (o una xapa) segons la taula de valors límit.
+
+L'encapçalament (referència, projecte, adreça, ciutat i client) s'omple des de
+l'expedient i es pot vincular a un client de la Base de Dades.
+
+La pestanya **Perfils i soldadures** (i el botó «Taules de perfils» de cada
+càlcul) mostra les taules del catàleg: IPE, IPN, HEB, HEA, HEM, UPN, T, L, LD,
+ZF, tubs, rodons, soldadures, acers i les taules de fàbrica del CTE DB SE-F.
+Estan transcrites a `src/lib/calculs/perfils/*.json` a partir de les fotos del
+catàleg (`public/calculs/perfils/`); les cel·les que no quadren amb la resta de
+la fila hi surten marcades amb una nota (`perfils-data.ts`).
+
+Diferències amb els fulls de càlcul, a propòsit (detall a `src/lib/calculs/paret.ts`):
+cada comprovació es fa contra el valor que s'hi mostra (alguns OK!/NO! de l'Excel
+miraven una altra cel·la), la reacció als extrems és Q·L/2 (l'Excel la rebaixava
+un ~2 %) i el pes propi del perfil surt del catàleg si no s'escriu.
+
+Tests sense base de dades (comparen amb els valors dels fulls de càlcul):
+`npm run test:calculs`.
+
 ## Plugin de ChatGPT i Claude
 
 L'aplicació exposa un servidor MCP a `/api/mcp` amb OAuth propi, de manera que

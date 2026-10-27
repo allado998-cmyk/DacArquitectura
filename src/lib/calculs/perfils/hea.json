@@ -1,0 +1,709 @@
+{
+ "key": "hea",
+ "title": "Perfils HEA",
+ "legend": [
+  {
+   "sym": "A",
+   "desc": "Área de la sección"
+  },
+  {
+   "sym": "Sx",
+   "desc": "Momento estático de media sección, respecto a X"
+  },
+  {
+   "sym": "Ix",
+   "desc": "Momento de inercia de la sección, respecto a X"
+  },
+  {
+   "sym": "Wx",
+   "desc": "2·Ix : h. Módulo resistente de la sección, respecto a X"
+  },
+  {
+   "sym": "ix",
+   "desc": "√(Ix : A). Radio de giro de la sección, respecto a X"
+  },
+  {
+   "sym": "Iy",
+   "desc": "Momento de inercia de la sección, respecto a Y"
+  },
+  {
+   "sym": "Wy",
+   "desc": "2·Iy : b. Módulo resistente de la sección, respecto a Y"
+  },
+  {
+   "sym": "iy",
+   "desc": "√(Iy : A). Radio de giro de la sección, respecto a Y"
+  },
+  {
+   "sym": "It",
+   "desc": "Módulo de torsión de la sección"
+  },
+  {
+   "sym": "Ia",
+   "desc": "Módulo de alabeo de la sección"
+  },
+  {
+   "sym": "u",
+   "desc": "Perímetro de la sección"
+  },
+  {
+   "sym": "a",
+   "desc": "Diámetro del agujero del roblón normal"
+  },
+  {
+   "sym": "w",
+   "desc": "Gramil, distancia entre ejes de agujeros"
+  },
+  {
+   "sym": "h1",
+   "desc": "Altura de la parte plana del alma"
+  },
+  {
+   "sym": "p",
+   "desc": "Peso por m"
+  }
+ ],
+ "columns": [
+  {
+   "key": "h",
+   "label": "h",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "b",
+   "label": "b",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tw",
+   "label": "e",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tf",
+   "label": "e1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r1",
+   "label": "r1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "h1",
+   "label": "h1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "u",
+   "label": "u",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "A",
+   "label": "A",
+   "unit": "cm²",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Sx",
+   "label": "Sx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ix",
+   "label": "Ix",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wx",
+   "label": "Wx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "ix",
+   "label": "ix",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Iy",
+   "label": "Iy",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wy",
+   "label": "Wy",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "iy",
+   "label": "iy",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "It",
+   "label": "It",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ia",
+   "label": "Ia",
+   "unit": "cm⁶",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "w",
+   "label": "w",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "w1",
+   "label": "w1",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "a",
+   "label": "a",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "p",
+   "label": "p",
+   "unit": "kp/m",
+   "group": "Peso"
+  }
+ ],
+ "rows": [
+  {
+   "name": "HEA 100",
+   "v": [
+    96,
+    100,
+    5,
+    8,
+    12,
+    56,
+    561,
+    21.2,
+    41.5,
+    349,
+    73,
+    4.06,
+    134,
+    27,
+    2.51,
+    4.83,
+    2581,
+    55,
+    null,
+    13,
+    16.7
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 120",
+   "v": [
+    114,
+    120,
+    5,
+    8,
+    12,
+    74,
+    677,
+    25.3,
+    59.7,
+    606,
+    106,
+    4.89,
+    231,
+    38,
+    3.02,
+    5.81,
+    6472,
+    65,
+    null,
+    17,
+    19.9
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 140",
+   "v": [
+    133,
+    140,
+    5.5,
+    8.5,
+    12,
+    92,
+    794,
+    31.4,
+    86.7,
+    1033,
+    155,
+    5.73,
+    389,
+    56,
+    3.52,
+    8.22,
+    15060,
+    75,
+    null,
+    21,
+    24.7
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 160",
+   "v": [
+    152,
+    160,
+    6,
+    9,
+    15,
+    104,
+    906,
+    38.8,
+    123,
+    1673,
+    220,
+    6.57,
+    616,
+    77,
+    3.98,
+    11.3,
+    31410,
+    85,
+    null,
+    23,
+    30.4
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 180",
+   "v": [
+    171,
+    180,
+    6,
+    9.5,
+    15,
+    122,
+    1020,
+    45.3,
+    162,
+    2510,
+    294,
+    7.45,
+    925,
+    103,
+    4.52,
+    14.7,
+    60210,
+    100,
+    null,
+    25,
+    35.5
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 200",
+   "v": [
+    190,
+    200,
+    6.5,
+    10,
+    18,
+    134,
+    1140,
+    53.8,
+    215,
+    3692,
+    389,
+    8.28,
+    1336,
+    134,
+    4.98,
+    19.2,
+    108000,
+    110,
+    null,
+    25,
+    42.3
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 220",
+   "v": [
+    210,
+    220,
+    7,
+    11,
+    18,
+    152,
+    1260,
+    64.3,
+    284,
+    5410,
+    515,
+    9.17,
+    1955,
+    178,
+    5.51,
+    28,
+    193300,
+    120,
+    null,
+    25,
+    50.5
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 240",
+   "v": [
+    230,
+    240,
+    7.5,
+    12,
+    21,
+    164,
+    1370,
+    76.8,
+    372,
+    7763,
+    675,
+    10.1,
+    2769,
+    231,
+    6,
+    39.4,
+    328500,
+    90,
+    35,
+    25,
+    60.3
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 260",
+   "v": [
+    250,
+    260,
+    7.5,
+    12.5,
+    24,
+    177,
+    1480,
+    86.8,
+    460,
+    10455,
+    836,
+    11,
+    3668,
+    282,
+    6.5,
+    47.8,
+    516400,
+    100,
+    40,
+    25,
+    68.2
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 280",
+   "v": [
+    270,
+    280,
+    8,
+    13,
+    24,
+    196,
+    1600,
+    97.3,
+    556,
+    13673,
+    1010,
+    11.9,
+    4763,
+    340,
+    7,
+    58.3,
+    785400,
+    110,
+    45,
+    25,
+    76.4
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 300",
+   "v": [
+    290,
+    300,
+    8.5,
+    14,
+    27,
+    208,
+    1720,
+    112.5,
+    692,
+    18263,
+    1260,
+    12.7,
+    6310,
+    421,
+    7.49,
+    77.7,
+    1200000,
+    120,
+    50,
+    25,
+    88.3
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 320",
+   "v": [
+    310,
+    300,
+    9,
+    15.5,
+    27,
+    225,
+    1760,
+    124.4,
+    814,
+    22928,
+    1480,
+    13.6,
+    6985,
+    466,
+    7.49,
+    105,
+    1512000,
+    120,
+    50,
+    25,
+    97.6
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 340",
+   "v": [
+    330,
+    300,
+    9.5,
+    16.5,
+    27,
+    243,
+    1790,
+    133.5,
+    925,
+    27693,
+    1680,
+    14.4,
+    7436,
+    496,
+    7.46,
+    127,
+    1824000,
+    120,
+    50,
+    25,
+    105
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 360",
+   "v": [
+    350,
+    300,
+    10,
+    17.5,
+    27,
+    261,
+    1830,
+    142.8,
+    1040,
+    33090,
+    1890,
+    15.2,
+    7887,
+    526,
+    7.43,
+    152,
+    2177000,
+    120,
+    50,
+    25,
+    112
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 400",
+   "v": [
+    390,
+    300,
+    11,
+    19,
+    27,
+    298,
+    1910,
+    159,
+    1280,
+    45069,
+    2310,
+    16.8,
+    8564,
+    571,
+    7.34,
+    197,
+    2942000,
+    120,
+    50,
+    25,
+    125
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 450",
+   "v": [
+    440,
+    300,
+    11.5,
+    21,
+    27,
+    344,
+    2010,
+    178,
+    1610,
+    63722,
+    2900,
+    18.9,
+    9465,
+    631,
+    7.29,
+    265,
+    4148000,
+    120,
+    50,
+    25,
+    140
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 500",
+   "v": [
+    490,
+    300,
+    12,
+    23,
+    27,
+    390,
+    2110,
+    197.5,
+    1970,
+    86975,
+    3550,
+    21,
+    10367,
+    691,
+    7.24,
+    347,
+    5643000,
+    120,
+    45,
+    28,
+    155
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 550",
+   "v": [
+    540,
+    300,
+    12.5,
+    24,
+    27,
+    438,
+    2210,
+    211.8,
+    2310,
+    111932,
+    4150,
+    23,
+    10819,
+    721,
+    7.15,
+    398,
+    7189000,
+    120,
+    45,
+    28,
+    166
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEA 600",
+   "v": [
+    590,
+    300,
+    13,
+    25,
+    27,
+    486,
+    2310,
+    226.5,
+    2680,
+    141208,
+    4790,
+    25,
+    11271,
+    751,
+    7.05,
+    454,
+    8978000,
+    120,
+    45,
+    28,
+    178
+   ],
+   "avail": "C"
+  }
+ ]
+}

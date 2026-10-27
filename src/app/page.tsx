@@ -33,6 +33,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Actes</h2>
             <p className="text-sm text-[var(--color-muted)]">Actes de visites d'obra i reunions.</p>
           </Link>
+          <Link href="/calculs" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">Càlculs</h2>
+            <p className="text-sm text-[var(--color-muted)]">Justificacions de càlcul d&apos;estintolaments i taules de perfils.</p>
+          </Link>
           <Link href="/honoraris" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Honoraris</h2>
             <p className="text-sm text-[var(--color-muted)]">Càlcul d'honoraris.</p>

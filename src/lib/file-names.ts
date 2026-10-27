@@ -58,6 +58,13 @@ export function propostaFileName(num: string | null | undefined, descripcio: str
   return join("FE72.01-02 Proposta d'Honoraris", [propostaNumForFile(num), firstLine(descripcio)]);
 }
 
+// Structural calculation: "<spreadsheet name>-261773-v1-261027"
+// (expedient number / calculation version / date as YYMMDD).
+export function calculFileName(c: { fileTitle: string; referencia?: string | null; versio?: string | null; data?: string | null }): string {
+  const versio = (c.versio ?? "").trim();
+  return join(c.fileTitle, [digits(c.referencia), versio ? `v${versio}` : "", yymmdd(c.data)]);
+}
+
 // Invoice "26-006" -> "26006".
 export function facturaFileName(num: string | null | undefined, concepte: string | null | undefined): string {
   return join("FE72.01-08 Model de Factura", [digits(num), firstLine(concepte)]);

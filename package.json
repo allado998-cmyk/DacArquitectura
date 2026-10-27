@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test:mcp": "node scripts/test-mcp.mjs",
+    "test:calculs": "node scripts/test-calculs.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:migrate:demo": "node --env-file=.env.demo.local scripts/migrate.mjs",
     "db:seed:demo": "node --env-file=.env.demo.local scripts/seed-demo.mjs"

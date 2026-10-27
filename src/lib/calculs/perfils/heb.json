@@ -1,0 +1,709 @@
+{
+ "key": "heb",
+ "title": "Perfils HEB",
+ "legend": [
+  {
+   "sym": "A",
+   "desc": "Área de la sección"
+  },
+  {
+   "sym": "Sx",
+   "desc": "Momento estático de media sección, respecto a X"
+  },
+  {
+   "sym": "Ix",
+   "desc": "Momento de inercia de la sección, respecto a X"
+  },
+  {
+   "sym": "Wx",
+   "desc": "2·Ix : h. Módulo resistente de la sección, respecto a X"
+  },
+  {
+   "sym": "ix",
+   "desc": "√(Ix : A). Radio de giro de la sección, respecto a X"
+  },
+  {
+   "sym": "Iy",
+   "desc": "Momento de inercia de la sección, respecto a Y"
+  },
+  {
+   "sym": "Wy",
+   "desc": "2·Iy : b. Módulo resistente de la sección, respecto a Y"
+  },
+  {
+   "sym": "iy",
+   "desc": "√(Iy : A). Radio de giro de la sección, respecto a Y"
+  },
+  {
+   "sym": "It",
+   "desc": "Módulo de torsión de la sección"
+  },
+  {
+   "sym": "Ia",
+   "desc": "Módulo de alabeo de la sección"
+  },
+  {
+   "sym": "u",
+   "desc": "Perímetro de la sección"
+  },
+  {
+   "sym": "a",
+   "desc": "Diámetro del agujero del roblón normal"
+  },
+  {
+   "sym": "w",
+   "desc": "Gramil, distancia entre ejes de agujeros"
+  },
+  {
+   "sym": "h1",
+   "desc": "Altura de la parte plana del alma"
+  },
+  {
+   "sym": "p",
+   "desc": "Peso por m"
+  }
+ ],
+ "columns": [
+  {
+   "key": "h",
+   "label": "h",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "b",
+   "label": "b",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tw",
+   "label": "e",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "tf",
+   "label": "e1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "r1",
+   "label": "r1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "h1",
+   "label": "h1",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "u",
+   "label": "u",
+   "unit": "mm",
+   "group": "Dimensiones"
+  },
+  {
+   "key": "A",
+   "label": "A",
+   "unit": "cm²",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Sx",
+   "label": "Sx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ix",
+   "label": "Ix",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wx",
+   "label": "Wx",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "ix",
+   "label": "ix",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Iy",
+   "label": "Iy",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Wy",
+   "label": "Wy",
+   "unit": "cm³",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "iy",
+   "label": "iy",
+   "unit": "cm",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "It",
+   "label": "It",
+   "unit": "cm⁴",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "Ia",
+   "label": "Ia",
+   "unit": "cm⁶",
+   "group": "Términos de sección"
+  },
+  {
+   "key": "w",
+   "label": "w",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "w1",
+   "label": "w1",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "a",
+   "label": "a",
+   "unit": "mm",
+   "group": "Agujeros"
+  },
+  {
+   "key": "p",
+   "label": "p",
+   "unit": "kp/m",
+   "group": "Peso"
+  }
+ ],
+ "rows": [
+  {
+   "name": "HEB 100",
+   "v": [
+    100,
+    100,
+    6,
+    10,
+    12,
+    56,
+    567,
+    26,
+    52.1,
+    450,
+    90,
+    4.16,
+    167,
+    33,
+    2.53,
+    9.34,
+    3375,
+    55,
+    null,
+    13,
+    20.4
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 120",
+   "v": [
+    120,
+    120,
+    6.5,
+    11,
+    12,
+    74,
+    686,
+    34,
+    82.6,
+    864,
+    144,
+    5.04,
+    318,
+    53,
+    3.06,
+    14.9,
+    9410,
+    65,
+    null,
+    17,
+    26.7
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 140",
+   "v": [
+    140,
+    140,
+    7,
+    12,
+    12,
+    92,
+    805,
+    43,
+    123,
+    1509,
+    216,
+    5.93,
+    550,
+    79,
+    3.58,
+    22.5,
+    22480,
+    75,
+    null,
+    21,
+    33.7
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 160",
+   "v": [
+    160,
+    160,
+    8,
+    13,
+    15,
+    104,
+    918,
+    54.3,
+    177,
+    2492,
+    311,
+    6.78,
+    889,
+    111,
+    4.05,
+    33.2,
+    47940,
+    85,
+    null,
+    23,
+    42.6
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 180",
+   "v": [
+    180,
+    180,
+    8.5,
+    14,
+    15,
+    122,
+    1040,
+    65.3,
+    241,
+    3831,
+    426,
+    7.66,
+    1363,
+    151,
+    4.57,
+    46.5,
+    93750,
+    100,
+    null,
+    25,
+    51.2
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 200",
+   "v": [
+    200,
+    200,
+    9,
+    15,
+    18,
+    134,
+    1150,
+    78.1,
+    321,
+    5696,
+    570,
+    8.54,
+    2003,
+    200,
+    5.07,
+    63.4,
+    171100,
+    110,
+    null,
+    25,
+    61.3
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 220",
+   "v": [
+    220,
+    220,
+    9.5,
+    16,
+    18,
+    152,
+    1270,
+    91,
+    414,
+    8091,
+    736,
+    9.43,
+    2843,
+    258,
+    5.59,
+    84.4,
+    295400,
+    120,
+    null,
+    25,
+    71.5
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 240",
+   "v": [
+    240,
+    240,
+    10,
+    17,
+    21,
+    164,
+    1380,
+    106,
+    527,
+    11259,
+    938,
+    10.3,
+    3923,
+    327,
+    6.08,
+    110,
+    486900,
+    90,
+    35,
+    25,
+    83.2
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 260",
+   "v": [
+    260,
+    260,
+    10,
+    17.5,
+    24,
+    177,
+    1500,
+    118.4,
+    641,
+    14919,
+    1150,
+    11.2,
+    5135,
+    395,
+    6.58,
+    130,
+    753700,
+    100,
+    40,
+    25,
+    93
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 280",
+   "v": [
+    280,
+    280,
+    10.5,
+    18,
+    24,
+    196,
+    1620,
+    131.4,
+    767,
+    19270,
+    1380,
+    12.1,
+    6595,
+    471,
+    7.09,
+    153,
+    1130000,
+    110,
+    45,
+    25,
+    103
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 300",
+   "v": [
+    300,
+    300,
+    11,
+    19,
+    27,
+    208,
+    1730,
+    149.1,
+    934,
+    25166,
+    1680,
+    13,
+    8563,
+    571,
+    7.58,
+    192,
+    1688000,
+    120,
+    50,
+    25,
+    117
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 320",
+   "v": [
+    320,
+    300,
+    11.5,
+    20.5,
+    27,
+    225,
+    1770,
+    161.3,
+    1070,
+    30823,
+    1930,
+    13.8,
+    9239,
+    616,
+    7.57,
+    241,
+    2069000,
+    120,
+    50,
+    25,
+    127
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 340",
+   "v": [
+    340,
+    300,
+    12,
+    21.5,
+    27,
+    243,
+    1810,
+    170.9,
+    1200,
+    36656,
+    2160,
+    14.6,
+    9690,
+    646,
+    7.53,
+    278,
+    2454000,
+    120,
+    50,
+    25,
+    134
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 360",
+   "v": [
+    300,
+    300,
+    12.5,
+    22.5,
+    27,
+    261,
+    1850,
+    180.6,
+    1340,
+    43193,
+    2400,
+    15.5,
+    10140,
+    676,
+    7.49,
+    320,
+    2883000,
+    120,
+    50,
+    25,
+    142
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 400",
+   "v": [
+    400,
+    300,
+    13.5,
+    24,
+    27,
+    298,
+    1930,
+    197.8,
+    1620,
+    57680,
+    2880,
+    17.1,
+    10819,
+    721,
+    7.4,
+    394,
+    3817000,
+    120,
+    50,
+    25,
+    155
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 450",
+   "v": [
+    450,
+    300,
+    14,
+    26,
+    27,
+    344,
+    2030,
+    218,
+    1990,
+    79887,
+    3550,
+    19.1,
+    11721,
+    781,
+    7.33,
+    500,
+    5258000,
+    120,
+    50,
+    25,
+    171
+   ],
+   "avail": "P"
+  },
+  {
+   "name": "HEB 500",
+   "v": [
+    500,
+    300,
+    14.5,
+    28,
+    27,
+    390,
+    2120,
+    238.6,
+    2410,
+    107176,
+    4290,
+    21.2,
+    12624,
+    842,
+    7.27,
+    625,
+    7018000,
+    120,
+    45,
+    28,
+    187
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEB 550",
+   "v": [
+    550,
+    300,
+    15,
+    29,
+    27,
+    438,
+    2220,
+    254.1,
+    2800,
+    136691,
+    4970,
+    23.2,
+    13077,
+    872,
+    7.17,
+    701,
+    8856000,
+    120,
+    45,
+    28,
+    199
+   ],
+   "avail": "C"
+  },
+  {
+   "name": "HEB 600",
+   "v": [
+    600,
+    300,
+    15.5,
+    30,
+    27,
+    486,
+    2320,
+    270,
+    3210,
+    171041,
+    5700,
+    25.2,
+    13530,
+    902,
+    7.08,
+    783,
+    10965000,
+    120,
+    45,
+    28,
+    212
+   ],
+   "avail": "C"
+  }
+ ]
+}

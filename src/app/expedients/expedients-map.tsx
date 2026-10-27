@@ -4,8 +4,8 @@
 // an effect. Expedients at the same spot share one pin with a count; clicking
 // it shows a card for each of them beside the map.
 //
-// Base layers: "Mapa" (OpenStreetMap) and "Satèl·lit" (ICGC orthophoto inside
-// Catalonia, Esri World Imagery elsewhere, with place names on top).
+// Base layers: "Satèl·lit" (default; ICGC orthophoto inside Catalonia, Esri
+// World Imagery elsewhere, with place names on top) and "Mapa" (OpenStreetMap).
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import type { Map as LMap, LayerGroup, Marker, LatLngBoundsExpression } from "leaflet";
@@ -93,7 +93,7 @@ export function ExpedientsMap({ groups, selectedKey, onSelect }: { groups: MapGr
           maxNativeZoom: 18,
         }),
       ]);
-      mapa.addTo(m);
+      satellit.addTo(m);
       L.control.layers({ Mapa: mapa, "Satèl·lit": satellit }, undefined, { position: "topright", collapsed: false }).addTo(m);
 
       // View buttons under the zoom control.

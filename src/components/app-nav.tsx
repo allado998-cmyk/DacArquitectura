@@ -74,12 +74,6 @@ export async function AppNav({ current }: { current?: "honoraris" | "parameters"
           >
             Notes
           </Link>
-          <Link
-            href="/ai"
-            className={`px-3 py-1.5 rounded-md ${current === "ai" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
-          >
-            IA
-          </Link>
         </nav>
         {isDemo && (
           <span

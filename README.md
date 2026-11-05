@@ -93,6 +93,12 @@ Un contacte pot tenir diversos telèfons i mails. `telefon` i `mail` són sempre
 els **principals** (els que mostren les taules i llegeixen les actes i el
 plugin); la resta van a `telefons_extra` i `mails_extra` (migració 0044).
 
+Els telèfons amb un nombre de xifres incorrecte surten amb un avís ⚠
+(`src/lib/telefon.ts`): sense prefix, o amb +34 / 0034, han de tenir 9 xifres; la
+resta de números internacionals (+ o 00), entre 8 i 15. És un avís, no un
+bloqueig: en desar es demana confirmació i el número es pot guardar igualment.
+Per veure'ls tots: pestanya Contactes, filtre Telèfon → Incorrecte.
+
 ## Mapa d'obres (Expedients → Mapa)
 
 Cada expedient pot tenir una **adreça** i un **enllaç de Google Maps**. En desar,

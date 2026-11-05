@@ -10,6 +10,7 @@ import {
   updateClientContacteAction,
 } from "@/app/parameters/actions";
 import { CATEGORIES } from "@/lib/expedients";
+import { telefonsAmbAvis } from "@/lib/telefon";
 import { id, registerAction, shortText, type Plan } from "../core";
 import { findClient, lastInsertedId, listTasques, resolveClient, searchClients } from "../data";
 import { callAction } from "../shared";
@@ -168,6 +169,9 @@ registerAction({
   },
 });
 
+const telefonWarnings = (a: { telefon?: string | null; telefons_extra?: string[] }) =>
+  telefonsAmbAvis([a.telefon, ...(a.telefons_extra ?? [])]).map((w) => `Telèfon ${w}`);
+
 const contacteFields = z.object({
   nom: shortText.nullable().optional(),
   telefon: shortText.nullable().optional().describe("Telèfon principal"),
@@ -189,7 +193,7 @@ registerAction({
     if (!a.nom?.trim() && !a.telefon?.trim() && !a.mail?.trim()) errors.push("Cal almenys nom, telèfon o correu.");
     const r = await resolveClient(a.client_id);
     if (r.error) errors.push(r.error);
-    return { summary: `Crear el contacte «${a.nom ?? a.mail ?? a.telefon}»${r.client ? ` del client ${r.client.nom}` : ""}.`, details: { ...a, client: r.client?.nom ?? null }, errors };
+    return { summary: `Crear el contacte «${a.nom ?? a.mail ?? a.telefon}»${r.client ? ` del client ${r.client.nom}` : ""}.`, details: { ...a, client: r.client?.nom ?? null }, errors, warnings: telefonWarnings(a) };
   },
   async commit(a) {
     await callAction(() => createContacteAction({ nom: a.nom ?? "", telefon: a.telefon ?? "", mail: a.mail ?? "", telefonsExtra: a.telefons_extra ?? [], mailsExtra: a.mails_extra ?? [], comentari: a.comentari ?? "", clientId: a.client_id ?? null }));
@@ -217,7 +221,7 @@ registerAction({
       if (r.error) errors.push(r.error);
       else changes.client = r.client?.nom;
     }
-    return { summary: `Modificar el contacte «${k.nom ?? k.mail ?? k.id}»: ${Object.keys(changes).join(", ")}.`, details: { abans: k, despres: changes }, errors };
+    return { summary: `Modificar el contacte «${k.nom ?? k.mail ?? k.id}»: ${Object.keys(changes).join(", ")}.`, details: { abans: k, despres: changes }, errors, warnings: telefonWarnings(a) };
   },
   async commit(a) {
     const k = await getContacte(a.id);

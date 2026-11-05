@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { updateActaAction, deleteActaAction, createActaContacteAction, addActaFotoAction, removeActaFotoAction, addActaDocAction, removeActaDocAction, addActaAudioAction, removeActaAudioAction, type ActaPatch } from "../actions";
 import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, temaCat, type ActaLang } from "@/lib/acta-doc";
+import { confirmaTelefons } from "@/lib/telefon";
 import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 import { actaFileName } from "@/lib/file-names";
 
@@ -211,6 +212,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
   function saveNewContact() {
     const nom = ncNom.trim();
     if (!nom && !ncTel.trim() && !ncMail.trim()) { setNewContact(false); return; }
+    if (!confirmaTelefons([ncTel])) return;
     startTransition(async () => {
       const res = await createActaContacteAction({ nom, telefon: ncTel, mail: ncMail });
       if (res) {

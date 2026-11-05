@@ -385,6 +385,32 @@ await test("a preview with errors cannot be confirmed", async () => {
   assert.equal(db.writes.length, 0);
 });
 
+console.log("telefon");
+const { telefonAvis, telefonsAmbAvis } = await import("../src/lib/telefon.ts");
+await test("Spanish numbers have 9 digits, however they are written", () => {
+  for (const ok of ["600111222", "600 111 222", "93 123 45 67", "600.111.222", "600-111-222", "+34 600 111 222", "+34600111222", "0034 600111222"]) assert.equal(telefonAvis(ok), null, ok);
+  assert.match(telefonAvis("600 111 22"), /Té 8 xifres; n'hi hauria d'haver 9/);
+  assert.match(telefonAvis("6001112223"), /Té 10 xifres/);
+  assert.match(telefonAvis("+34 600 111 22"), /Té 8 xifres/);
+  assert.match(telefonAvis("0034 600 111 2223"), /Té 10 xifres/);
+  assert.match(telefonAvis("6"), /Té 1 xifra;/);
+  assert.match(telefonAvis("34 600 111 222"), /Té 11 xifres/); // country code without + or 00
+});
+await test("international numbers take 8 to 15 digits, with + or 00", () => {
+  for (const ok of ["+44 (0) 7700900123", "+49 (0) 1701234567", "00 52 1 55 1234 5678", "+1 212 555 0123", "+33 1 23 45 67 89"]) assert.equal(telefonAvis(ok), null, ok);
+  assert.match(telefonAvis("+44 1234"), /Té 6 xifres; un número internacional/);
+  assert.match(telefonAvis("+44 1234567890123456"), /Té 18 xifres/);
+});
+await test("blank phones are not flagged, and only wrong ones are listed", () => {
+  for (const blank of ["", "   ", null, undefined]) assert.equal(telefonAvis(blank), null);
+  assert.deepEqual(telefonsAmbAvis(["600111222", null, " 6001 "]), ["6001: Té 4 xifres; n'hi hauria d'haver 9."]);
+});
+await test("the plugin preview warns about a wrong phone, and only that one", async () => {
+  const plan = await core.getAction("create_contacte").plan({ nom: "Prova", telefon: "600 11", telefons_extra: ["+44 (0) 7700900123"] });
+  assert.deepEqual(plan.warnings, ["Telèfon 600 11: Té 5 xifres; n'hi hauria d'haver 9."]);
+  assert.deepEqual((await core.getAction("create_contacte").plan({ nom: "Prova", telefon: "600111222" })).warnings, []);
+});
+
 console.log("source checks");
 await test("tool modules never write SQL directly: writes go through the app's server actions", async () => {
   const dir = join(ROOT, "src", "lib", "mcp", "tools");

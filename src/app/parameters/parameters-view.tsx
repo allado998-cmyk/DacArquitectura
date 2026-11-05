@@ -36,6 +36,7 @@ import type {
 } from "@/types/db";
 import { formatEur, formatEurPrecise } from "@/lib/format";
 import { openListPdf } from "@/lib/pdf";
+import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
@@ -194,6 +195,7 @@ const dash = <span className="text-[var(--color-muted)]">—</span>;
 
 const EXPEDIENTS_OPTIONS: [string, string][] = [["oberts", "Amb oberts"], ["tancats", "Només tancats"], ["cap", "Sense expedients"]];
 const AMB_SENSE: [string, string][] = [["amb", "Amb"], ["sense", "Sense"]];
+const TELEFON_OPTIONS: [string, string][] = [...AMB_SENSE, ["incorrecte", "Incorrecte"]];
 const optionLabel = (options: [string, string][], value: string) => options.find(([v]) => v === value)?.[1];
 
 function matchesExpedients(s: ClientStats | undefined, filter: string) {
@@ -206,6 +208,15 @@ function matchesExpedients(s: ClientStats | undefined, filter: string) {
 }
 
 const matchesAmbSense = (has: boolean, filter: string) => !filter || (filter === "amb") === has;
+
+const contacteAvisos = (c: ClientContacte) => telefonsAmbAvis([c.telefon, ...c.telefons_extra]);
+
+// Warning for the tables, which only show the main phone: it covers the others too.
+function TelefonsAvis({ contacte }: { contacte: ClientContacte }) {
+  const text = contacteAvisos(contacte).join("\n");
+  if (!text) return null;
+  return <span className="ml-1.5 cursor-help text-amber-700" title={text} role="img" aria-label={text}>⚠</span>;
+}
 
 function FilterSelect({
   label,
@@ -273,7 +284,7 @@ function ContactesPanel({
       if (fClient === SENSE_CLIENT ? c.client_id != null : fClient != null && c.client_id !== fClient) return false;
       if (fCiutat && (c.client_id == null || ciutatByClient.get(c.client_id) !== fCiutat)) return false;
       if (fExpedients && (c.client_id == null || !matchesExpedients(statsByClient.get(c.client_id), fExpedients))) return false;
-      if (!matchesAmbSense(!!c.telefon, fTelefon)) return false;
+      if (fTelefon === "incorrecte" ? contacteAvisos(c).length === 0 : !matchesAmbSense(!!c.telefon, fTelefon)) return false;
       if (!matchesAmbSense(!!c.mail, fMail)) return false;
       if (!matchesAmbSense(!!c.comentari, fComentari)) return false;
       return !q || fold([c.nom, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
@@ -296,7 +307,7 @@ function ContactesPanel({
       clientFilterOpts.find((o) => o.id === fClient)?.label,
       fCiutat,
       optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
-      fTelefon && `${optionLabel(AMB_SENSE, fTelefon)} telèfon`,
+      fTelefon && (fTelefon === "incorrecte" ? "Telèfon incorrecte" : `${optionLabel(AMB_SENSE, fTelefon)} telèfon`),
       fMail && `${optionLabel(AMB_SENSE, fMail)} mail`,
       fComentari && `${optionLabel(AMB_SENSE, fComentari)} comentari`,
       q && `Cerca: "${query.trim()}"`,
@@ -323,7 +334,7 @@ function ContactesPanel({
         </div>
         <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
         <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
-        <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={AMB_SENSE} />
+        <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={TELEFON_OPTIONS} />
         <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
         <FilterSelect label="Comentari" value={fComentari} onChange={setFComentari} options={AMB_SENSE} />
         {hasFilters && <button type="button" className="btn-ghost" onClick={clearFilters}>Netejar</button>}
@@ -351,7 +362,7 @@ function ContactesPanel({
                 <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setOpenId(c.id)}>
                   <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom ?? "Sense nom"}</button></td>
                   <td className="td whitespace-nowrap">{c.mail ?? dash}</td>
-                  <td className="td whitespace-nowrap tabular-nums">{c.telefon ?? dash}</td>
+                  <td className="td whitespace-nowrap tabular-nums">{c.telefon ?? dash}<TelefonsAvis contacte={c} /></td>
                   <td className="td whitespace-nowrap">{c.client_nom ?? dash}</td>
                 </tr>
               ))}
@@ -420,7 +431,7 @@ function ContacteDetail({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <ContacteLinks label="Telèfons" scheme="tel" main={contacte.telefon} extras={contacte.telefons_extra} />
+        <ContacteLinks label="Telèfons" scheme="tel" main={contacte.telefon} extras={contacte.telefons_extra} avis={telefonAvis} />
         <ContacteLinks label="Mails" scheme="mailto" main={contacte.mail} extras={contacte.mails_extra} />
         <div>
           <div className="label">Client</div>
@@ -450,7 +461,19 @@ function ContacteDetail({
   );
 }
 
-function ContacteLinks({ label, scheme, main, extras }: { label: string; scheme: "tel" | "mailto"; main: string | null; extras: string[] }) {
+function ContacteLinks({
+  label,
+  scheme,
+  main,
+  extras,
+  avis,
+}: {
+  label: string;
+  scheme: "tel" | "mailto";
+  main: string | null;
+  extras: string[];
+  avis?: (value: string) => string | null;
+}) {
   const values = [main, ...extras].filter((v): v is string => !!v);
   return (
     <div>
@@ -463,6 +486,7 @@ function ContacteLinks({ label, scheme, main, extras }: { label: string; scheme:
             <li key={v}>
               <a className="break-all text-[var(--color-accent)] hover:underline" href={`${scheme}:${v.replace(/\s/g, "")}`}>{v}</a>
               {i === 0 && values.length > 1 && <span className="ml-2 text-xs text-[var(--color-muted)]">Principal</span>}
+              {avis?.(v) && <p className="text-xs text-amber-700">⚠ {avis(v)}</p>}
             </li>
           ))}
         </ul>
@@ -491,6 +515,9 @@ function ContacteForm({
 
   function save() {
     if (![nom, comentari, ...telefons, ...mails].some((v) => v.trim())) return;
+    // Only the numbers typed here: a known odd one shouldn't ask on every save.
+    const saved = [contacte?.telefon, ...(contacte?.telefons_extra ?? [])];
+    if (!confirmaTelefons(telefons.filter((t) => !saved.includes(t.trim())))) return;
     const [telefon, ...telefonsExtra] = telefons;
     const [mail, ...mailsExtra] = mails;
     const patch = { nom, telefon, mail, telefonsExtra, mailsExtra, comentari };
@@ -501,16 +528,19 @@ function ContacteForm({
       } else {
         await createContacteAction({ ...patch, clientId });
       }
-      onDone();
+      // Its own transition, or the page would come back before the fresh data does.
+      startTransition(onDone);
     });
   }
 
   return (
-    <div className="space-y-4">
+    // Leaving a phone field can show its warning and push the buttons down, which
+    // would lose the click. Buttons don't take the focus, so nothing moves mid-click.
+    <div className="space-y-4" onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) e.preventDefault(); }}>
       <div className="grid items-start gap-3 sm:grid-cols-2">
         <Field label="Nom"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom del contacte" /></Field>
         <Field label="Client"><Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Sense client" overlay /></Field>
-        <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={telefons} onChange={setTelefons} />
+        <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={telefons} onChange={setTelefons} avis={telefonAvis} />
         <MultiValueField label="Mails" addLabel="+ Afegir mail" placeholder="correu@exemple.cat" type="email" values={mails} onChange={setMails} />
         <div className="sm:col-span-2">
           <Field label="Comentari (opcional)"><textarea className="input" rows={3} value={comentari} onChange={(e) => setComentari(e.target.value)} placeholder="Notes lliures…" /></Field>
@@ -533,6 +563,7 @@ function MultiValueField({
   type = "text",
   values,
   onChange,
+  avis,
 }: {
   label: string;
   addLabel: string;
@@ -540,45 +571,56 @@ function MultiValueField({
   type?: "text" | "email";
   values: string[];
   onChange: (values: string[]) => void;
+  avis?: (value: string) => string | null;
 }) {
+  // Warnings wait until the user leaves the line, not on every digit typed.
+  const [focused, setFocused] = useState<number | null>(null);
   const several = values.length > 1;
   return (
     <div>
       <label className="label">{label}</label>
       <div className="space-y-2">
-        {values.map((v, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <input
-              className="input min-w-0 flex-1"
-              type={type}
-              value={v}
-              placeholder={placeholder}
-              onChange={(e) => onChange(values.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-            {several && (
-              <>
-                <button
-                  type="button"
-                  className={`shrink-0 px-1 text-base ${i === 0 ? "cursor-default text-[var(--color-accent)]" : "text-[var(--color-muted)] hover:text-[var(--color-accent)]"}`}
-                  title={i === 0 ? "Principal" : "Fer principal"}
-                  aria-label={i === 0 ? "Principal" : "Fer principal"}
-                  disabled={i === 0}
-                  onClick={() => onChange([v, ...values.filter((_, j) => j !== i)])}
-                >
-                  {i === 0 ? "★" : "☆"}
-                </button>
-                <button
-                  type="button"
-                  className="shrink-0 px-1 text-sm text-red-700 hover:underline"
-                  aria-label="Treure"
-                  onClick={() => onChange(values.filter((_, j) => j !== i))}
-                >
-                  ✕
-                </button>
-              </>
-            )}
-          </div>
-        ))}
+        {values.map((v, i) => {
+          const warning = i === focused ? null : avis?.(v);
+          return (
+            <div key={i}>
+              <div className="flex items-center gap-1">
+                <input
+                  className="input min-w-0 flex-1"
+                  type={type}
+                  value={v}
+                  placeholder={placeholder}
+                  onFocus={() => setFocused(i)}
+                  onBlur={() => setFocused(null)}
+                  onChange={(e) => onChange(values.map((x, j) => (j === i ? e.target.value : x)))}
+                />
+                {several && (
+                  <>
+                    <button
+                      type="button"
+                      className={`shrink-0 px-1 text-base ${i === 0 ? "cursor-default text-[var(--color-accent)]" : "text-[var(--color-muted)] hover:text-[var(--color-accent)]"}`}
+                      title={i === 0 ? "Principal" : "Fer principal"}
+                      aria-label={i === 0 ? "Principal" : "Fer principal"}
+                      disabled={i === 0}
+                      onClick={() => onChange([v, ...values.filter((_, j) => j !== i)])}
+                    >
+                      {i === 0 ? "★" : "☆"}
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 px-1 text-sm text-red-700 hover:underline"
+                      aria-label="Treure"
+                      onClick={() => onChange(values.filter((_, j) => j !== i))}
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+              {warning && <p className="mt-1 text-xs text-amber-700">⚠ {warning}</p>}
+            </div>
+          );
+        })}
       </div>
       <button type="button" className="mt-1 text-sm text-[var(--color-accent)] hover:underline" onClick={() => onChange([...values, ""])}>{addLabel}</button>
     </div>
@@ -1094,7 +1136,7 @@ function ClientContactesSection({
                   <tr key={ct.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onOpen(ct.id)}>
                     <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{ct.nom ?? "Sense nom"}</button></td>
                     <td className="td whitespace-nowrap">{ct.mail ?? dash}</td>
-                    <td className="td whitespace-nowrap tabular-nums">{ct.telefon ?? dash}</td>
+                    <td className="td whitespace-nowrap tabular-nums">{ct.telefon ?? dash}<TelefonsAvis contacte={ct} /></td>
                     <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} title="Pujar" aria-label="Pujar">↑</button>
                       <button type="button" className="btn-ghost ml-1 px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === list.length - 1} title="Baixar" aria-label="Baixar">↓</button>

@@ -64,28 +64,33 @@ export async function deleteClientAction(id: number) {
 
 // Client contactes ----------------------------------------------------------
 
-export async function addClientContacteAction(clientId: number) {
-  await requireUser();
-  await sql`
-    insert into public.client_contactes (client_id, ordre)
-    values (
-      ${clientId},
-      coalesce((select max(ordre) + 10 from public.client_contactes where client_id = ${clientId}), 10)
-    )
-  `;
-  revalidatePath("/parameters");
+export interface ContactePatch {
+  nom: string;
+  telefon: string;
+  mail: string;
+  telefonsExtra: string[];
+  mailsExtra: string[];
+  comentari?: string;
 }
 
-export async function updateClientContacteAction(
-  id: number,
-  data: { nom: string; telefon: string; mail: string; comentari?: string },
-) {
+// Trims, drops blanks and repeats. If the main value is blank, the next one
+// becomes the main one, so the tables never show "—" for a contact that has one.
+function mainAndExtras(main: string, extras: string[]) {
+  const [first = null, ...rest] = [...new Set([main, ...extras].map((v) => v.trim()).filter(Boolean))];
+  return { main: first, extras: rest };
+}
+
+export async function updateClientContacteAction(id: number, data: ContactePatch) {
   await requireUser();
+  const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
+  const mail = mainAndExtras(data.mail, data.mailsExtra);
   await sql`
     update public.client_contactes set
       nom = ${data.nom.trim() || null},
-      telefon = ${data.telefon.trim() || null},
-      mail = ${data.mail.trim() || null},
+      telefon = ${telefon.main},
+      mail = ${mail.main},
+      telefons_extra = ${telefon.extras}::text[],
+      mails_extra = ${mail.extras}::text[],
       comentari = ${(data.comentari ?? "").trim() || null}
     where id = ${id}
   `;
@@ -110,17 +115,20 @@ export async function reorderClientContactesAction(clientId: number, ids: number
 }
 
 // Standalone contact (no client required).
-export async function createContacteAction(data: { nom: string; telefon: string; mail: string; comentari?: string; clientId?: number | null }) {
+export async function createContacteAction(data: ContactePatch & { clientId?: number | null }) {
   await requireUser();
   const nom = data.nom.trim();
-  const telefon = data.telefon.trim();
-  const mail = data.mail.trim();
+  const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
+  const mail = mainAndExtras(data.mail, data.mailsExtra);
   const comentari = (data.comentari ?? "").trim();
-  if (!nom && !telefon && !mail && !comentari) return;
+  if (!nom && !telefon.main && !mail.main && !comentari) return;
   const cid = data.clientId && Number.isFinite(data.clientId) ? data.clientId : null;
   await sql`
-    insert into public.client_contactes (client_id, nom, telefon, mail, comentari)
-    values (${cid}, ${nom || null}, ${telefon || null}, ${mail || null}, ${comentari || null})
+    insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, ordre)
+    values (
+      ${cid}, ${nom || null}, ${telefon.main}, ${mail.main}, ${telefon.extras}::text[], ${mail.extras}::text[], ${comentari || null},
+      coalesce((select max(ordre) + 10 from public.client_contactes where client_id = ${cid}), 10)
+    )
   `;
   revalidatePath("/parameters");
 }

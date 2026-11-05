@@ -82,6 +82,17 @@ El seed ancora les dates al dia que s'executa, així que tornar-lo a passar
 posa la Planificació al dia. Es nega a executar-se si el nom de la base de
 dades no conté "demo".
 
+## Clients i contactes (Base de Dades)
+
+Les pestanyes **Clients** i **Contactes** són taules amb cerca i filtres, tot al
+navegador (filtrar no fa cap consulta a la base de dades). La cerca de Clients
+també troba els noms dels contactes de cada client. En clicar una fila s'obre la
+fitxa, que és on es pot editar o eliminar; el comentari només surt a la fitxa.
+
+Un contacte pot tenir diversos telèfons i mails. `telefon` i `mail` són sempre
+els **principals** (els que mostren les taules i llegeixen les actes i el
+plugin); la resta van a `telefons_extra` i `mails_extra` (migració 0044).
+
 ## Mapa d'obres (Expedients → Mapa)
 
 Cada expedient pot tenir una **adreça** i un **enllaç de Google Maps**. En desar,

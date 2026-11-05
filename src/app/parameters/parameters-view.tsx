@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  addClientContacteAction,
   createClientFullAction,
   createConcepteAltraAction,
   createConcepteDirectaAction,
@@ -84,6 +83,23 @@ export function ParametersView({
     return map;
   }, [clientStats]);
 
+  const contactesByClient = useMemo(() => {
+    const map = new Map<number, ClientContacte[]>();
+    for (const k of contactes) {
+      if (k.client_id == null) continue;
+      const list = map.get(k.client_id);
+      if (list) list.push(k);
+      else map.set(k.client_id, [k]);
+    }
+    for (const list of map.values()) list.sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+    return map;
+  }, [contactes]);
+
+  const ciutats = useMemo(
+    () => Array.from(new Set(clients.map((c) => (c.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
+    [clients],
+  );
+
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
@@ -96,8 +112,8 @@ export function ParametersView({
         <TabBtn current={tab} value="ite" onClick={changeTab}>Tarifa ITE</TabBtn>
       </div>
 
-      {tab === "clients" && <ClientsPanel rows={clients} statsByClient={statsByClient} onCount={setShown} />}
-      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} onCount={setShown} />}
+      {tab === "clients" && <ClientsPanel rows={clients} contactes={contactes} contactesByClient={contactesByClient} ciutats={ciutats} statsByClient={statsByClient} onCount={setShown} />}
+      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} ciutats={ciutats} statsByClient={statsByClient} onCount={setShown} />}
       {tab === "tipologies" && <TipologiesPanel rows={tipologies} onCount={setShown} />}
       {tab === "tasques" && <TasquesPanel rows={tasques} onCount={setShown} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
@@ -166,40 +182,155 @@ function IteTarifaField({ label, hint, value, onChange }: { label: string; hint:
 }
 
 // ============================================================================
+// Shared by the Clients and Contactes tables
+// ============================================================================
+
+// Case- and accent-insensitive text, so "nuria" finds "Núria" and "collegi" "Col·legi".
+const fold = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[\p{M}·]/gu, "").toLowerCase();
+
+const byNom = (a: { nom: string | null }, b: { nom: string | null }) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca");
+
+const dash = <span className="text-[var(--color-muted)]">—</span>;
+
+const EXPEDIENTS_OPTIONS: [string, string][] = [["oberts", "Amb oberts"], ["tancats", "Només tancats"], ["cap", "Sense expedients"]];
+const AMB_SENSE: [string, string][] = [["amb", "Amb"], ["sense", "Sense"]];
+const optionLabel = (options: [string, string][], value: string) => options.find(([v]) => v === value)?.[1];
+
+function matchesExpedients(s: ClientStats | undefined, filter: string) {
+  const n = s?.n ?? 0;
+  const oberts = s?.oberts ?? 0;
+  if (filter === "oberts") return oberts > 0;
+  if (filter === "tancats") return n > 0 && oberts === 0;
+  if (filter === "cap") return n === 0;
+  return true;
+}
+
+const matchesAmbSense = (has: boolean, filter: string) => !filter || (filter === "amb") === has;
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  allLabel = "Tots",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: [string, string][];
+  allLabel?: string;
+}) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{allLabel}</option>
+        {options.map(([v, text]) => <option key={v} value={v}>{text}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ============================================================================
 // Contactes (flat list across all clients + standalone)
 // ============================================================================
 
-function ContactesPanel({ rows, clients, onCount }: { rows: ClientContacte[]; clients: Client[]; onCount: (n: number) => void }) {
+const SENSE_CLIENT = 0; // Client filter value for contacts with no client; real ids start at 1
+
+function ContactesPanel({
+  rows,
+  clients,
+  ciutats,
+  statsByClient,
+  onCount,
+}: {
+  rows: ClientContacte[];
+  clients: Client[];
+  ciutats: string[];
+  statsByClient: Map<number, ClientStats>;
+  onCount: (n: number) => void;
+}) {
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<ClientContacte | null>(null);
+  const [fClient, setFClient] = useState<number | null>(null);
+  const [fCiutat, setFCiutat] = useState("");
+  const [fExpedients, setFExpedients] = useState("");
+  const [fTelefon, setFTelefon] = useState("");
+  const [fMail, setFMail] = useState("");
+  const [fComentari, setFComentari] = useState("");
+  // Track the OPEN contact by id and re-derive from rows, so it shows fresh
+  // server data after saving and closes by itself once deleted.
+  const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  const [, startTransition] = useTransition();
+  const open = rows.find((c) => c.id === openId) ?? null;
 
-  const clientOpts: ComboOption[] = clients.map((c) => ({ id: c.id, label: c.nom }));
+  const clientOpts: ComboOption[] = useMemo(() => clients.map((c) => ({ id: c.id, label: c.nom })), [clients]);
+  const clientFilterOpts = useMemo(() => [{ id: SENSE_CLIENT, label: "Sense client" }, ...clientOpts], [clientOpts]);
+  const ciutatByClient = useMemo(() => new Map(clients.map((c) => [c.id, (c.ciutat ?? "").trim()])), [clients]);
 
-  const q = query.trim().toLowerCase();
-  const filtered = (q
-    ? rows.filter((r) => `${r.nom ?? ""} ${r.telefon ?? ""} ${r.mail ?? ""} ${r.comentari ?? ""} ${r.client_nom ?? ""}`.toLowerCase().includes(q))
-    : rows
-  ).slice().sort((a, b) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca"));
+  const q = fold(query.trim());
+  const filtered = rows
+    .filter((c) => {
+      if (fClient === SENSE_CLIENT ? c.client_id != null : fClient != null && c.client_id !== fClient) return false;
+      if (fCiutat && (c.client_id == null || ciutatByClient.get(c.client_id) !== fCiutat)) return false;
+      if (fExpedients && (c.client_id == null || !matchesExpedients(statsByClient.get(c.client_id), fExpedients))) return false;
+      if (!matchesAmbSense(!!c.telefon, fTelefon)) return false;
+      if (!matchesAmbSense(!!c.mail, fMail)) return false;
+      if (!matchesAmbSense(!!c.comentari, fComentari)) return false;
+      return !q || fold([c.nom, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
+    })
+    .sort(byNom);
   useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
+  const hasFilters = fClient != null || !!(fCiutat || fExpedients || fTelefon || fMail || fComentari);
+  function clearFilters() {
+    setFClient(null);
+    setFCiutat("");
+    setFExpedients("");
+    setFTelefon("");
+    setFMail("");
+    setFComentari("");
+  }
+
   function exportPdf() {
+    const applied = [
+      clientFilterOpts.find((o) => o.id === fClient)?.label,
+      fCiutat,
+      optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
+      fTelefon && `${optionLabel(AMB_SENSE, fTelefon)} telèfon`,
+      fMail && `${optionLabel(AMB_SENSE, fMail)} mail`,
+      fComentari && `${optionLabel(AMB_SENSE, fComentari)} comentari`,
+      q && `Cerca: "${query.trim()}"`,
+    ].filter(Boolean).join(" · ");
     openListPdf({
       title: "Contactes",
-      subtitle: q ? `Cerca: "${query.trim()}" · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
+      subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
       landscape: false,
-      columns: [{ label: "Nom" }, { label: "Telèfon" }, { label: "Mail" }, { label: "Comentari" }, { label: "Client" }],
-      rows: filtered.map((c) => [c.nom ?? "—", c.telefon ?? "—", c.mail ?? "—", c.comentari ?? "—", c.client_nom ?? "—"]),
+      columns: [{ label: "Nom" }, { label: "Mail" }, { label: "Telèfon" }, { label: "Client" }],
+      rows: filtered.map((c) => [c.nom ?? "—", c.mail ?? "—", c.telefon ?? "—", c.client_nom ?? "—"]),
     });
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <input className="input max-w-xs" placeholder="Cercar contacte…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <button type="button" className="btn-ghost ml-auto inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels contactes mostrats"><ParamPdfIcon /> PDF</button>
-        <button type="button" className="btn-primary" onClick={() => setCreating(true)}>+ Nou contacte</button>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-56">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Nom, telèfon, mail, comentari, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <div className="w-60">
+          <label className="label">Client</label>
+          <Combobox options={clientFilterOpts} value={fClient} onChange={setFClient} placeholder="Cerca client…" emptyLabel="Tots" />
+        </div>
+        <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+        <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
+        <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={AMB_SENSE} />
+        <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
+        <FilterSelect label="Comentari" value={fComentari} onChange={setFComentari} options={AMB_SENSE} />
+        {hasFilters && <button type="button" className="btn-ghost" onClick={clearFilters}>Netejar</button>}
+        <div className="ml-auto flex items-center gap-3">
+          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels contactes mostrats"><ParamPdfIcon /> PDF</button>
+          <button type="button" className="btn-primary whitespace-nowrap" onClick={() => setCreating(true)}>+ Nou contacte</button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -210,25 +341,18 @@ function ContactesPanel({ rows, clients, onCount }: { rows: ClientContacte[]; cl
             <thead>
               <tr>
                 <th className="th">Nom</th>
-                <th className="th w-40">Telèfon</th>
-                <th className="th">Mail</th>
-                <th className="th">Comentari</th>
-                <th className="th w-56">Client</th>
-                <th className="th w-24"></th>
+                <th className="th">Mail principal</th>
+                <th className="th">Telèfon principal</th>
+                <th className="th">Client</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setEditing(c)}>
-                  <td className="td font-medium">{c.nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td tabular-nums">{c.telefon ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td">{c.mail ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td text-[var(--color-muted)]">{c.comentari ?? ""}</td>
-                  <td className="td">{c.client_nom ?? <span className="text-[var(--color-muted)]">—</span>}</td>
-                  <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="text-[var(--color-accent)] hover:underline text-sm mr-3" onClick={() => setEditing(c)}>Editar</button>
-                    <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(c.id)); }}>Eliminar</button>
-                  </td>
+                <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setOpenId(c.id)}>
+                  <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom ?? "Sense nom"}</button></td>
+                  <td className="td whitespace-nowrap">{c.mail ?? dash}</td>
+                  <td className="td whitespace-nowrap tabular-nums">{c.telefon ?? dash}</td>
+                  <td className="td whitespace-nowrap">{c.client_nom ?? dash}</td>
                 </tr>
               ))}
             </tbody>
@@ -236,78 +360,227 @@ function ContactesPanel({ rows, clients, onCount }: { rows: ClientContacte[]; cl
         </div>
       )}
 
-      <ContacteFormModal
-        open={creating || editing != null}
-        contacte={editing}
+      <ContacteModal
+        open={creating || open != null}
+        contacte={open}
         clientOpts={clientOpts}
-        onClose={() => { setCreating(false); setEditing(null); }}
+        onClose={() => { setCreating(false); setOpenId(null); }}
       />
     </div>
   );
 }
 
-function ContacteFormModal({
+function ContacteModal({
   open,
   contacte,
+  presetClientId,
   clientOpts,
   onClose,
 }: {
   open: boolean;
   contacte: ClientContacte | null;
+  presetClientId?: number;
   clientOpts: ComboOption[];
   onClose: () => void;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={<h3 className="text-base font-semibold">{contacte ? "Editar contacte" : "Nou contacte"}</h3>}>
-      {open && <ContacteForm key={contacte?.id ?? "new"} contacte={contacte} clientOpts={clientOpts} onClose={onClose} />}
+    <Modal open={open} onClose={onClose} title={<h3 className="text-base font-semibold">{contacte ? contacte.nom ?? "Sense nom" : "Nou contacte"}</h3>}>
+      {open && <ContacteDetail key={contacte?.id ?? "new"} contacte={contacte} presetClientId={presetClientId} clientOpts={clientOpts} onClose={onClose} />}
     </Modal>
+  );
+}
+
+// A contact's page: everything about it, with Editar and Eliminar. A new
+// contact goes straight to the form.
+function ContacteDetail({
+  contacte,
+  presetClientId,
+  clientOpts,
+  onClose,
+}: {
+  contacte: ClientContacte | null;
+  presetClientId?: number;
+  clientOpts: ComboOption[];
+  onClose: () => void;
+}) {
+  const [editing, setEditing] = useState(contacte == null);
+  const [, startTransition] = useTransition();
+
+  if (!contacte || editing) {
+    return (
+      <ContacteForm
+        contacte={contacte}
+        presetClientId={presetClientId}
+        clientOpts={clientOpts}
+        onDone={() => { if (contacte) setEditing(false); else onClose(); }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ContacteLinks label="Telèfons" scheme="tel" main={contacte.telefon} extras={contacte.telefons_extra} />
+        <ContacteLinks label="Mails" scheme="mailto" main={contacte.mail} extras={contacte.mails_extra} />
+        <div>
+          <div className="label">Client</div>
+          <div className="text-sm">{contacte.client_nom ?? dash}</div>
+        </div>
+        <div className="sm:col-span-2">
+          <div className="label">Comentari</div>
+          <p className="text-sm whitespace-pre-wrap">{contacte.comentari ?? dash}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-primary" onClick={() => setEditing(true)}>Editar</button>
+        <button
+          type="button"
+          className="btn-danger"
+          onClick={() => {
+            if (confirm("Eliminar aquest contacte?")) {
+              startTransition(() => deleteClientContacteAction(contacte.id));
+              onClose();
+            }
+          }}
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ContacteLinks({ label, scheme, main, extras }: { label: string; scheme: "tel" | "mailto"; main: string | null; extras: string[] }) {
+  const values = [main, ...extras].filter((v): v is string => !!v);
+  return (
+    <div>
+      <div className="label">{label}</div>
+      {values.length === 0 ? (
+        <div className="text-sm">{dash}</div>
+      ) : (
+        <ul className="space-y-1 text-sm">
+          {values.map((v, i) => (
+            <li key={v}>
+              <a className="break-all text-[var(--color-accent)] hover:underline" href={`${scheme}:${v.replace(/\s/g, "")}`}>{v}</a>
+              {i === 0 && values.length > 1 && <span className="ml-2 text-xs text-[var(--color-muted)]">Principal</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
 function ContacteForm({
   contacte,
+  presetClientId,
   clientOpts,
-  onClose,
+  onDone,
 }: {
   contacte: ClientContacte | null;
+  presetClientId?: number;
   clientOpts: ComboOption[];
-  onClose: () => void;
+  onDone: () => void;
 }) {
   const [nom, setNom] = useState(contacte?.nom ?? "");
-  const [telefon, setTelefon] = useState(contacte?.telefon ?? "");
-  const [mail, setMail] = useState(contacte?.mail ?? "");
+  const [telefons, setTelefons] = useState([contacte?.telefon ?? "", ...(contacte?.telefons_extra ?? [])]);
+  const [mails, setMails] = useState([contacte?.mail ?? "", ...(contacte?.mails_extra ?? [])]);
   const [comentari, setComentari] = useState(contacte?.comentari ?? "");
-  const [clientId, setClientId] = useState<number | null>(contacte?.client_id ?? null);
+  const [clientId, setClientId] = useState<number | null>(contacte ? contacte.client_id : presetClientId ?? null);
   const [pending, startTransition] = useTransition();
 
   function save() {
-    if (!nom.trim() && !telefon.trim() && !mail.trim() && !comentari.trim()) return;
+    if (![nom, comentari, ...telefons, ...mails].some((v) => v.trim())) return;
+    const [telefon, ...telefonsExtra] = telefons;
+    const [mail, ...mailsExtra] = mails;
+    const patch = { nom, telefon, mail, telefonsExtra, mailsExtra, comentari };
     startTransition(async () => {
       if (contacte) {
-        await updateClientContacteAction(contacte.id, { nom, telefon, mail, comentari });
-        if ((clientId ?? null) !== (contacte.client_id ?? null)) await setContacteClientAction(contacte.id, clientId);
+        await updateClientContacteAction(contacte.id, patch);
+        if (clientId !== contacte.client_id) await setContacteClientAction(contacte.id, clientId);
       } else {
-        await createContacteAction({ nom, telefon, mail, comentari, clientId });
+        await createContacteAction({ ...patch, clientId });
       }
-      onClose();
+      onDone();
     });
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid items-start gap-3 sm:grid-cols-2">
         <Field label="Nom"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom del contacte" /></Field>
-        <Field label="Telèfon"><input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="Telèfon" /></Field>
-        <Field label="Mail"><input className="input" type="email" value={mail} onChange={(e) => setMail(e.target.value)} placeholder="correu@exemple.cat" /></Field>
         <Field label="Client"><Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Sense client" overlay /></Field>
+        <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={telefons} onChange={setTelefons} />
+        <MultiValueField label="Mails" addLabel="+ Afegir mail" placeholder="correu@exemple.cat" type="email" values={mails} onChange={setMails} />
         <div className="sm:col-span-2">
-          <Field label="Comentari (opcional)"><input className="input" value={comentari} onChange={(e) => setComentari(e.target.value)} placeholder="Notes lliures…" /></Field>
+          <Field label="Comentari (opcional)"><textarea className="input" rows={3} value={comentari} onChange={(e) => setComentari(e.target.value)} placeholder="Notes lliures…" /></Field>
         </div>
       </div>
       <div className="flex items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
-        <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
+        <button type="button" className="btn-ghost" onClick={onDone}>Cancel·lar</button>
       </div>
+    </div>
+  );
+}
+
+// A list of phones or mails. The first one is the main one, the one the tables
+// show; the star on any other line moves it to the top.
+function MultiValueField({
+  label,
+  addLabel,
+  placeholder,
+  type = "text",
+  values,
+  onChange,
+}: {
+  label: string;
+  addLabel: string;
+  placeholder: string;
+  type?: "text" | "email";
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const several = values.length > 1;
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="space-y-2">
+        {values.map((v, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <input
+              className="input min-w-0 flex-1"
+              type={type}
+              value={v}
+              placeholder={placeholder}
+              onChange={(e) => onChange(values.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+            {several && (
+              <>
+                <button
+                  type="button"
+                  className={`shrink-0 px-1 text-base ${i === 0 ? "cursor-default text-[var(--color-accent)]" : "text-[var(--color-muted)] hover:text-[var(--color-accent)]"}`}
+                  title={i === 0 ? "Principal" : "Fer principal"}
+                  aria-label={i === 0 ? "Principal" : "Fer principal"}
+                  disabled={i === 0}
+                  onClick={() => onChange([v, ...values.filter((_, j) => j !== i)])}
+                >
+                  {i === 0 ? "★" : "☆"}
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 px-1 text-sm text-red-700 hover:underline"
+                  aria-label="Treure"
+                  onClick={() => onChange(values.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <button type="button" className="mt-1 text-sm text-[var(--color-accent)] hover:underline" onClick={() => onChange([...values, ""])}>{addLabel}</button>
     </div>
   );
 }
@@ -478,94 +751,143 @@ function TabBtn({
 
 function ClientsPanel({
   rows,
+  contactes,
+  contactesByClient,
+  ciutats,
   statsByClient,
   onCount,
 }: {
   rows: Client[];
+  contactes: ClientContacte[];
+  contactesByClient: Map<number, ClientContacte[]>;
+  ciutats: string[];
   statsByClient: Map<number, ClientStats>;
   onCount: (n: number) => void;
 }) {
   const [query, setQuery] = useState("");
-  // Track the OPEN client by id and re-derive from rows, so it reflects fresh
-  // server data (e.g. a contact just added) without needing to reopen.
+  const [fCiutat, setFCiutat] = useState("");
+  const [fExpedients, setFExpedients] = useState("");
+  const [fContactes, setFContactes] = useState("");
+  // Track the OPEN client and contact by id and re-derive from the rows, so
+  // they reflect fresh server data (e.g. a contact just added) without reopening.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [contacteId, setContacteId] = useState<number | null>(null);
+  const [creatingContacte, setCreatingContacte] = useState(false);
   const editing = rows.find((c) => c.id === editingId) ?? null;
+  const openContacte = contactes.find((k) => k.id === contacteId) ?? null;
+  const contacteOpen = creatingContacte || openContacte != null;
 
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? rows.filter(
-        (c) => c.nom.toLowerCase().includes(q) || (c.ciutat ?? "").toLowerCase().includes(q),
-      )
-    : rows;
+  const clientOpts: ComboOption[] = useMemo(() => rows.map((c) => ({ id: c.id, label: c.nom })), [rows]);
+
+  const q = fold(query.trim());
+  const contactHits = (c: Client) => (q ? (contactesByClient.get(c.id) ?? []).filter((k) => fold(k.nom).includes(q)) : []);
+  const filtered = rows
+    .filter((c) => {
+      if (fCiutat && (c.ciutat ?? "").trim() !== fCiutat) return false;
+      if (!matchesExpedients(statsByClient.get(c.id), fExpedients)) return false;
+      if (!matchesAmbSense(contactesByClient.has(c.id), fContactes)) return false;
+      return !q || fold(`${c.nom} ${c.ciutat ?? ""} ${c.nif ?? ""}`).includes(q) || contactHits(c).length > 0;
+    })
+    .sort(byNom);
   useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
-  const ciutats = useMemo(
-    () => Array.from(new Set(rows.map((c) => (c.ciutat ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ca")),
-    [rows],
-  );
+  const hasFilters = !!(fCiutat || fExpedients || fContactes);
+  function clearFilters() {
+    setFCiutat("");
+    setFExpedients("");
+    setFContactes("");
+  }
 
   function exportPdf() {
+    const applied = [
+      fCiutat,
+      optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
+      fContactes && `${optionLabel(AMB_SENSE, fContactes)} contactes`,
+      q && `Cerca: "${query.trim()}"`,
+    ].filter(Boolean).join(" · ");
     openListPdf({
       title: "Clients",
-      subtitle: q ? `Cerca: "${query.trim()}" · ${filtered.length} de ${rows.length}` : `${rows.length} clients`,
+      subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} clients`,
       landscape: false,
-      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Exp.", align: "right" }, { label: "Oberts", align: "right" }],
+      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Exp.", align: "right" }, { label: "Oberts", align: "right" }, { label: "Contactes", align: "right" }],
       rows: filtered.map((c) => {
         const s = statsByClient.get(c.id);
-        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(s?.n ?? 0), String(s?.oberts ?? 0)];
+        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(s?.n ?? 0), String(s?.oberts ?? 0), String(contactesByClient.get(c.id)?.length ?? 0)];
       }),
     });
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          className="input max-w-xs"
-          placeholder="Cercar client…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <button type="button" className="btn-ghost ml-auto inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels clients mostrats"><ParamPdfIcon /> PDF</button>
-        <button type="button" className="btn-primary" onClick={() => setCreating(true)}>+ Nou client</button>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-56">
+          <label className="label">Cercar</label>
+          <input className="input" placeholder="Client, contacte, ciutat, NIF…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
+        <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
+        <FilterSelect label="Contactes" value={fContactes} onChange={setFContactes} options={AMB_SENSE} />
+        {hasFilters && <button type="button" className="btn-ghost" onClick={clearFilters}>Netejar</button>}
+        <div className="ml-auto flex items-center gap-3">
+          <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels clients mostrats"><ParamPdfIcon /> PDF</button>
+          <button type="button" className="btn-primary whitespace-nowrap" onClick={() => setCreating(true)}>+ Nou client</button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap client encara." : "Cap resultat."}</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((c) => {
-            const s = statsByClient.get(c.id);
-            return (
-              <div
-                key={c.id}
-                onClick={() => setEditingId(c.id)}
-                className="cursor-pointer rounded-xl border border-[var(--color-line)] bg-white p-4 text-left shadow-sm transition hover:border-[var(--color-accent)] hover:shadow"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{c.nom}</div>
-                    <div className="text-xs text-[var(--color-muted)] truncate">{c.ciutat ?? "—"}</div>
-                  </div>
-                  <button type="button" className="shrink-0 text-sm text-[var(--color-accent)] hover:underline" onClick={(e) => { e.stopPropagation(); setEditingId(c.id); }}>Editar</button>
-                </div>
-                <div className="mt-3 flex gap-4 text-sm">
-                  <span><span className="font-semibold tabular-nums">{s?.n ?? 0}</span> <span className="text-[var(--color-muted)]">exp.</span></span>
-                  <span><span className="font-semibold tabular-nums text-[var(--color-accent)]">{s?.oberts ?? 0}</span> <span className="text-[var(--color-muted)]">oberts</span></span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="table-wrap">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="th">Nom</th>
+                <th className="th w-40 text-center whitespace-nowrap">Expedients oberts</th>
+                <th className="th w-40 text-center whitespace-nowrap">Expedients totals</th>
+                <th className="th w-40">Contactes</th>
+                <th className="th w-56">Ubicació</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => {
+                const s = statsByClient.get(c.id);
+                const hits = contactHits(c);
+                return (
+                  <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setEditingId(c.id)}>
+                    <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom}</button></td>
+                    <td className={`td text-center tabular-nums ${s?.oberts ? "font-semibold text-[var(--color-accent)]" : "text-[var(--color-muted)]"}`}>{s?.oberts ?? 0}</td>
+                    <td className="td text-center tabular-nums">{s?.n ?? 0}</td>
+                    <td className="td whitespace-nowrap">
+                      <span className="tabular-nums">{contactesByClient.get(c.id)?.length ?? 0}</span>
+                      {hits.length > 0 && <span className="ml-2 text-[var(--color-muted)]">{hits.map((k) => k.nom).join(", ")}</span>}
+                    </td>
+                    <td className="td whitespace-nowrap">{c.ciutat ?? dash}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
       <ClientFormModal
         open={creating || editing != null}
         client={editing}
+        contactes={editing ? contactesByClient.get(editing.id) ?? [] : []}
         stats={editing ? statsByClient.get(editing.id) : undefined}
         ciutats={ciutats}
-        onClose={() => { setCreating(false); setEditingId(null); }}
+        onOpenContacte={setContacteId}
+        onNewContacte={() => setCreatingContacte(true)}
+        // Escape reaches both popups; only the contact one, on top, should close.
+        onClose={() => { if (contacteOpen) return; setCreating(false); setEditingId(null); }}
+      />
+      <ContacteModal
+        open={contacteOpen}
+        contacte={openContacte}
+        presetClientId={editing?.id}
+        clientOpts={clientOpts}
+        onClose={() => { setCreatingContacte(false); setContacteId(null); }}
       />
     </div>
   );
@@ -574,14 +896,20 @@ function ClientsPanel({
 function ClientFormModal({
   open,
   client,
+  contactes,
   stats,
   ciutats,
+  onOpenContacte,
+  onNewContacte,
   onClose,
 }: {
   open: boolean;
   client: Client | null;
+  contactes: ClientContacte[];
   stats?: ClientStats;
   ciutats: string[];
+  onOpenContacte: (id: number) => void;
+  onNewContacte: () => void;
   onClose: () => void;
 }) {
   return (
@@ -595,8 +923,11 @@ function ClientFormModal({
         <ClientForm
           key={client?.id ?? "new"}
           client={client}
+          contactes={contactes}
           stats={client ? stats ?? { client_id: client.id, ...EMPTY_STATS } : null}
           ciutats={ciutats}
+          onOpenContacte={onOpenContacte}
+          onNewContacte={onNewContacte}
           onClose={onClose}
         />
       )}
@@ -606,13 +937,19 @@ function ClientFormModal({
 
 function ClientForm({
   client,
+  contactes,
   stats,
   ciutats,
+  onOpenContacte,
+  onNewContacte,
   onClose,
 }: {
   client: Client | null;
+  contactes: ClientContacte[];
   stats: ClientStats | null;
   ciutats: string[];
+  onOpenContacte: (id: number) => void;
+  onNewContacte: () => void;
   onClose: () => void;
 }) {
   const [nom, setNom] = useState(client?.nom ?? "");
@@ -631,8 +968,6 @@ function ClientForm({
       onClose();
     });
   }
-
-  const contactes = client?.contactes ?? [];
 
   return (
     <div className="space-y-6">
@@ -680,12 +1015,24 @@ function ClientForm({
         <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
       </div>
 
-      {client && <ClientContactesSection client={client} contactes={contactes} onDeleted={onClose} />}
+      {client && <ClientContactesSection client={client} contactes={contactes} onOpen={onOpenContacte} onNew={onNewContacte} onDeleted={onClose} />}
     </div>
   );
 }
 
-function ClientContactesSection({ client, contactes, onDeleted }: { client: Client; contactes: ClientContacte[]; onDeleted: () => void }) {
+function ClientContactesSection({
+  client,
+  contactes,
+  onOpen,
+  onNew,
+  onDeleted,
+}: {
+  client: Client;
+  contactes: ClientContacte[];
+  onOpen: (id: number) => void;
+  onNew: () => void;
+  onDeleted: () => void;
+}) {
   const [, startTransition] = useTransition();
   // Local order while a reorder is being saved; reset whenever the server
   // sends the list again (it comes back sorted by the saved order).
@@ -722,7 +1069,7 @@ function ClientContactesSection({ client, contactes, onDeleted }: { client: Clie
               Ordenar A–Z
             </button>
           )}
-          <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => startTransition(() => addClientContacteAction(client.id))}>
+          <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={onNew}>
             + Afegir contacte
           </button>
         </div>
@@ -732,9 +1079,31 @@ function ClientContactesSection({ client, contactes, onDeleted }: { client: Clie
       ) : (
         <div className="space-y-2">
           {list.length > 1 && <p className="text-xs text-[var(--color-muted)]">Fes servir les fletxes per canviar l&apos;ordre.</p>}
-          {list.map((ct, i) => (
-            <ContacteRow key={ct.id} row={ct} onUp={i > 0 ? () => move(i, -1) : undefined} onDown={i < list.length - 1 ? () => move(i, 1) : undefined} />
-          ))}
+          <div className="table-wrap">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="th">Nom</th>
+                  <th className="th">Mail principal</th>
+                  <th className="th">Telèfon principal</th>
+                  <th className="th w-20"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((ct, i) => (
+                  <tr key={ct.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onOpen(ct.id)}>
+                    <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{ct.nom ?? "Sense nom"}</button></td>
+                    <td className="td whitespace-nowrap">{ct.mail ?? dash}</td>
+                    <td className="td whitespace-nowrap tabular-nums">{ct.telefon ?? dash}</td>
+                    <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} title="Pujar" aria-label="Pujar">↑</button>
+                      <button type="button" className="btn-ghost ml-1 px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === list.length - 1} title="Baixar" aria-label="Baixar">↓</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -761,36 +1130,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="label">{label}</label>
       {children}
-    </div>
-  );
-}
-
-function ContacteRow({ row, onUp, onDown }: { row: ClientContacte; onUp?: () => void; onDown?: () => void }) {
-  const [nom, setNom] = useState(row.nom ?? "");
-  const [telefon, setTelefon] = useState(row.telefon ?? "");
-  const [mail, setMail] = useState(row.mail ?? "");
-  const [comentari, setComentari] = useState(row.comentari ?? "");
-  const [, startTransition] = useTransition();
-
-  function persist() {
-    if (nom !== (row.nom ?? "") || telefon !== (row.telefon ?? "") || mail !== (row.mail ?? "") || comentari !== (row.comentari ?? "")) {
-      startTransition(() => updateClientContacteAction(row.id, { nom, telefon, mail, comentari }));
-    }
-  }
-
-  return (
-    <div className="grid gap-2 sm:grid-cols-12 items-center">
-      <input className="input sm:col-span-3" placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-2" placeholder="Telèfon" value={telefon} onChange={(e) => setTelefon(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-3" placeholder="Mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} onBlur={persist} />
-      <input className="input sm:col-span-2" placeholder="Comentari (opcional)" value={comentari} onChange={(e) => setComentari(e.target.value)} onBlur={persist} />
-      <div className="sm:col-span-2 flex items-center justify-end gap-1">
-        <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={onUp} disabled={!onUp} title="Pujar" aria-label="Pujar">↑</button>
-        <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={onDown} disabled={!onDown} title="Baixar" aria-label="Baixar">↓</button>
-        <button type="button" className="ml-1 text-red-700 hover:underline text-sm" onClick={() => { if (confirm("Eliminar aquest contacte?")) startTransition(() => deleteClientContacteAction(row.id)); }} aria-label="Eliminar">
-          ✕
-        </button>
-      </div>
     </div>
   );
 }

@@ -39,8 +39,8 @@ export function registerRouter(server: McpServer): void {
             matchExpedients(q, 15),
             sql`select id, nom, nif, ciutat from public.clients
                 where public.dac_fold(concat_ws(' ', nom, nif, ciutat)) like public.dac_fold(${like}) order by nom limit 10`,
-            sql`select k.id, k.nom, k.telefon, k.mail, c.nom as client_nom from public.client_contactes k left join public.clients c on c.id = k.client_id
-                where public.dac_fold(concat_ws(' ', k.nom, k.mail, k.telefon)) like public.dac_fold(${like}) order by k.nom limit 10`,
+            sql`select k.id, k.nom, k.telefon, k.mail, k.telefons_extra, k.mails_extra, c.nom as client_nom from public.client_contactes k left join public.clients c on c.id = k.client_id
+                where public.dac_fold(concat_ws(' ', k.nom, k.mail, k.telefon, array_to_string(k.mails_extra, ' '), array_to_string(k.telefons_extra, ' '))) like public.dac_fold(${like}) order by k.nom limit 10`,
             sql`select d.id, d.num, d.descripcio, d.estat, c.nom as client_nom from public.proposta_doc d left join public.clients c on c.id = d.client_id
                 where public.dac_fold(concat_ws(' ', d.num, d.descripcio, c.nom, d.adreca)) like public.dac_fold(${like}) order by d.num desc limit 10`,
             sql`select f.id, f.num, f.estat, f.concepte, c.nom as client_nom, f.preu::text as base, f.pagada from public.factura f left join public.clients c on c.id = f.client_id

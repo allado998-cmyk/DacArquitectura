@@ -14,7 +14,6 @@ export interface Client {
   codi_postal: string | null;
   contacte: string | null; // legacy, used by Honoraris
   created_at: string;
-  contactes?: ClientContacte[]; // joined
 }
 
 export interface Tasca {
@@ -112,8 +111,10 @@ export interface ClientContacte {
   id: number;
   client_id: number | null;
   nom: string | null;
-  telefon: string | null;
-  mail: string | null;
+  telefon: string | null; // main phone
+  mail: string | null; // main mail
+  telefons_extra: string[];
+  mails_extra: string[];
   comentari: string | null;
   ordre: number;
   client_nom?: string | null; // joined (Contactes tab)

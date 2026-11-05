@@ -17,7 +17,7 @@ import type { ClientContacte } from "@/types/db";
 
 async function getContacte(idv: number): Promise<(ClientContacte & { client_nom: string | null }) | null> {
   const rows = (await sql`
-    select k.id, k.client_id, k.nom, k.telefon, k.mail, k.comentari, k.ordre, c.nom as client_nom
+    select k.id, k.client_id, k.nom, k.telefon, k.mail, k.telefons_extra, k.mails_extra, k.comentari, k.ordre, c.nom as client_nom
     from public.client_contactes k left join public.clients c on c.id = k.client_id where k.id = ${idv}
   `) as (ClientContacte & { client_nom: string | null })[];
   return rows[0] ?? null;
@@ -54,7 +54,7 @@ registerAction({
     const client = await findClient(a.id);
     if (!client) return { error: `No hi ha cap client amb id ${a.id}.` };
     const [contactes, expedients, factures, propostes] = await Promise.all([
-      sql`select id, nom, telefon, mail, comentari from public.client_contactes where client_id = ${a.id} order by ordre, id`,
+      sql`select id, nom, telefon, mail, telefons_extra, mails_extra, comentari from public.client_contactes where client_id = ${a.id} order by ordre, id`,
       sql`select id, num_expedient, projecte, estat, categoria, ciutat, pressupost::text as pressupost from public.expedients where client_id = ${a.id} order by num_expedient desc`,
       sql`select id, num, estat, to_char(data,'YYYY-MM-DD') as data, preu::text as base, pagada from public.factura where client_id = ${a.id} order by data desc nulls last, id desc`,
       sql`select id, num, to_char(data,'YYYY-MM-DD') as data, descripcio, estat from public.proposta_doc where client_id = ${a.id} order by num desc`,
@@ -67,15 +67,16 @@ registerAction({
   kind: "read",
   name: "list_contactes",
   domain: "clients",
-  description: "Agenda de contactes (persones) amb telèfon i correu; filtre per text o client.",
+  description: "Agenda de contactes (persones) amb telèfon i correu principals i els addicionals; filtre per text o client.",
   schema: z.object({ q: shortText.optional(), client_id: id.optional(), limit: z.number().int().min(1).max(500).default(200) }),
   async run(a) {
     const like = a.q ? `%${a.q.trim()}%` : null;
     const rows = await sql`
-      select k.id, k.nom, k.telefon, k.mail, k.comentari, k.client_id, c.nom as client_nom
+      select k.id, k.nom, k.telefon, k.mail, k.telefons_extra, k.mails_extra, k.comentari, k.client_id, c.nom as client_nom
       from public.client_contactes k left join public.clients c on c.id = k.client_id
       where (${like}::text is null or coalesce(k.nom,'') ilike ${like} or coalesce(k.mail,'') ilike ${like}
-             or coalesce(k.telefon,'') ilike ${like} or coalesce(c.nom,'') ilike ${like} or coalesce(k.comentari,'') ilike ${like})
+             or coalesce(k.telefon,'') ilike ${like} or coalesce(c.nom,'') ilike ${like} or coalesce(k.comentari,'') ilike ${like}
+             or array_to_string(k.telefons_extra, ' ') ilike ${like} or array_to_string(k.mails_extra, ' ') ilike ${like})
         and (${a.client_id ?? null}::bigint is null or k.client_id = ${a.client_id ?? null})
       order by c.nom nulls last, k.ordre, k.id limit ${a.limit}`;
     return { count: (rows as unknown[]).length, contactes: rows };
@@ -169,8 +170,10 @@ registerAction({
 
 const contacteFields = z.object({
   nom: shortText.nullable().optional(),
-  telefon: shortText.nullable().optional(),
-  mail: shortText.nullable().optional(),
+  telefon: shortText.nullable().optional().describe("Telèfon principal"),
+  mail: shortText.nullable().optional().describe("Correu principal"),
+  telefons_extra: z.array(shortText).max(20).optional().describe("Altres telèfons; substitueix tota la llista"),
+  mails_extra: z.array(shortText).max(20).optional().describe("Altres correus; substitueix tota la llista"),
   comentari: shortText.nullable().optional(),
   client_id: id.nullable().optional().describe("Client al qual pertany; null si és un contacte solt"),
 });
@@ -189,7 +192,7 @@ registerAction({
     return { summary: `Crear el contacte «${a.nom ?? a.mail ?? a.telefon}»${r.client ? ` del client ${r.client.nom}` : ""}.`, details: { ...a, client: r.client?.nom ?? null }, errors };
   },
   async commit(a) {
-    await callAction(() => createContacteAction({ nom: a.nom ?? "", telefon: a.telefon ?? "", mail: a.mail ?? "", comentari: a.comentari ?? "", clientId: a.client_id ?? null }));
+    await callAction(() => createContacteAction({ nom: a.nom ?? "", telefon: a.telefon ?? "", mail: a.mail ?? "", telefonsExtra: a.telefons_extra ?? [], mailsExtra: a.mails_extra ?? [], comentari: a.comentari ?? "", clientId: a.client_id ?? null }));
     const newId = await lastInsertedId("client_contactes");
     return newId ? await getContacte(newId) : { ok: true };
   },
@@ -199,7 +202,7 @@ registerAction({
   kind: "change",
   name: "update_contacte",
   domain: "clients",
-  description: "Modifica un contacte (nom, telèfon, correu, comentari o client). Només canvia els camps indicats.",
+  description: "Modifica un contacte (nom, telèfons, correus, comentari o client). Només canvia els camps indicats.",
   schema: contacteFields.extend({ id }),
   async plan(a): Promise<Plan> {
     const k = await getContacte(a.id);
@@ -220,7 +223,7 @@ registerAction({
     const k = await getContacte(a.id);
     if (!k) throw new Error("Contacte no trobat.");
     const v = (f: "nom" | "telefon" | "mail" | "comentari") => (a[f] === undefined ? (k[f] ?? "") : (a[f] ?? ""));
-    await callAction(() => updateClientContacteAction(a.id, { nom: v("nom"), telefon: v("telefon"), mail: v("mail"), comentari: v("comentari") }));
+    await callAction(() => updateClientContacteAction(a.id, { nom: v("nom"), telefon: v("telefon"), mail: v("mail"), telefonsExtra: a.telefons_extra ?? k.telefons_extra, mailsExtra: a.mails_extra ?? k.mails_extra, comentari: v("comentari") }));
     if (a.client_id !== undefined) await callAction(() => setContacteClientAction(a.id, a.client_id ?? null));
     return await getContacte(a.id);
   },

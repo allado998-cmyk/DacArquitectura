@@ -69,6 +69,19 @@ function quanFita(iso: string, today: string) {
   return { text: `d'aquí ${d} ${d === 1 ? "dia" : "dies"}`, passada: false, avui: false };
 }
 
+// A structural calculation (Càlculs) linked to an expedient.
+export interface CalculVinculat {
+  id: number;
+  num: string | null;
+  tipus: string;
+  tipus_label: string;
+  expedient_id: number;
+  element: string | null;
+  situacio: string | null;
+  versio: string | null;
+  data: string | null;
+}
+
 export function ExpedientsView({
   expedients,
   clients,
@@ -77,6 +90,7 @@ export function ExpedientsView({
   tipologies,
   calculs,
   propostes,
+  calculsVinculats,
 }: {
   expedients: Expedient[];
   clients: Client[];
@@ -85,6 +99,7 @@ export function ExpedientsView({
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
+  calculsVinculats: CalculVinculat[];
 }) {
   const [tab, setTab] = useState<Tab>("llista");
   const [listCount, setListCount] = useState(expedients.length);
@@ -150,7 +165,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} onCount={setListCount} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} calculsVinculats={calculsVinculats} onCount={setListCount} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} dedicByExp={dedicByExp} />}
       {tab === "mapa" && <MapPanel rows={expedients} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
     </div>
@@ -225,6 +240,7 @@ function ExpedientsList({
   tipologies,
   calculs,
   propostes,
+  calculsVinculats,
   onCount,
 }: {
   rows: Expedient[];
@@ -235,6 +251,7 @@ function ExpedientsList({
   tipologies: Tipologia[];
   calculs: CalculOpt[];
   propostes: PropostaOpt[];
+  calculsVinculats: CalculVinculat[];
   onCount: (n: number) => void;
 }) {
   const [detail, setDetail] = useState<Expedient | null>(null);
@@ -394,6 +411,7 @@ function ExpedientsList({
         expedient={detail}
         dedicacions={detail ? dedicByExp.get(detail.id) ?? [] : []}
         fites={detail ? fitesByExp.get(detail.id) ?? [] : []}
+        calculs={detail ? calculsVinculats.filter((c) => c.expedient_id === detail.id) : []}
         onClose={() => setDetail(null)}
       />
 
@@ -965,11 +983,13 @@ function DedicacioModal({
   expedient,
   dedicacions,
   fites,
+  calculs,
   onClose,
 }: {
   expedient: Expedient | null;
   dedicacions: Dedicacio[];
   fites: ExpedientFita[];
+  calculs: CalculVinculat[];
   onClose: () => void;
 }) {
   const total = dedicacions.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
@@ -1084,6 +1104,48 @@ function DedicacioModal({
                       <td className="td text-right tabular-nums">{fmtHores(parseFloat(d.hores) || 0)}</td>
                       <td className="td">{d.tasca ?? <span className="text-[var(--color-muted)]">—</span>}</td>
                       <td className="td text-[var(--color-muted)]">{d.comentari ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] pt-2">
+            Càlculs vinculats{calculs.length > 0 && ` (${calculs.length})`}
+          </h4>
+          {calculs.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">
+              Encara no hi ha cap càlcul d&apos;aquest expedient. Es creen des de{" "}
+              <Link href="/calculs" className="underline">Càlculs</Link>.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="th w-28">Núm</th>
+                    <th className="th">Tipus</th>
+                    <th className="th">Element</th>
+                    <th className="th w-16 text-center">Versió</th>
+                    <th className="th w-28">Data</th>
+                    <th className="th w-20"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calculs.map((c) => (
+                    <tr key={c.id}>
+                      <td className="td font-mono">{c.num ?? "—"}</td>
+                      <td className="td">{c.tipus_label}</td>
+                      <td className="td">
+                        <div>{c.element ?? <span className="text-[var(--color-muted)]">—</span>}</div>
+                        {c.situacio && <div className="text-xs text-[var(--color-muted)]">{c.situacio}</div>}
+                      </td>
+                      <td className="td text-center">{c.versio ?? ""}</td>
+                      <td className="td tabular-nums">{c.data ? fmtDate(c.data) : "—"}</td>
+                      <td className="td text-right">
+                        <Link href={`/calculs/${c.id}`} className="text-[var(--color-accent)] hover:underline">Obrir</Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

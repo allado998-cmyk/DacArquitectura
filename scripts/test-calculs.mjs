@@ -22,6 +22,8 @@ const { computePilar } = await import("../src/lib/calculs/pilar.ts");
 const { computeSoldadura } = await import("../src/lib/calculs/soldadura.ts");
 const { verdict } = await import("../src/lib/calculs/common.ts");
 const { perfilProps, soldaduraPer, FAMILIES } = await import("../src/lib/calculs/perfils.ts");
+const { buildCalculHtml } = await import("../src/lib/calculs/report.ts");
+const { AJUDA } = await import("../src/lib/calculs/ajuda.ts");
 
 let passed = 0;
 const failures = [];
@@ -169,6 +171,16 @@ test("σ ≈ 14,2923 kg/cm² < 16,3412 (OK)", () => {
   near(r.check.limit, 16.34122973);
   assert.equal(r.check.ok, true);
 });
+test("spread to one side only (end of the wall): Lef = a + p + c · cot 60° ≈ 28,89 cm", () => {
+  const one = computePilar({ costats: "1" });
+  const lef = val(one, "Longitud efectiva");
+  near(lef.value, 6 + 20 + 5 / Math.tan(Math.PI / 3), 1e-9);
+  assert.equal(lef.formula, "Lef = a + p + c · cos 60° / sin 60°");
+  assert.equal(val(pilar, "Longitud efectiva").formula, "Lef = a + p + 2 · c · cos 60° / sin 60°");
+  assert.equal(lef.hint, "CTE DB SE-F figura 5.7");
+  assert.deepEqual(lef.aux, [AJUDA.figura57]);
+  assert.ok(val(one, "Tensió a la base").value > val(pilar, "Tensió a la base").value, "a shorter Lef means more stress");
+});
 
 console.log("Soldadures (Justificació Comprovació Compatibilitat Soldadures.xls)");
 test("catalogue thicknesses: UPN 140 e 7 / e1 10 · IPN 140 e 5,7 / e1 8,6", () => {
@@ -216,8 +228,28 @@ test("combinations left out don't count and keep their place when the profiles c
   const other = computeSoldadura({ perfil1: "UPN 200", perfil2: "IPN 200", ocultes: ["ala|ànima"] }).sections.find((s) => s.welds).welds;
   assert.equal(other.find((c) => c.key === "ala|ànima").included, false);
 });
-test("no reference annex for Soldadures and Paret de càrrega", () => {
-  for (const r of [computeSoldadura({}), computeParet({})]) assert.ok(r.sections.every((s) => !s.reference?.length));
+test("no annex in any report", () => {
+  const calcs = [["paret", computeParet({})], ["biga", computeBiga({})], ["pilar", computePilar({})], ["soldadura", computeSoldadura({})]];
+  for (const [tipus, r] of calcs) {
+    const html = buildCalculHtml({ tipus, num: "CE-26-001", referencia: "26-0001", data: "2026-11-07" }, r, { logo: "/logo.jpg" });
+    assert.ok(html.includes("Resum de les comprovacions"), tipus);
+    assert.equal(/annex/i.test(html), false, tipus);
+  }
+});
+test("the masonry rows carry their CTE reference and help image, in all three wall calculations", () => {
+  for (const r of [computeParet({}), computeBiga({}), computePilar({})]) {
+    const k = val(r, "Constant de la fàbrica");
+    assert.equal(k.hint, "CTE DB SE-F annex C");
+    assert.deepEqual(k.aux, [AJUDA.annexC]);
+    for (const label of ["Resistència normalitzada", "Resistència del morter"]) {
+      assert.equal(val(r, label).hint, "CTE DB SE-F taula 4.4");
+      assert.deepEqual(val(r, label).aux, [AJUDA.taula44]);
+    }
+    assert.deepEqual(val(r, "Coeficient parcial de seguretat").aux, [AJUDA.taula48]);
+  }
+});
+test("every help image exists", () => {
+  for (const img of Object.values(AJUDA)) assert.ok(existsSync(join(ROOT, "public", img.src)), img.src);
 });
 
 console.log("Paret · perfils que compleixen");

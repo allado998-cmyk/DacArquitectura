@@ -131,16 +131,25 @@ s'exporta com a informe de justificació en **Word** i **PDF**.
   actuals (`paretPerfilsValids`), i en canviar de tipus tria el més lleuger
   que compleix.
 - **Recolzament biga**: daus de formigó i connectors a partir de l'esforç tallant.
-- **Base pilar estintolament**: tensió sota la base amb repartiment a 60°.
+- **Base pilar estintolament**: tensió sota la base amb repartiment a 60°, a
+  dos costats o a un de sol quan el pilar és a l'extrem de la paret (CTE DB
+  SE-F figura 5.7).
 - **Compatibilitat soldadures**: gola compatible entre ala i ànima de dos perfils
   (o una xapa) segons la taula de valors límit. Cada combinació es pot treure
   (no es comprova ni surt a l'informe).
 
 L'encapçalament (referència, projecte, adreça, ciutat i client) s'omple des de
-l'expedient. Recolzament biga i Base pilar també es poden vincular a un client
-de la Base de Dades; Paret de càrrega i Soldadures només van per expedient.
-L'annex «Valors de referència» només surt als informes de Recolzament biga i
-Base pilar.
+l'expedient: els càlculs van per expedient, sense triar client a part. La fitxa
+de cada expedient (clicar-ne la fila) llista els seus càlculs vinculats, amb un
+enllaç per obrir-los. Els informes no porten annex.
+
+Imatges d'ajuda (`src/lib/calculs/ajuda.ts`, fitxers a `public/calculs/ajuda/`):
+extractes del CTE que s'obren amb un botó al costat de la fila, sense sortir a
+l'informe. A «Paret de càrrega de suport» (els tres càlculs de paret): annex C
+de l'SE-F per a K, taula 4.4 per a fb i fm, taula 4.8 per a γM. A la base del
+pilar, la figura 5.7. A cada sostre de l'estat de càrregues, la taula 3.1 de
+l'SE-AE (sobrecàrregues d'ús) i les seves notes. A l'estat de càrregues, les
+columnes Càrrega i Coef. mostren els valors amb dos decimals.
 
 La pestanya **Perfils i soldadures** (i el botó «Taules de perfils» de cada
 càlcul) mostra les taules del catàleg: IPE, IPN, HEB, HEA, HEM, UPN, T, L, LD,

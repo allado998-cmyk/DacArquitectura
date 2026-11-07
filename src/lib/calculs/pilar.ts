@@ -2,13 +2,17 @@
 // Port of "Justificació Comprovació Recolzament Base Pilar Estintolament.xls":
 // the pillar's axial load (from CYPE) spreads at 60° through the sleeper
 // (dorment) into the load-bearing wall; checks the wall stress under it.
+// The load spreads to both sides, or to one only when the pillar stands at the
+// end of the wall (CTE DB SE-F figura 5.7).
 
+import { AJUDA } from "./ajuda";
 import { type CalcResult, type Section, G, NMM2_TO_KGCM2, check, div, fabricaFd, fabricaRows, num } from "./common";
 
 export interface PilarDades {
   aUpn: number; // cm, width of the UPN arriving at the base
   pletina: number; // cm, reinforcing plate under the UPN
   cantell: number; // cm, sleeper depth (slab thickness)
+  costats: "1" | "2"; // sides the load spreads to at 60°
   gParet: number; // cm
   N: number; // kg, axial (CYPE)
   k: number;
@@ -18,7 +22,7 @@ export interface PilarDades {
 }
 
 export function pilarDefaults(): PilarDades {
-  return { aUpn: 6, pletina: 20, cantell: 5, gParet: 15, N: 6811, k: 0.6, fb: 10, fm: 5, gM: 2.5 };
+  return { aUpn: 6, pletina: 20, cantell: 5, costats: "2", gParet: 15, N: 6811, k: 0.6, fb: 10, fm: 5, gM: 2.5 };
 }
 
 const COT60 = 1 / Math.tan(Math.PI / 3); // cos 60° / sin 60° = 0,577
@@ -31,7 +35,8 @@ export function computePilar(raw: Partial<PilarDades>): CalcResult {
   const p = num(d.pletina);
   const c = num(d.cantell);
   const gP = num(d.gParet);
-  const lef = a + p + 2 * c * COT60; // cm
+  const costats = String(d.costats) === "1" ? 1 : 2;
+  const lef = a + p + costats * c * COT60; // cm
   const aap = lef * gP; // cm²
   const N = num(d.N);
   const fd = fabricaFd(num(d.k), num(d.fb), num(d.fm), num(d.gM));
@@ -42,7 +47,6 @@ export function computePilar(raw: Partial<PilarDades>): CalcResult {
     key: "base",
     title: "Base de formigó en massa als extrems de l'estintolament",
     enabled: true,
-    reference: ["pilar60"],
     blocks: [
       {
         title: "Base",
@@ -51,7 +55,22 @@ export function computePilar(raw: Partial<PilarDades>): CalcResult {
           { label: "Pletina de reforç a la base de la UPN", sym: "p", value: p, unit: "cm", input: { type: "num", key: "pletina", decimals: 2 }, alt: { value: p * 10, unit: "mm" } },
           { label: "Cantell del dorment (gruix del forjat)", sym: "c", value: c, unit: "cm", input: { type: "num", key: "cantell", decimals: 2 }, alt: { value: c * 10, unit: "mm" } },
           { label: "cos 60° / sin 60°", value: COT60, decimals: 3 },
-          { label: "Longitud efectiva de contacte (repartiment a 60°)", formula: "Lef = a + p + 2 · c · cos 60° / sin 60°", sym: "Lef", value: lef, unit: "cm", alt: { value: lef * 10, unit: "mm" } },
+          {
+            label: "Repartiment de la càrrega a 60°",
+            value: costats === 2 ? "A dos costats" : "A un costat",
+            hint: "A un costat quan el pilar és a l'extrem de la paret",
+            input: { type: "select", key: "costats", options: [{ value: "2", label: "A dos costats" }, { value: "1", label: "A un costat" }] },
+          },
+          {
+            label: "Longitud efectiva de contacte (repartiment a 60°)",
+            formula: costats === 2 ? "Lef = a + p + 2 · c · cos 60° / sin 60°" : "Lef = a + p + c · cos 60° / sin 60°",
+            hint: "CTE DB SE-F figura 5.7",
+            aux: [AJUDA.figura57],
+            sym: "Lef",
+            value: lef,
+            unit: "cm",
+            alt: { value: lef * 10, unit: "mm" },
+          },
           { label: "Gruix de la paret de càrrega", sym: "G", value: gP, unit: "cm", input: { type: "num", key: "gParet", decimals: 2 }, alt: { value: gP * 10, unit: "mm" } },
           { label: "Àrea nominal", formula: "Aap = Lef · G", sym: "Aap", value: aap, unit: "cm²", alt: { value: aap * 100, unit: "mm²" } },
         ],
@@ -67,7 +86,6 @@ export function computePilar(raw: Partial<PilarDades>): CalcResult {
     key: "fabrica",
     title: "Paret de càrrega de suport",
     enabled: true,
-    reference: ["fabrica"],
     blocks: [
       { rows: fabricaRows(dd, fd) },
       {

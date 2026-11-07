@@ -4,6 +4,9 @@
 // soldadura.ts) turns its inputs into Sections; the editor renders them with input fields and live
 // checks, and report.ts prints the same Sections as the justification report.
 
+import type { AuxImage } from "./ajuda";
+import { AJUDA } from "./ajuda";
+
 export type CalcTipus = "paret" | "biga" | "pilar" | "soldadura";
 
 // The spreadsheets convert kg ↔ N with 9,81 (and kg/cm² ↔ N/mm² with 100/9,81).
@@ -36,6 +39,7 @@ export interface Row {
   alt?: { value: number | null; unit: string; decimals?: number }; // unit conversion column
   check?: Check;
   hint?: string; // short help under the label (editor only)
+  aux?: AuxImage[]; // help images opened from a button beside the label (editor only)
 }
 
 export interface Block {
@@ -51,7 +55,6 @@ export interface Section {
   blocks: Block[];
   loads?: LoadsTable; // paret: "Estat de càrregues ponderat"
   welds?: WeldCombo[]; // soldadura: one entry per pair of welded parts
-  reference?: ("fabrica" | "pilar60" | "soldadura")[]; // reference tables printed in the annex
 }
 
 // Soldadura: a part of a piece (ala / ànima of a profile, or a plate) with
@@ -187,10 +190,10 @@ export const FABRICA_DEFAULT: FabricaInputs = { k: 0.6, fb: 10, fm: 5, gM: 2.5 }
 
 export function fabricaRows(d: Record<string, unknown>, fd: number | null, opts: { fdLabel?: string } = {}): Row[] {
   return [
-    { label: "Constant de la fàbrica", sym: "K", value: num(d.k), decimals: 2, input: { type: "num", key: "k", decimals: 2 }, hint: "CTE DB SE-F annex C: 0,60 massissa · 0,55 perforada · 0,50 alleugerida · 0,40 buida (1 full)" },
-    { label: "Resistència normalitzada de les peces", sym: "fb", value: num(d.fb), unit: "N/mm²", decimals: 2, input: { type: "num", key: "fb", decimals: 2 } },
-    { label: "Resistència del morter", sym: "fm", value: num(d.fm), unit: "N/mm²", decimals: 2, input: { type: "num", key: "fm", decimals: 2 } },
-    { label: "Coeficient parcial de seguretat del material", sym: "γM", value: num(d.gM), decimals: 2, input: { type: "num", key: "gM", decimals: 2 }, hint: "CTE DB SE-F taula 4.8" },
+    { label: "Constant de la fàbrica", sym: "K", value: num(d.k), decimals: 2, input: { type: "num", key: "k", decimals: 2 }, hint: "CTE DB SE-F annex C", aux: [AJUDA.annexC] },
+    { label: "Resistència normalitzada de les peces", sym: "fb", value: num(d.fb), unit: "N/mm²", decimals: 2, input: { type: "num", key: "fb", decimals: 2 }, hint: "CTE DB SE-F taula 4.4", aux: [AJUDA.taula44] },
+    { label: "Resistència del morter", sym: "fm", value: num(d.fm), unit: "N/mm²", decimals: 2, input: { type: "num", key: "fm", decimals: 2 }, hint: "CTE DB SE-F taula 4.4", aux: [AJUDA.taula44] },
+    { label: "Coeficient parcial de seguretat del material", sym: "γM", value: num(d.gM), decimals: 2, input: { type: "num", key: "gM", decimals: 2 }, hint: "CTE DB SE-F taula 4.8", aux: [AJUDA.taula48] },
     {
       label: opts.fdLabel ?? "Resistència de càlcul a compressió",
       formula: "fd = K · fb^0,65 · fm^0,25 / γM",
@@ -203,51 +206,7 @@ export function fabricaRows(d: Record<string, unknown>, fd: number | null, opts:
   ];
 }
 
-// ---- reference tables printed with the report and shown in the editor ----
-
-// CTE DB SE-F annex C: K constant.
-export const FABRICA_K: { label: string; k: number }[] = [
-  { label: "1 full · peça massissa", k: 0.6 },
-  { label: "1 full · peça perforada", k: 0.55 },
-  { label: "1 full · peça alleugerida", k: 0.5 },
-  { label: "1 full · peça buida", k: 0.4 },
-  { label: "2 fulls · peces massisses", k: 0.5 },
-  { label: "2 fulls · peces perforades", k: 0.45 },
-  { label: "2 fulls · peces alleugerides", k: 0.4 },
-];
-
-// CTE DB SE-F taula 4.4: characteristic compressive strength fk (N/mm²).
-export const FABRICA_FK = {
-  cols: [
-    { fb: 10, fm: 5 },
-    { fb: 10, fm: 7.5 },
-    { fb: 15, fm: 7.5 },
-    { fb: 15, fm: 10 },
-    { fb: 20, fm: 10 },
-    { fb: 20, fm: 15 },
-    { fb: 25, fm: 15 },
-  ],
-  rows: [
-    { label: "Maó massís amb junta prima", fk: [5, 5, 7, 7, 9, 10, 11] },
-    { label: "Maó massís", fk: [4, 4, 6, 6, 8, 8, 10] },
-    { label: "Maó perforat", fk: [4, 4, 5, 6, 7, 8, 9] },
-    { label: "Blocs alleugerits", fk: [3, 4, 5, 5, 6, 7, 8] },
-    { label: "Blocs buits", fk: [2, 3, 4, 4, 5, 6, 6] },
-  ],
-};
-
-// CTE DB SE-F taula 4.8: partial safety factors γM.
-export const FABRICA_GM = {
-  head: ["A", "B", "C"],
-  rows: [
-    { label: "Resistència de la fàbrica · control de fabricació I", v: [1.7, 2.2, 2.7] },
-    { label: "Resistència de la fàbrica · control de fabricació II", v: [2.0, 2.5, 3.0] },
-    { label: "Resistència de claus i amarratges", v: [2.5, 2.5, 2.5] },
-    { label: "Ancoratge de l'acer d'armar", v: [1.7, 2.2, null] },
-    { label: "Acer (armadura activa i passiva)", v: [1.15, 1.15, null] },
-  ] as { label: string; v: (number | null)[] }[],
-  note: "Per a situacions extraordinàries, fàbriques: 1,2 · 1,5 · 1,8 per a les categories A, B i C.",
-};
+// ---- reference tables shown in Perfils i soldadures ----
 
 // CTE DB SE-A taula 4.1: steel grades (fy by nominal thickness t, fu).
 export const ACER_GRADES: { nom: string; fy16: number; fy40: number; fy63: number; fu: number }[] = [

@@ -2,12 +2,11 @@
 // print/PDF window and the Word (.doc) download — same approach as the actes
 // (acta-doc.ts). Laid out like David's spreadsheet printout: inputs on a
 // yellow background, OK! / NO! next to each check, unit conversions on the
-// right, then a summary of every check and the reference tables as an annex.
+// right, then a summary of every check.
 
 import type { CalculEstructural } from "@/types/db";
-import { type CalcResult, type LoadsTable, type Row, type Section, type WeldCombo, allChecks, fmt, verdict, verdictText, weldResultText, FABRICA_FK, FABRICA_GM, FABRICA_K } from "./common";
+import { type CalcResult, type LoadsTable, type Row, type Section, type WeldCombo, allChecks, fmt, verdict, verdictText, weldResultText } from "./common";
 import { calcType } from "./index";
-import { SOLDADURA } from "./perfils";
 
 const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 const BD = "1px solid #c9c9c9";
@@ -170,40 +169,8 @@ function summary(r: CalcResult): string {
   return head + `<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><colgroup><col style="width:38%"><col style="width:50%"><col style="width:12%"></colgroup>${rows}</table>`;
 }
 
-function annexFabrica(): string {
-  const th = (s: string) => `<td bgcolor="#f3f3f3" style="border:${BD};padding:3px 6px;font-size:8.5px;font-weight:bold;text-align:center;background:#f3f3f3;">${s}</td>`;
-  const td = (s: string, align = "center") => `<td style="border:${BD};padding:3px 6px;font-size:9px;text-align:${align};">${s}</td>`;
-  const k = `<p style="font-size:9.5px;font-weight:bold;margin:8px 0 3px;">CTE DB SE-F, annex C · Resistència característica a compressió</p>
-    <p style="font-size:9px;margin:0 0 4px;">fk = K · fb<sup>0,65</sup> · fm<sup>0,25</sup>, amb fm no superior a 20 N/mm² ni a 2·fb. fd = fk / γM.</p>
-    <table style="border-collapse:collapse;"><tr>${th("Tipus de fàbrica")}${th("K")}</tr>${FABRICA_K.map((x) => `<tr>${td(esc(x.label), "left")}${td(fmt(x.k))}</tr>`).join("")}</table>`;
-  const fk = `<p style="font-size:9.5px;font-weight:bold;margin:10px 0 3px;">CTE DB SE-F, taula 4.4 · Resistència característica a la compressió de fàbriques usuals fk (N/mm²)</p>
-    <table style="border-collapse:collapse;">
-      <tr>${th("fb (N/mm²)")}${FABRICA_FK.cols.map((c) => th(fmt(c.fb, 0))).join("")}</tr>
-      <tr>${th("fm (N/mm²)")}${FABRICA_FK.cols.map((c) => th(fmt(c.fm, c.fm % 1 ? 1 : 0))).join("")}</tr>
-      ${FABRICA_FK.rows.map((r) => `<tr>${td(esc(r.label), "left")}${r.fk.map((v) => td(fmt(v, 0))).join("")}</tr>`).join("")}
-    </table>`;
-  const gm = `<p style="font-size:9.5px;font-weight:bold;margin:10px 0 3px;">CTE DB SE-F, taula 4.8 · Coeficients parcials de seguretat γM (situacions persistents i transitòries)</p>
-    <table style="border-collapse:collapse;">
-      <tr>${th("Categoria de l'execució")}${FABRICA_GM.head.map((h) => th(h)).join("")}</tr>
-      ${FABRICA_GM.rows.map((r) => `<tr>${td(esc(r.label), "left")}${r.v.map((v) => td(v == null ? "" : fmt(v))).join("")}</tr>`).join("")}
-    </table>
-    <p style="font-size:8.5px;color:#555;margin:3px 0 0;">${esc(FABRICA_GM.note)}</p>`;
-  return k + fk + gm;
-}
-
-function annexSoldadura(): string {
-  const th = (s: string) => `<td bgcolor="#f3f3f3" style="border:${BD};padding:2px 6px;font-size:8.5px;font-weight:bold;text-align:center;background:#f3f3f3;">${s}</td>`;
-  const td = (s: string) => `<td style="border:${BD};padding:1px 6px;font-size:8.5px;text-align:center;">${s}</td>`;
-  return `<p style="font-size:9.5px;font-weight:bold;margin:8px 0 3px;">Valors límit de la gola d'una soldadura en angle</p>
-    <table style="border-collapse:collapse;">
-      <tr>${th("Gruix de la peça (mm)")}${th("Gola màxima (mm)")}${th("Gola mínima (mm)")}</tr>
-      ${SOLDADURA.map((s) => `<tr>${td(`${fmt(s.tMin, 1)} – ${fmt(s.tMax, 1)}`)}${td(fmt(s.aMax, 1))}${td(fmt(s.aMin, 1))}</tr>`).join("")}
-    </table>`;
-}
-
 export interface ReportAssets {
   logo: string;
-  pilar60: string;
 }
 
 export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets: ReportAssets): string {
@@ -237,15 +204,6 @@ export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets
     .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + (s.welds ? weldsTable(s.welds) : ""))
     .join("");
 
-  const refs = new Set(result.sections.filter((s) => s.enabled).flatMap((s) => s.reference ?? []));
-  const pageBreak = `<div style="page-break-before:always;break-before:page;mso-break-type:page-break;height:0;line-height:0;font-size:1px;">&nbsp;</div>`;
-  const annex = refs.size
-    ? `${pageBreak}${bar("Annex · Valors de referència")}
-      ${refs.has("pilar60") ? `<p style="font-size:9.5px;font-weight:bold;margin:8px 0 3px;">Repartiment de la càrrega a 60° (alçat)</p><img src="${assets.pilar60}" width="305" height="216" style="width:305px;height:auto;" />` : ""}
-      ${refs.has("fabrica") ? annexFabrica() : ""}
-      ${refs.has("soldadura") ? annexSoldadura() : ""}`
-    : "";
-
   return `
   <div style="font-family:${DOC_FONT};font-size:10px;color:#111;max-width:820px;margin:0 auto;">
     <table style="width:100%;border-collapse:collapse;"><tr>
@@ -260,7 +218,6 @@ export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets
     ${sections}
     ${bar("Resum de les comprovacions")}
     ${summary(result)}
-    ${annex}
   </div>`;
 }
 
@@ -294,7 +251,7 @@ export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { margin: 0; }
       tr { page-break-inside: avoid; }
-    </style></head><body>${buildCalculHtml(c, result, { logo: `${origin}/logo.jpg`, pilar60: `${origin}/calculs/repartiment-60.png` })}</body></html>`;
+    </style></head><body>${buildCalculHtml(c, result, { logo: `${origin}/logo.jpg` })}</body></html>`;
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -303,14 +260,14 @@ export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName
 }
 
 export async function downloadCalculWord(c: CalculEstructural, result: CalcResult, fileName: string) {
-  const [logo, pilar60] = await Promise.all([toDataUri("/logo.jpg"), toDataUri("/calculs/repartiment-60.png")]);
+  const logo = await toDataUri("/logo.jpg");
   // Word reads the @page rule for paper size and margins from a named section.
   const head = `<style>
     @page WordSection1 { size: 21cm 29.7cm; margin: 1.5cm 1.5cm 1.5cm 1.5cm; }
     div.WordSection1 { page: WordSection1; }
     body,table,td,th,tr,div,span,p,b{font-family:${DOC_FONT};}
   </style>`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo, pilar60 })}</div></body></html>`;
+  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo })}</div></body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

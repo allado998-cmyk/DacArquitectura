@@ -15,8 +15,6 @@ export interface CalcType {
   fileTitle: string; // exported file name prefix (the original spreadsheet name)
   situacioLabel: string; // header row under "Arquitecte" (value e.g. "Planta baixa")
   desc: string;
-  // false: the header takes the client from the expedient only (no client picker).
-  clientPicker: boolean;
   defaults: () => Record<string, unknown>;
   compute: (dades: Record<string, unknown>) => CalcResult;
   // Profile inputs (by key) → the profiles that pass, marked in the picker.
@@ -31,7 +29,6 @@ export const CALC_TYPES: CalcType[] = [
     fileTitle: "Justificació de Càlcul Estintolament Paret de Càrrega",
     situacioLabel: "Paret de càrrega",
     desc: "Estat de càrregues ponderat, comprovació del perfil (E.L.S. i E.L.U.), recolzament als extrems (connectors, daus o brancals) i esnelles.",
-    clientPicker: false,
     defaults: () => paretDefaults() as unknown as Record<string, unknown>,
     compute: (d) => computeParet(d),
     perfilsValids: (d) => ({ perfil: paretPerfilsValids(d) }),
@@ -43,7 +40,6 @@ export const CALC_TYPES: CalcType[] = [
     fileTitle: "Justificació Comprovació Recolzament Biga amb Daus o Connectors",
     situacioLabel: "Paret de càrrega",
     desc: "Recolzament d'una biga sobre paret de càrrega a partir de l'esforç tallant (CYPE): daus de formigó en massa i connectors travessers.",
-    clientPicker: true,
     defaults: () => bigaDefaults() as unknown as Record<string, unknown>,
     compute: (d) => computeBiga(d),
   },
@@ -54,7 +50,6 @@ export const CALC_TYPES: CalcType[] = [
     fileTitle: "Justificació Comprovació Recolzament Base Pilar Estintolament",
     situacioLabel: "Base paviment",
     desc: "Tensió a la paret de càrrega sota la base d'un pilar d'estintolament, amb repartiment a 60° a través del dorment.",
-    clientPicker: true,
     defaults: () => pilarDefaults() as unknown as Record<string, unknown>,
     compute: (d) => computePilar(d),
   },
@@ -65,7 +60,6 @@ export const CALC_TYPES: CalcType[] = [
     fileTitle: "Justificació Comprovació Compatibilitat Soldadures",
     situacioLabel: "Situació",
     desc: "Gola de soldadura en angle compatible entre dos perfils (ala i ànima de cadascun, o una xapa), segons els gruixos del catàleg i la taula de valors límit de la gola.",
-    clientPicker: false,
     defaults: () => soldaduraDefaults() as unknown as Record<string, unknown>,
     compute: (d) => computeSoldadura(d),
   },

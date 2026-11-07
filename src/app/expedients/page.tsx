@@ -3,14 +3,15 @@ import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
 import { ExpedientsView } from "./expedients-view";
 import type { Expedient, Client, Dedicacio, Tipologia } from "@/types/db";
-import type { CalculOpt, PropostaOpt, ExpedientFita } from "./expedients-view";
+import type { CalculOpt, CalculVinculat, PropostaOpt, ExpedientFita } from "./expedients-view";
+import { calcType } from "@/lib/calculs";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExpedientsPage() {
   await requireUser();
 
-  const [expedients, clients, dedicacions, fites, tipologies, calculs, propostes] = await Promise.all([
+  const [expedients, clients, dedicacions, fites, tipologies, calculs, propostes, estructurals] = await Promise.all([
     sql`
       select e.id, e.num_expedient, e.projecte, e.client_id,
              c.nom as client_nom,
@@ -68,7 +69,15 @@ export default async function ExpedientsPage() {
       from public.proposta_doc d
       order by d.num desc nulls last, d.id desc
     ` as unknown as Promise<PropostaOpt[]>,
+    // Structural calculations (Càlculs) linked to an expedient; no dades, just what the list shows.
+    sql`
+      select id, num, tipus, expedient_id, element, situacio, versio, to_char(data, 'YYYY-MM-DD') as data
+      from public.calcul_estructural
+      where expedient_id is not null
+      order by data desc nulls last, id desc
+    ` as unknown as Promise<Omit<CalculVinculat, "tipus_label">[]>,
   ]);
+  const calculsVinculats: CalculVinculat[] = estructurals.map((c) => ({ ...c, tipus_label: calcType(c.tipus).tab }));
 
   return (
     <>
@@ -86,6 +95,7 @@ export default async function ExpedientsPage() {
           tipologies={tipologies}
           calculs={calculs}
           propostes={propostes}
+          calculsVinculats={calculsVinculats}
         />
       </main>
     </>

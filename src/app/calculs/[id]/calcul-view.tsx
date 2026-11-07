@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deleteCalculAction, updateCalculAction, type CalculPatch } from "../actions";
 import { calcType } from "@/lib/calculs";
 import { allChecks, fmt, verdict, verdictText, weldResultText, type LoadsTable, type Row, type Section, type WeldCombo } from "@/lib/calculs/common";
 import { PLATE, perfilOptions, perfilProps } from "@/lib/calculs/perfils";
 import { newSostre, type Sostre } from "@/lib/calculs/paret";
+import { AJUDA, type AuxImage } from "@/lib/calculs/ajuda";
 import { downloadCalculWord, openCalculPdf } from "@/lib/calculs/report";
 import { calculFileName } from "@/lib/file-names";
 import { parseLocaleNumber } from "@/lib/format";
@@ -15,12 +16,11 @@ import { PerfilsRef } from "../perfils-ref";
 import type { CalculEstructural } from "@/types/db";
 
 export type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null; adreca: string | null; ciutat: string | null; client_id: number | null; client_nom: string | null };
-export type ClientOpt = { id: number; nom: string; ciutat: string | null };
 
 type Dades = Record<string, unknown>;
 type SetDada = (key: string, value: unknown) => void;
 
-export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstructural; expedients: ExpedientOpt[]; clients: ClientOpt[] }) {
+export function CalculView({ calcul, expedients }: { calcul: CalculEstructural; expedients: ExpedientOpt[] }) {
   const t = calcType(calcul.tipus);
   const [doc, setDoc] = useState<CalculPatch>(() => ({
     expedient_id: calcul.expedient_id,
@@ -105,15 +105,16 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
     return out;
   }, [result]);
   const [refOpen, setRefOpen] = useState<string[] | null>(null);
+  const [aux, setAux] = useState<AuxImage | null>(null);
 
   const [generating, setGenerating] = useState(false);
   const live = (): CalculEstructural => ({ ...calcul, ...doc });
   const fileName = () => calculFileName({ fileTitle: t.fileTitle, referencia: doc.referencia, versio: doc.versio, data: doc.data });
 
   const expedientOpts = expedients.map((e) => ({ id: e.id, label: e.num_expedient, sub: e.projecte ?? undefined }));
-  const clientOpts = clients.map((c) => ({ id: c.id, label: c.nom, sub: c.ciutat ?? undefined }));
 
   return (
+    <AuxContext.Provider value={setAux}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -155,22 +156,6 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
               </button>
             )}
           </div>
-          {/* Some calculations always hang off an expedient, which brings the client. */}
-          {t.clientPicker && (
-            <div>
-              <label className="label">Client (Base de Dades)</label>
-              <Combobox
-                options={clientOpts}
-                value={doc.client_id}
-                onChange={(id) => {
-                  const c = id == null ? null : clients.find((x) => x.id === id);
-                  update(c ? { client_id: c.id, client: c.nom } : { client_id: null });
-                }}
-                placeholder="Cercar client…"
-                emptyLabel="— Sense client —"
-              />
-            </div>
-          )}
         </div>
         <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Referència DAC" value={doc.referencia} onChange={(v) => update({ referencia: v })} />
@@ -217,7 +202,9 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
       </div>
 
       {refOpen && <RefDrawer highlight={refOpen} onClose={() => setRefOpen(null)} />}
+      {aux && <AuxViewer img={aux} onClose={() => setAux(null)} />}
     </div>
+    </AuxContext.Provider>
   );
 }
 
@@ -290,7 +277,10 @@ function BlockRows({ title, rows, dades, setDada, valids, onShowProfile }: { tit
         ) : (
         <tr key={i} className="border-b border-[var(--color-line)] last:border-b-0">
           <td className="px-5 py-2 align-middle">
-            <div>{r.label}</div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {r.label}
+              {r.aux?.map((img) => <AuxButton key={img.src} img={img} />)}
+            </div>
             {r.formula && <div className="text-xs italic text-[var(--color-muted)]">{r.formula}</div>}
             {r.hint && <div className="text-xs text-[var(--color-muted)]">{r.hint}</div>}
           </td>
@@ -472,26 +462,42 @@ function ValueCell({ row, dades, setDada, onShowProfile }: { row: Row; dades: Da
   );
 }
 
-function toText(v: unknown): string {
-  return typeof v === "number" && Number.isFinite(v) ? String(v).replace(".", ",") : "";
+// With decimals, a value shows that many (1,7 → 1,70) while it isn't being typed in.
+function toText(v: unknown, decimals?: number): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "";
+  return (decimals == null ? String(v) : v.toFixed(decimals)).replace(".", ",");
 }
 
-function NumInput({ value, onChange, auto, integer, className }: { value: unknown; onChange: (n: number | null) => void; auto?: number | null; integer?: boolean; className?: string }) {
-  const [text, setText] = useState(toText(value));
+function NumInput({
+  value,
+  onChange,
+  auto,
+  integer,
+  className,
+  decimals,
+}: {
+  value: unknown;
+  onChange: (n: number | null) => void;
+  auto?: number | null;
+  integer?: boolean;
+  className?: string;
+  decimals?: number;
+}) {
+  const [text, setText] = useState(toText(value, decimals));
   const focused = useRef(false);
   useEffect(() => {
-    if (!focused.current) setText(toText(value));
-  }, [value]);
+    if (!focused.current) setText(toText(value, decimals));
+  }, [value, decimals]);
   return (
     <input
       className={`input input-dada text-right tabular-nums ${className ?? ""}`}
       inputMode="decimal"
       value={text}
-      placeholder={auto != null ? toText(Math.round(auto * 1000) / 1000) : undefined}
+      placeholder={auto != null ? toText(decimals == null ? Math.round(auto * 1000) / 1000 : auto, decimals) : undefined}
       onFocus={() => (focused.current = true)}
       onBlur={() => {
         focused.current = false;
-        setText(toText(value));
+        setText(toText(value, decimals));
       }}
       onChange={(e) => {
         const s = e.target.value;
@@ -535,6 +541,8 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
                     {s && si != null ? (
                       <div className="flex flex-wrap items-center gap-3">
                         <input className="input input-sm w-56 font-semibold" value={s.nom} onChange={(e) => setSostre(si, { nom: e.target.value })} />
+                        <AuxButton img={AJUDA.sobrecarregues} />
+                        <AuxButton img={AJUDA.sobrecarreguesNotes} />
                         <span className="text-xs uppercase text-[var(--color-muted)]">Nombre</span>
                         <div className="w-20">
                           <NumInput value={s.nombre} onChange={(n) => setSostre(si, { nombre: n ?? 0 })} className="input-sm" />
@@ -564,7 +572,7 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
                         <td className="px-5 py-1.5">{p.label}</td>
                         <td className="px-2 py-1.5">
                           <div className="flex items-center gap-1">
-                            <NumInput value={dades[p.key]} onChange={(n) => setDada(p.key, n)} className="input-sm" />
+                            <NumInput value={dades[p.key]} onChange={(n) => setDada(p.key, n)} className="input-sm" decimals={2} />
                             <span className="w-12 text-xs text-[var(--color-muted)]">{p.unit}</span>
                           </div>
                         </td>
@@ -575,15 +583,15 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
                   const ln = l.line!;
                   const qInput =
                     s && si != null && ln.qKey ? (
-                      <NumInput value={s[ln.qKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.qKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" />
+                      <NumInput value={s[ln.qKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.qKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" decimals={2} />
                     ) : ln.qKey ? (
-                      <NumInput value={dades[ln.qKey]} onChange={(n) => setDada(ln.qKey!, n)} auto={ln.qAuto} className="input-sm" />
+                      <NumInput value={dades[ln.qKey]} onChange={(n) => setDada(ln.qKey!, n)} auto={ln.qAuto} className="input-sm" decimals={2} />
                     ) : null;
                   const gammaInput =
                     ln.gammaKey && s && si != null ? (
-                      <NumInput value={s[ln.gammaKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.gammaKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" />
+                      <NumInput value={s[ln.gammaKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.gammaKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" decimals={2} />
                     ) : ln.gammaKey ? (
-                      <NumInput value={dades[ln.gammaKey]} onChange={(n) => setDada(ln.gammaKey!, n)} className="input-sm" />
+                      <NumInput value={dades[ln.gammaKey]} onChange={(n) => setDada(ln.gammaKey!, n)} className="input-sm" decimals={2} />
                     ) : null;
                   return (
                     <tr key={li} className="border-b border-[var(--color-line)]">
@@ -717,6 +725,47 @@ function WeldsTable({ welds, dades, setDada }: { welds: WeldCombo[]; dades: Dade
       <p className="px-5 py-3 text-xs text-[var(--color-muted)]">
         Ombrejats: la gola màxima de la peça més prima i la mínima de la més gruixuda. La primera ha d&apos;estar dins del marge de la peça més gruixuda i la segona dins del de la més prima.
       </p>
+    </div>
+  );
+}
+
+// ---- help images (CTE extracts) ----
+
+const AuxContext = createContext<(img: AuxImage) => void>(() => {});
+
+function AuxButton({ img }: { img: AuxImage }) {
+  const open = useContext(AuxContext);
+  return (
+    <button
+      type="button"
+      title={img.title}
+      onClick={() => open(img)}
+      className="inline-flex items-center gap-1 rounded border border-[var(--color-line)] bg-white px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+      </svg>
+      {img.short}
+    </button>
+  );
+}
+
+function AuxViewer({ img, onClose }: { img: AuxImage; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <figure className="max-h-full w-full max-w-[960px] overflow-auto rounded-lg bg-white p-4 shadow-2xl">
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <figcaption className="text-sm font-semibold">{img.title}</figcaption>
+          <button type="button" onClick={onClose} className="rounded-md px-2 py-0.5 text-[var(--color-muted)] hover:bg-[var(--color-paper)]" aria-label="Tancar">✕</button>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img.src} alt={img.title} className="h-auto w-full" />
+      </figure>
     </div>
   );
 }

@@ -46,7 +46,6 @@ export function computeBiga(raw: Partial<BigaDades>): CalcResult {
     key: "fabrica",
     title: "Paret de càrrega de suport",
     enabled: true,
-    reference: ["fabrica"],
     blocks: [{ rows: fabricaRows(dd, fd) }],
   };
 

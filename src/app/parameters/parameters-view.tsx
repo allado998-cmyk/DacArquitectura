@@ -23,6 +23,7 @@ import {
   updateConcepteAltraAction,
   updateConcepteDirectaAction,
   type ClientPatch,
+  type ContactePatch,
 } from "./actions";
 import type {
   Client,
@@ -114,7 +115,7 @@ export function ParametersView({
       </div>
 
       {tab === "clients" && <ClientsPanel rows={clients} contactes={contactes} contactesByClient={contactesByClient} ciutats={ciutats} statsByClient={statsByClient} onCount={setShown} />}
-      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} ciutats={ciutats} statsByClient={statsByClient} onCount={setShown} />}
+      {tab === "contactes" && <ContactesPanel rows={contactes} clients={clients} onCount={setShown} />}
       {tab === "tipologies" && <TipologiesPanel rows={tipologies} onCount={setShown} />}
       {tab === "tasques" && <TasquesPanel rows={tasques} onCount={setShown} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
@@ -211,11 +212,116 @@ const matchesAmbSense = (has: boolean, filter: string) => !filter || (filter ===
 
 const contacteAvisos = (c: ClientContacte) => telefonsAmbAvis([c.telefon, ...c.telefons_extra]);
 
-// Warning for the tables, which only show the main phone: it covers the others too.
-function TelefonsAvis({ contacte }: { contacte: ClientContacte }) {
-  const text = contacteAvisos(contacte).join("\n");
+// ⚠ after a phone in a table, with what's wrong as its tooltip.
+function AvisTelefons({ telefons }: { telefons: (string | null | undefined)[] }) {
+  const text = telefonsAmbAvis(telefons).join("\n");
   if (!text) return null;
   return <span className="ml-1.5 cursor-help text-amber-700" title={text} role="img" aria-label={text}>⚠</span>;
+}
+
+// A contact's phones and mail as table cells: Telèfon 1 is the main phone,
+// Telèfon 2 the next one, with "+N" for any more (they're in the contact's page).
+function ContacteCells({ contacte: c }: { contacte: ClientContacte }) {
+  const [tel2, ...mes] = c.telefons_extra;
+  return (
+    <>
+      <td className="td whitespace-nowrap tabular-nums">{c.telefon ?? dash}<AvisTelefons telefons={[c.telefon]} /></td>
+      <td className="td whitespace-nowrap tabular-nums">
+        {tel2 ?? dash}
+        <AvisTelefons telefons={[tel2, ...mes]} />
+        {mes.length > 0 && <span className="ml-1.5 text-xs text-[var(--color-muted)]" title={mes.join("\n")}>+{mes.length}</span>}
+      </td>
+      <td className="td whitespace-nowrap">{c.mail ?? dash}</td>
+    </>
+  );
+}
+
+// Initial letter for the A–Z filter: "Àngel" → A, "«La Caixa»" → L; digits → #.
+const LLETRES = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
+function inicial(nom: string | null | undefined) {
+  const c = fold(nom).replace(/^[^a-z0-9]+/, "").charAt(0).toUpperCase();
+  return c >= "A" && c <= "Z" ? c : "#";
+}
+
+// Letters with no rows under the other filters are greyed out. Clicking the
+// chosen letter again shows them all.
+function Abecedari({ value, onChange, presents }: { value: string; onChange: (v: string) => void; presents: Set<string> }) {
+  return (
+    <div>
+      <div className="label">Inicial</div>
+      <div className="flex flex-wrap overflow-hidden rounded-md border border-[var(--color-line)] bg-white" role="group" aria-label="Inicial">
+        {LLETRES.map((l) => {
+          const active = value === l;
+          const has = presents.has(l);
+          return (
+            <button
+              key={l}
+              type="button"
+              aria-pressed={active}
+              disabled={!has && !active}
+              title={l === "#" ? "Comença amb un número o un altre signe" : undefined}
+              onClick={() => onChange(active ? "" : l)}
+              className={`h-9 w-6 text-sm ${
+                active
+                  ? "bg-[var(--color-accent)] font-semibold text-white"
+                  : has
+                    ? "text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]"
+                    : "cursor-default text-[var(--color-muted)] opacity-35"
+              }`}
+            >
+              {l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type Rgb = [number, number, number];
+const VERD: Rgb = [31, 77, 63]; // --color-accent
+const BLAU: Rgb = [3, 105, 161];
+
+const linear = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+const luminance = ([r, g, b]: number[]) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+
+// A count as a pill whose colour deepens with the value, relative to the
+// largest in the table, so the busiest rows stand out. 0 stays plain.
+function Heat({ n, max, rgb }: { n: number; max: number; rgb: Rgb }) {
+  if (!n) return <span className="tabular-nums text-[var(--color-muted)]">0</span>;
+  // Square root, so 1 and 3 still look different when the largest is 20.
+  const t = 0.18 + 0.82 * Math.sqrt(n / Math.max(n, max));
+  const bg = rgb.map((c) => Math.round(255 + (c - 255) * t));
+  return (
+    <span
+      className="inline-block min-w-8 rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums"
+      // White text only where it has enough contrast; dark text on the pale ones.
+      style={{ backgroundColor: `rgb(${bg.join(",")})`, color: luminance(bg) < 0.19 ? "#fff" : "#111" }}
+    >
+      {n}
+    </span>
+  );
+}
+
+// Appears once the page has scrolled past the first rows.
+function BackToTop() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShow(window.scrollY > 400);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <button
+      type="button"
+      className="fixed bottom-6 right-6 z-40 rounded-full bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white shadow-lg hover:opacity-90"
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+    >
+      ↑ Tornar a dalt
+    </button>
+  );
 }
 
 function FilterSelect({
@@ -251,22 +357,17 @@ const SENSE_CLIENT = 0; // Client filter value for contacts with no client; real
 function ContactesPanel({
   rows,
   clients,
-  ciutats,
-  statsByClient,
   onCount,
 }: {
   rows: ClientContacte[];
   clients: Client[];
-  ciutats: string[];
-  statsByClient: Map<number, ClientStats>;
   onCount: (n: number) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [fClient, setFClient] = useState<number | null>(null);
-  const [fCiutat, setFCiutat] = useState("");
-  const [fExpedients, setFExpedients] = useState("");
+  const [lletra, setLletra] = useState("");
   const [fTelefon, setFTelefon] = useState("");
   const [fMail, setFMail] = useState("");
+  const [fClient, setFClient] = useState<number | null>(null);
   const [fComentari, setFComentari] = useState("");
   // Track the OPEN contact by id and re-derive from rows, so it shows fresh
   // server data after saving and closes by itself once deleted.
@@ -276,66 +377,61 @@ function ContactesPanel({
 
   const clientOpts: ComboOption[] = useMemo(() => clients.map((c) => ({ id: c.id, label: c.nom })), [clients]);
   const clientFilterOpts = useMemo(() => [{ id: SENSE_CLIENT, label: "Sense client" }, ...clientOpts], [clientOpts]);
-  const ciutatByClient = useMemo(() => new Map(clients.map((c) => [c.id, (c.ciutat ?? "").trim()])), [clients]);
 
   const q = fold(query.trim());
-  const filtered = rows
-    .filter((c) => {
-      if (fClient === SENSE_CLIENT ? c.client_id != null : fClient != null && c.client_id !== fClient) return false;
-      if (fCiutat && (c.client_id == null || ciutatByClient.get(c.client_id) !== fCiutat)) return false;
-      if (fExpedients && (c.client_id == null || !matchesExpedients(statsByClient.get(c.client_id), fExpedients))) return false;
-      if (fTelefon === "incorrecte" ? contacteAvisos(c).length === 0 : !matchesAmbSense(!!c.telefon, fTelefon)) return false;
-      if (!matchesAmbSense(!!c.mail, fMail)) return false;
-      if (!matchesAmbSense(!!c.comentari, fComentari)) return false;
-      return !q || fold([c.nom, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
-    })
-    .sort(byNom);
+  // Every filter but the letter; the letter bar greys out the letters with none.
+  const base = rows.filter((c) => {
+    if (fTelefon === "incorrecte" ? contacteAvisos(c).length === 0 : !matchesAmbSense(!!c.telefon, fTelefon)) return false;
+    if (!matchesAmbSense(!!c.mail, fMail)) return false;
+    if (fClient === SENSE_CLIENT ? c.client_id != null : fClient != null && c.client_id !== fClient) return false;
+    if (!matchesAmbSense(!!c.comentari, fComentari)) return false;
+    return !q || fold([c.nom, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
+  });
+  const presents = new Set(base.map((c) => inicial(c.nom)));
+  const filtered = (lletra ? base.filter((c) => inicial(c.nom) === lletra) : base).sort(byNom);
   useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
-  const hasFilters = fClient != null || !!(fCiutat || fExpedients || fTelefon || fMail || fComentari);
+  const hasFilters = fClient != null || !!(lletra || fTelefon || fMail || fComentari);
   function clearFilters() {
-    setFClient(null);
-    setFCiutat("");
-    setFExpedients("");
+    setLletra("");
     setFTelefon("");
     setFMail("");
+    setFClient(null);
     setFComentari("");
   }
 
   function exportPdf() {
     const applied = [
-      clientFilterOpts.find((o) => o.id === fClient)?.label,
-      fCiutat,
-      optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
+      q && `Cerca: "${query.trim()}"`,
+      lletra && `Inicial ${lletra}`,
       fTelefon && (fTelefon === "incorrecte" ? "Telèfon incorrecte" : `${optionLabel(AMB_SENSE, fTelefon)} telèfon`),
       fMail && `${optionLabel(AMB_SENSE, fMail)} mail`,
+      clientFilterOpts.find((o) => o.id === fClient)?.label,
       fComentari && `${optionLabel(AMB_SENSE, fComentari)} comentari`,
-      q && `Cerca: "${query.trim()}"`,
     ].filter(Boolean).join(" · ");
     openListPdf({
       title: "Contactes",
       subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
       landscape: false,
-      columns: [{ label: "Nom" }, { label: "Mail" }, { label: "Telèfon" }, { label: "Client" }],
-      rows: filtered.map((c) => [c.nom ?? "—", c.mail ?? "—", c.telefon ?? "—", c.client_nom ?? "—"]),
+      columns: [{ label: "Nom" }, { label: "Telèfon 1" }, { label: "Telèfon 2" }, { label: "Mail" }, { label: "Client" }],
+      rows: filtered.map((c) => [c.nom ?? "—", c.telefon ?? "—", c.telefons_extra[0] ?? "—", c.mail ?? "—", c.client_nom ?? "—"]),
     });
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-56">
+        <div className="w-64">
           <label className="label">Cercar</label>
-          <input className="input" placeholder="Nom, telèfon, mail, comentari, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="input" placeholder="Nom, telèfon, mail, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
+        <Abecedari value={lletra} onChange={setLletra} presents={presents} />
+        <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={TELEFON_OPTIONS} />
+        <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
         <div className="w-60">
           <label className="label">Client</label>
           <Combobox options={clientFilterOpts} value={fClient} onChange={setFClient} placeholder="Cerca client…" emptyLabel="Tots" />
         </div>
-        <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
-        <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
-        <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={TELEFON_OPTIONS} />
-        <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
         <FilterSelect label="Comentari" value={fComentari} onChange={setFComentari} options={AMB_SENSE} />
         {hasFilters && <button type="button" className="btn-ghost" onClick={clearFilters}>Netejar</button>}
         <div className="ml-auto flex items-center gap-3">
@@ -347,13 +443,14 @@ function ContactesPanel({
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap contacte encara." : "Cap resultat."}</p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-sticky">
           <table className="w-full">
             <thead>
               <tr>
                 <th className="th">Nom</th>
-                <th className="th">Mail principal</th>
-                <th className="th">Telèfon principal</th>
+                <th className="th">Telèfon 1</th>
+                <th className="th">Telèfon 2</th>
+                <th className="th">Mail</th>
                 <th className="th">Client</th>
               </tr>
             </thead>
@@ -361,8 +458,7 @@ function ContactesPanel({
               {filtered.map((c) => (
                 <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setOpenId(c.id)}>
                   <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom ?? "Sense nom"}</button></td>
-                  <td className="td whitespace-nowrap">{c.mail ?? dash}</td>
-                  <td className="td whitespace-nowrap tabular-nums">{c.telefon ?? dash}<TelefonsAvis contacte={c} /></td>
+                  <ContacteCells contacte={c} />
                   <td className="td whitespace-nowrap">{c.client_nom ?? dash}</td>
                 </tr>
               ))}
@@ -370,6 +466,7 @@ function ContactesPanel({
           </table>
         </div>
       )}
+      <BackToTop />
 
       <ContacteModal
         open={creating || open != null}
@@ -807,6 +904,7 @@ function ClientsPanel({
   onCount: (n: number) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [lletra, setLletra] = useState("");
   const [fCiutat, setFCiutat] = useState("");
   const [fExpedients, setFExpedients] = useState("");
   const [fContactes, setFContactes] = useState("");
@@ -822,20 +920,26 @@ function ClientsPanel({
 
   const clientOpts: ComboOption[] = useMemo(() => rows.map((c) => ({ id: c.id, label: c.nom })), [rows]);
 
+  // Colours scale against the largest across all clients, so they don't shift while filtering.
+  const maxOberts = useMemo(() => Math.max(0, ...rows.map((c) => statsByClient.get(c.id)?.oberts ?? 0)), [rows, statsByClient]);
+  const maxContactes = useMemo(() => Math.max(0, ...[...contactesByClient.values()].map((l) => l.length)), [contactesByClient]);
+
   const q = fold(query.trim());
   const contactHits = (c: Client) => (q ? (contactesByClient.get(c.id) ?? []).filter((k) => fold(k.nom).includes(q)) : []);
-  const filtered = rows
-    .filter((c) => {
-      if (fCiutat && (c.ciutat ?? "").trim() !== fCiutat) return false;
-      if (!matchesExpedients(statsByClient.get(c.id), fExpedients)) return false;
-      if (!matchesAmbSense(contactesByClient.has(c.id), fContactes)) return false;
-      return !q || fold(`${c.nom} ${c.ciutat ?? ""} ${c.nif ?? ""}`).includes(q) || contactHits(c).length > 0;
-    })
-    .sort(byNom);
+  // Every filter but the letter; the letter bar greys out the letters with none.
+  const base = rows.filter((c) => {
+    if (fCiutat && (c.ciutat ?? "").trim() !== fCiutat) return false;
+    if (!matchesExpedients(statsByClient.get(c.id), fExpedients)) return false;
+    if (!matchesAmbSense(contactesByClient.has(c.id), fContactes)) return false;
+    return !q || fold(`${c.nom} ${c.ciutat ?? ""} ${c.nif ?? ""}`).includes(q) || contactHits(c).length > 0;
+  });
+  const presents = new Set(base.map((c) => inicial(c.nom)));
+  const filtered = (lletra ? base.filter((c) => inicial(c.nom) === lletra) : base).sort(byNom);
   useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
-  const hasFilters = !!(fCiutat || fExpedients || fContactes);
+  const hasFilters = !!(lletra || fCiutat || fExpedients || fContactes);
   function clearFilters() {
+    setLletra("");
     setFCiutat("");
     setFExpedients("");
     setFContactes("");
@@ -843,19 +947,20 @@ function ClientsPanel({
 
   function exportPdf() {
     const applied = [
+      q && `Cerca: "${query.trim()}"`,
+      lletra && `Inicial ${lletra}`,
       fCiutat,
       optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
       fContactes && `${optionLabel(AMB_SENSE, fContactes)} contactes`,
-      q && `Cerca: "${query.trim()}"`,
     ].filter(Boolean).join(" · ");
     openListPdf({
       title: "Clients",
       subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} clients`,
       landscape: false,
-      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Exp.", align: "right" }, { label: "Oberts", align: "right" }, { label: "Contactes", align: "right" }],
+      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Contactes", align: "right" }, { label: "Oberts", align: "right" }, { label: "Exp.", align: "right" }],
       rows: filtered.map((c) => {
         const s = statsByClient.get(c.id);
-        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(s?.n ?? 0), String(s?.oberts ?? 0), String(contactesByClient.get(c.id)?.length ?? 0)];
+        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(contactesByClient.get(c.id)?.length ?? 0), String(s?.oberts ?? 0), String(s?.n ?? 0)];
       }),
     });
   }
@@ -863,10 +968,11 @@ function ClientsPanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-56">
+        <div className="w-64">
           <label className="label">Cercar</label>
-          <input className="input" placeholder="Client, contacte, ciutat, NIF…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="input" placeholder="Client, contacte, NIF…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
+        <Abecedari value={lletra} onChange={setLletra} presents={presents} />
         <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
         <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
         <FilterSelect label="Contactes" value={fContactes} onChange={setFContactes} options={AMB_SENSE} />
@@ -880,15 +986,16 @@ function ClientsPanel({
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap client encara." : "Cap resultat."}</p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-sticky">
           <table className="w-full">
             <thead>
               <tr>
                 <th className="th">Nom</th>
+                <th className="th w-40">NIF</th>
+                <th className="th w-56">Ubicació</th>
+                <th className="th w-32 text-center">Contactes</th>
                 <th className="th w-40 text-center whitespace-nowrap">Expedients oberts</th>
                 <th className="th w-40 text-center whitespace-nowrap">Expedients totals</th>
-                <th className="th w-40">Contactes</th>
-                <th className="th w-56">Ubicació</th>
               </tr>
             </thead>
             <tbody>
@@ -898,13 +1005,15 @@ function ClientsPanel({
                 return (
                   <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setEditingId(c.id)}>
                     <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom}</button></td>
-                    <td className={`td text-center tabular-nums ${s?.oberts ? "font-semibold text-[var(--color-accent)]" : "text-[var(--color-muted)]"}`}>{s?.oberts ?? 0}</td>
-                    <td className="td text-center tabular-nums">{s?.n ?? 0}</td>
-                    <td className="td whitespace-nowrap">
-                      <span className="tabular-nums">{contactesByClient.get(c.id)?.length ?? 0}</span>
+                    <td className="td whitespace-nowrap tabular-nums">{c.nif ?? dash}</td>
+                    <td className="td whitespace-nowrap">{c.ciutat ?? dash}</td>
+                    {/* Centred, except while a search lists the matching contacts beside the count. */}
+                    <td className={`td whitespace-nowrap ${hits.length ? "" : "text-center"}`}>
+                      <Heat n={contactesByClient.get(c.id)?.length ?? 0} max={maxContactes} rgb={BLAU} />
                       {hits.length > 0 && <span className="ml-2 text-[var(--color-muted)]">{hits.map((k) => k.nom).join(", ")}</span>}
                     </td>
-                    <td className="td whitespace-nowrap">{c.ciutat ?? dash}</td>
+                    <td className="td text-center"><Heat n={s?.oberts ?? 0} max={maxOberts} rgb={VERD} /></td>
+                    <td className="td text-center tabular-nums">{s?.n ?? 0}</td>
                   </tr>
                 );
               })}
@@ -912,6 +1021,7 @@ function ClientsPanel({
           </table>
         </div>
       )}
+      <BackToTop />
 
       <ClientFormModal
         open={creating || editing != null}
@@ -999,20 +1109,26 @@ function ClientForm({
   const [carrer, setCarrer] = useState(client?.carrer ?? "");
   const [ciutat, setCiutat] = useState(client?.ciutat ?? "");
   const [codiPostal, setCodiPostal] = useState(client?.codi_postal ?? "");
+  // A new client's contacts, typed in this same form and saved with it.
+  const [drafts, setDrafts] = useState<ContacteDraft[]>([]);
   const [pending, startTransition] = useTransition();
 
   function save() {
     if (!nom.trim()) return;
+    if (!client && !confirmaTelefons(drafts.flatMap((d) => d.telefons))) return;
     const patch: ClientPatch = { nom, nif, carrer, ciutat, codi_postal: codiPostal };
+    const contactes: ContactePatch[] = drafts.map(({ nom, telefons: [telefon = "", ...telefonsExtra], mails: [mail = "", ...mailsExtra] }) => ({ nom, telefon, mail, telefonsExtra, mailsExtra }));
     startTransition(async () => {
       if (client) await updateClientAction(client.id, patch);
-      else await createClientFullAction(patch);
+      else await createClientFullAction(patch, contactes);
       onClose();
     });
   }
 
   return (
-    <div className="space-y-6">
+    // Leaving a phone field can show its warning and push the buttons down, which
+    // would lose the click. Buttons don't take the focus, so nothing moves mid-click.
+    <div className="space-y-6" onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) e.preventDefault(); }}>
       {client && stats && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="Expedients" value={String(stats.n)} accent="#1f4d3f" />
@@ -1052,12 +1168,55 @@ function ClientForm({
         </Field>
       </div>
 
+      {!client && <NewClientContactes drafts={drafts} onChange={setDrafts} />}
+
       <div className="flex items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>{pending ? "Desant…" : "Desar"}</button>
         <button type="button" className="btn-ghost" onClick={onClose}>Cancel·lar</button>
       </div>
 
       {client && <ClientContactesSection client={client} contactes={contactes} onOpen={onOpenContacte} onNew={onNewContacte} onDeleted={onClose} />}
+    </div>
+  );
+}
+
+interface ContacteDraft {
+  key: number;
+  nom: string;
+  telefons: string[];
+  mails: string[];
+}
+let draftKey = 0;
+
+// The contacts of a client that doesn't exist yet: they're saved with it.
+function NewClientContactes({ drafts, onChange }: { drafts: ContacteDraft[]; onChange: (drafts: ContacteDraft[]) => void }) {
+  const update = (key: number, patch: Partial<ContacteDraft>) => onChange(drafts.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+  return (
+    <div className="border-t border-[var(--color-line)] pt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
+        <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => onChange([...drafts, { key: ++draftKey, nom: "", telefons: [""], mails: [""] }])}>
+          + Afegir contacte
+        </button>
+      </div>
+      {drafts.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)]">Cap contacte. Els pots afegir ara, i es desaran amb el client, o més endavant.</p>
+      ) : (
+        <div className="space-y-3">
+          {drafts.map((d) => (
+            <div key={d.key} className="rounded-lg border border-[var(--color-line)] p-3">
+              <div className="grid items-start gap-3 sm:grid-cols-3">
+                <Field label="Nom"><input className="input" value={d.nom} onChange={(e) => update(d.key, { nom: e.target.value })} placeholder="Nom del contacte" /></Field>
+                <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={d.telefons} onChange={(telefons) => update(d.key, { telefons })} avis={telefonAvis} />
+                <MultiValueField label="Mails" addLabel="+ Afegir mail" placeholder="correu@exemple.cat" type="email" values={d.mails} onChange={(mails) => update(d.key, { mails })} />
+              </div>
+              <button type="button" className="mt-2 text-sm text-red-700 hover:underline" onClick={() => onChange(drafts.filter((x) => x.key !== d.key))}>
+                Treure contacte
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1126,8 +1285,9 @@ function ClientContactesSection({
               <thead>
                 <tr>
                   <th className="th">Nom</th>
-                  <th className="th">Mail principal</th>
-                  <th className="th">Telèfon principal</th>
+                  <th className="th">Telèfon 1</th>
+                  <th className="th">Telèfon 2</th>
+                  <th className="th">Mail</th>
                   <th className="th w-20"></th>
                 </tr>
               </thead>
@@ -1135,8 +1295,7 @@ function ClientContactesSection({
                 {list.map((ct, i) => (
                   <tr key={ct.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onOpen(ct.id)}>
                     <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{ct.nom ?? "Sense nom"}</button></td>
-                    <td className="td whitespace-nowrap">{ct.mail ?? dash}</td>
-                    <td className="td whitespace-nowrap tabular-nums">{ct.telefon ?? dash}<TelefonsAvis contacte={ct} /></td>
+                    <ContacteCells contacte={ct} />
                     <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} title="Pujar" aria-label="Pujar">↑</button>
                       <button type="button" className="btn-ghost ml-1 px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === list.length - 1} title="Baixar" aria-label="Baixar">↓</button>

@@ -121,6 +121,21 @@ html, body {
 
 .table-wrap table { width: 100%; border-collapse: collapse; }
 
+/* Long tables whose header row stays in view while the page scrolls. The
+   wrapper can't scroll sideways (that would trap the header inside it), so a
+   table wider than the screen scrolls the page sideways instead. */
+.table-wrap.table-sticky { overflow: visible; }
+.table-sticky thead .th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* A collapsed border stays behind when the cell sticks; a shadow moves with it. */
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 var(--color-line);
+}
+.table-sticky thead .th:first-child { border-top-left-radius: 0.5rem; }
+.table-sticky thead .th:last-child { border-top-right-radius: 0.5rem; }
+
 .th {
   font-size: 0.75rem;
   font-weight: 600;

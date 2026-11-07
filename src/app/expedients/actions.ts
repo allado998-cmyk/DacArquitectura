@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { locate } from "@/lib/geo";
+import { formatNumExpedient, nextCounter, parseNumExpedient, yearPrefix } from "@/lib/expedient-num";
 
 const ESTATS = ["obert", "tancat"];
 const CATEGORIES = ["re", "co", "ed", "rec", "do"];
@@ -12,22 +13,25 @@ const TIPUS = ["public", "privat"];
 // "YY-NNNN" with the current year prefix, but NNNN is a global running counter
 // that keeps increasing across years (it never resets when the year changes).
 async function nextNumExpedient(): Promise<string> {
-  const yy = String(new Date().getFullYear()).slice(-2);
   const rows = (await sql`select num_expedient from public.expedients`) as { num_expedient: string }[];
-  let max = 0;
-  for (const r of rows) {
-    const m = /-(\d+)$/.exec(r.num_expedient ?? "");
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  return `${yy}-${String(max + 1).padStart(4, "0")}`;
+  return formatNumExpedient(yearPrefix(new Date().getFullYear()), nextCounter(rows.map((r) => r.num_expedient)));
 }
 
-export async function createExpedientAction() {
+// With no number, the next one with the current year. A given number is kept
+// as written: an expedient from a past year carries the one on its documents.
+export async function createExpedientAction(num?: string) {
   await requireUser();
-  const num = await nextNumExpedient();
+  let value: string;
+  if (typeof num === "string") {
+    const parsed = parseNumExpedient(num);
+    if (!parsed) throw new Error(`Número d'expedient no vàlid: «${num}». Ha de ser AA-NNNN, p. ex. 19-1042.`);
+    value = parsed.num;
+  } else {
+    value = await nextNumExpedient();
+  }
   await sql`
     insert into public.expedients (num_expedient)
-    values (${num})
+    values (${value})
   `;
   revalidatePath("/expedients");
 }

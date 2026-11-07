@@ -84,10 +84,14 @@ dades no conté "demo".
 
 ## Clients i contactes (Base de Dades)
 
-Les pestanyes **Clients** i **Contactes** són taules amb cerca i filtres, tot al
-navegador (filtrar no fa cap consulta a la base de dades). La cerca de Clients
-també troba els noms dels contactes de cada client. En clicar una fila s'obre la
-fitxa, que és on es pot editar o eliminar; el comentari només surt a la fitxa.
+Les pestanyes **Clients** i **Contactes** són taules amb cerca, filtre per
+inicial (A–Z) i filtres, tot al navegador (filtrar no fa cap consulta a la base
+de dades). La capçalera de la taula queda fixa en baixar, i el botó «Tornar a
+dalt» torna a l'inici. La cerca de Clients també troba els noms dels contactes
+de cada client. A Clients, el color de Contactes i Expedients oberts s'intensifica
+com més n'hi ha. En clicar una fila s'obre la fitxa, que és on es pot editar o
+eliminar; el comentari només surt a la fitxa. En crear un client nou, s'hi poden
+afegir contactes al mateix formulari i es desen amb el client.
 
 Un contacte pot tenir diversos telèfons i mails. `telefon` i `mail` són sempre
 els **principals** (els que mostren les taules i llegeixen les actes i el
@@ -148,7 +152,15 @@ ChatGPT i Claude poden consultar i modificar expedients, dedicació, actes,
 honoraris, propostes, factures i notes en nom de l'usuari. Cada canvi es
 previsualitza al xat i només es desa quan l'usuari ho confirma.
 
-- Guia d'usuari (passos per connectar-lo i connexions actives): pàgina `/ai`.
+Expedients d'anys anteriors: en crear-ne un (p. ex. a partir de fotos dels seus
+documents), el plugin pot donar el número que surt als documents
+(`num_expedient`, p. ex. `19-1042`) o, si no n'hi ha, només l'any (`any`), que
+rep el següent número lliure amb aquell any. Sense cap dels dos, l'expedient rep
+l'any actual, com el botó «Nou expedient». La previsualització avisa si el
+número ja existeix o si faria saltar el comptador dels expedients nous.
+
+- Guia d'usuari (passos per connectar-lo i connexions actives): pàgina `/ai`. Ja
+  no surt al menú ni a l'inici: s'hi entra escrivint l'adreça.
 - Com està fet, fitxers i trampes: [docs/mcp.md](docs/mcp.md).
 - Tests sense base de dades: `npm run test:mcp`.
 - Variable opcional `APP_URL` per fixar l'origen públic si cal.

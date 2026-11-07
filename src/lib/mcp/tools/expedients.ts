@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { createExpedientAction, updateExpedientAction, type ExpedientPatch } from "@/app/expedients/actions";
 import { todayIso } from "@/lib/format";
+import { formatNumExpedient, nextCounter, parseNumExpedient, yearPrefix } from "@/lib/expedient-num";
 import { id, isoDate, money, num, registerAction, round2, shortText, type Plan } from "../core";
 import { expedientLabel, findExpedient, lastInsertedId, matchExpedients, parseExpedientRef, resolveClient, resolveExpedient, findTipologia, type ExpedientRow } from "../data";
 import { callAction } from "../shared";
@@ -172,23 +173,75 @@ function applyDefaults(p: Patch, changes: Record<string, unknown>): Patch {
   return out;
 }
 
+const createSchema = patchSchema.extend({
+  num_expedient: shortText.optional().describe("Només per a un expedient d'un any anterior: el número tal com surt als seus documents, AA-NNNN (p. ex. 19-1042)"),
+  any: z.number().int().min(1990).max(2100).optional().describe("Any d'un expedient anterior quan els documents no en mostren el número"),
+});
+
+const currentYear = () => new Date().getFullYear();
+
+// A past-year expedient keeps the number from its documents, or failing that
+// gets the next free counter with its year. Anything else: the next number
+// with the current year, as the website's "Nou expedient" button does.
+const isPastYear = (a: { num_expedient?: string; any?: number }) => !!a.num_expedient || (a.any !== undefined && a.any !== currentYear());
+
+async function planNumber(a: { num_expedient?: string; any?: number }): Promise<{ num: string | null; errors: string[]; warnings: string[] }> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const nums = (await sql`select num_expedient from public.expedients`) as { num_expedient: string }[];
+  const next = nextCounter(nums.map((r) => r.num_expedient));
+  const thisYear = currentYear();
+  if (a.num_expedient) {
+    const p = parseNumExpedient(a.num_expedient);
+    if (!p) return { num: null, errors: [`num_expedient «${a.num_expedient}» no és vàlid: ha de ser AA-NNNN, p. ex. 19-1042.`], warnings };
+    if (a.any !== undefined && yearPrefix(a.any) !== p.yy) errors.push(`El número ${p.num} no és de l'any ${a.any}.`);
+    const same = await matchExpedients(p.num, 5);
+    if (same.length) errors.push(`Ja existeix l'expedient ${same.map((e) => expedientLabel(e)).join(", ")}.`);
+    if (Number(p.yy) > Number(yearPrefix(thisYear))) warnings.push(`El número ${p.num} és d'un any posterior a l'actual: revisa'l.`);
+    if (p.n >= next) warnings.push(`El comptador ${p.n} supera l'últim usat (${next - 1}): els expedients nous continuaran a partir del ${p.n + 1}.`);
+    return { num: p.num, errors, warnings };
+  }
+  if (a.any !== undefined && a.any > thisYear) return { num: null, errors: [`L'any ${a.any} és posterior a l'actual.`], warnings };
+  const num = formatNumExpedient(yearPrefix(a.any ?? thisYear), next);
+  if (isPastYear(a)) warnings.push(`Sense el número dels documents: rebrà el següent lliure amb l'any ${a.any} (${num}). Si els documents el mostren, passa num_expedient.`);
+  return { num, errors, warnings };
+}
+
 registerAction({
   kind: "change",
   name: "create_expedient",
   domain: "expedients",
-  description: "Crea un expedient nou (el número YY-NNNN s'assigna sol) amb les dades indicades.",
-  notes: ["El client i la tipologia es passen per id: cerca'ls abans amb cerca o list_clients / catalegs.", "La categoria és re|co|ed|rec|do; el tipus és public|privat."],
-  schema: patchSchema,
+  description: "Crea un expedient nou amb les dades indicades. El número AA-NNNN s'assigna sol amb l'any actual; per a un expedient d'un any anterior es pot donar el número o l'any.",
+  notes: [
+    "El client i la tipologia es passen per id: cerca'ls abans amb cerca o list_clients / catalegs.",
+    "La categoria és re|co|ed|rec|do; el tipus és public|privat.",
+    "Expedient d'un any anterior (p. ex. a partir de fotos dels seus documents): passa num_expedient tal com surt als documents; si només se'n sap l'any, passa any. Sense cap dels dos, l'expedient rep l'any actual.",
+    "Un expedient antic sol estar tancat: passa estat=tancat amb data_tancament (si no, s'hi posa la d'avui) i data_inici si se sap.",
+  ],
+  schema: createSchema,
   async plan(a): Promise<Plan> {
-    const { changes, errors, warnings } = await describePatch(a, null);
-    return { summary: `Crear l'expedient «${a.projecte ?? "sense títol"}»${changes.client ? ` per a ${changes.client}` : ""}.`, details: changes, errors, warnings };
+    const { num_expedient, any, ...patch } = a;
+    const n = await planNumber({ num_expedient, any });
+    const { changes, errors, warnings } = await describePatch(patch, null);
+    return {
+      summary: `Crear l'expedient ${n.num ? `${n.num} ` : ""}«${a.projecte ?? "sense títol"}»${changes.client ? ` per a ${changes.client}` : ""}.`,
+      details: { num_expedient: n.num, ...changes },
+      errors: [...n.errors, ...errors],
+      warnings: [...n.warnings, ...warnings],
+    };
   },
   async commit(a, plan) {
-    await callAction(() => createExpedientAction());
+    const details = (plan.details ?? {}) as Record<string, unknown>;
+    // Commits only run on a fresh plan without errors, so its number is free.
+    const num = isPastYear(a) && typeof details.num_expedient === "string" ? details.num_expedient : undefined;
+    await callAction(() => createExpedientAction(num));
     const newId = await lastInsertedId("expedients");
     const e = newId ? await findExpedient({ id: newId }) : null;
     if (!e) throw new Error("No s'ha pogut crear l'expedient.");
-    const patch = applyDefaults(a, (plan.details ?? {}) as Record<string, unknown>);
+    const { num_expedient: _num, any: _any, ...fields } = a;
+    void _num;
+    void _any;
+    const patch = applyDefaults(fields, details);
     const r = await callAction(() => updateExpedientAction(e.id, toActionPatch(e, patch)));
     if (r.value?.geo === "not_found") (plan.warnings ??= []).push("No s'ha pogut situar al mapa: revisa l'adreça o passa un enllaç de Google Maps.");
     const saved = await findExpedient({ id: e.id });

@@ -61,6 +61,7 @@ globalThis.__fakeSql = async (text, params) => {
     db.writes.push({ text: q, params });
     return [];
   }
+  if (q === "select num_expedient from public.expedients") return ["14-585", "19-1018", "26-0007", "26-1818"].map((num_expedient) => ({ num_expedient }));
   if (q.includes("match_expedients:number")) return params[0] === 7 && (params[1] === null || params[1] === "26") ? [EXPEDIENT] : [];
   if (q.includes("match_expedients:text")) return params.every((w) => /casa|vila|girona/i.test(w)) ? [EXPEDIENT] : [];
   if (q.includes("from public.expedients e") && q.includes("where e.id = $1")) return params[0] === 7 ? [EXPEDIENT] : [];
@@ -409,6 +410,56 @@ await test("the plugin preview warns about a wrong phone, and only that one", as
   const plan = await core.getAction("create_contacte").plan({ nom: "Prova", telefon: "600 11", telefons_extra: ["+44 (0) 7700900123"] });
   assert.deepEqual(plan.warnings, ["Telèfon 600 11: Té 5 xifres; n'hi hauria d'haver 9."]);
   assert.deepEqual((await core.getAction("create_contacte").plan({ nom: "Prova", telefon: "600111222" })).warnings, []);
+});
+
+console.log("expedients d'anys anteriors");
+const { parseNumExpedient, nextCounter } = await import("../src/lib/expedient-num.ts");
+const createExpedient = core.getAction("create_expedient");
+const thisYear = new Date().getFullYear();
+await test("expedient numbers: the usual written forms, and the running counter", () => {
+  assert.deepEqual(parseNumExpedient("19/1042"), { yy: "19", n: 1042, num: "19-1042" });
+  assert.equal(parseNumExpedient(" 14-585 ")?.num, "14-585"); // old 3-digit numbers stay as written
+  assert.equal(parseNumExpedient("19 0042")?.num, "19-0042");
+  for (const bad of ["2019-1042", "1042", "19-12345", "hola", ""]) assert.equal(parseNumExpedient(bad), null, bad);
+  assert.equal(nextCounter(["14-585", "26-1818", null, "x"]), 1819);
+});
+await test("create_expedient: with no number or year it gets the current year", async () => {
+  const plan = await createExpedient.plan({ projecte: "Nou" });
+  assert.match(plan.details.num_expedient, new RegExp(`^${String(thisYear).slice(-2)}-\\d{4}$`));
+  assert.deepEqual([plan.errors, plan.warnings], [[], []]);
+});
+await test("create_expedient: a past expedient keeps the number on its documents", async () => {
+  const plan = await createExpedient.plan({ projecte: "Casa antiga", num_expedient: "19/1042", estat: "tancat", data_tancament: "2019-12-01" });
+  assert.equal(plan.details.num_expedient, "19-1042");
+  assert.match(plan.summary, /^Crear l'expedient 19-1042 «Casa antiga»/);
+  assert.deepEqual([plan.errors, plan.warnings], [[], []]);
+});
+await test("create_expedient: a year alone gives the next free counter with that year", async () => {
+  const plan = await createExpedient.plan({ projecte: "Casa antiga", any: 2019 });
+  assert.equal(plan.details.num_expedient, "19-1819");
+  assert.deepEqual(plan.errors, []);
+  assert.match(plan.warnings.join(), /Sense el número dels documents/);
+  assert.deepEqual((await createExpedient.plan({ projecte: "Nou", any: thisYear })).warnings, []);
+});
+await test("create_expedient: used, malformed, mismatched and future numbers are caught", async () => {
+  assert.match((await createExpedient.plan({ num_expedient: "26-7" })).errors.join(), /Ja existeix l'expedient 26-0007 — Casa Vila/);
+  assert.match((await createExpedient.plan({ num_expedient: "1042" })).errors.join(), /no és vàlid: ha de ser AA-NNNN/);
+  assert.match((await createExpedient.plan({ num_expedient: "19-1042", any: 2018 })).errors.join(), /no és de l'any 2018/);
+  assert.match((await createExpedient.plan({ any: thisYear + 1 })).errors.join(), /posterior a l'actual/);
+  const future = `${String(thisYear + 1).slice(-2)}-0001`;
+  assert.match((await createExpedient.plan({ num_expedient: future })).warnings.join(), /posterior a l'actual/);
+  // A misread counter above the last one would push every new number up.
+  assert.deepEqual((await createExpedient.plan({ num_expedient: "19-1900" })).warnings, ["El comptador 1900 supera l'últim usat (1818): els expedients nous continuaran a partir del 1901."]);
+});
+await test("create_expedient saves a past number through the website's own action", async () => {
+  db.writes.length = 0;
+  const args = { projecte: "Casa antiga", num_expedient: "19-1042" };
+  const preview = await rpc("tools/call", { name: "dac_change", arguments: { action: "create_expedient", args } });
+  const key = /idempotency_key="([a-f0-9]+)"/.exec(textOf(preview))?.[1];
+  assert.ok(key, textOf(preview));
+  await rpc("tools/call", { name: "dac_change", arguments: { action: "create_expedient", args, confirm: true, idempotency_key: key } });
+  const inserts = db.writes.filter((w) => w.text.startsWith("insert into public.expedients"));
+  assert.deepEqual(inserts.map((w) => w.params), [["19-1042"]]);
 });
 
 console.log("source checks");

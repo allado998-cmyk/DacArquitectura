@@ -22,12 +22,13 @@ export interface ClientPatch {
   codi_postal: string;
 }
 
-// Create a client with every field filled in (from the form popup).
-export async function createClientFullAction(data: ClientPatch) {
+// Create a client with every field filled in (from the form popup), plus the
+// contacts typed in the same form, kept in that order. Blank contacts are skipped.
+export async function createClientFullAction(data: ClientPatch, contactes: ContactePatch[] = []) {
   await requireUser();
   const nom = data.nom.trim();
   if (!nom) return;
-  await sql`
+  const rows = (await sql`
     insert into public.clients (nom, nif, carrer, ciutat, codi_postal)
     values (
       ${nom},
@@ -36,7 +37,16 @@ export async function createClientFullAction(data: ClientPatch) {
       ${data.ciutat.trim() || null},
       ${data.codi_postal.trim() || null}
     )
-  `;
+    returning id
+  `) as { id: number }[];
+  const clientId = rows[0]?.id;
+  const values = (Array.isArray(contactes) ? contactes : []).map(contacteValues).filter((v): v is NonNullable<typeof v> => v !== null);
+  for (const [i, k] of values.entries()) {
+    await sql`
+      insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, ordre)
+      values (${clientId}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari}, ${(i + 1) * 10})
+    `;
+  }
   revalidatePath("/parameters");
 }
 
@@ -80,6 +90,16 @@ function mainAndExtras(main: string, extras: string[]) {
   return { main: first, extras: rest };
 }
 
+// A new contact's columns, cleaned up; null when every field is blank.
+function contacteValues(data: ContactePatch) {
+  const nom = data.nom.trim();
+  const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
+  const mail = mainAndExtras(data.mail, data.mailsExtra);
+  const comentari = (data.comentari ?? "").trim();
+  if (!nom && !telefon.main && !mail.main && !comentari) return null;
+  return { nom: nom || null, telefon, mail, comentari: comentari || null };
+}
+
 export async function updateClientContacteAction(id: number, data: ContactePatch) {
   await requireUser();
   const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
@@ -117,16 +137,13 @@ export async function reorderClientContactesAction(clientId: number, ids: number
 // Standalone contact (no client required).
 export async function createContacteAction(data: ContactePatch & { clientId?: number | null }) {
   await requireUser();
-  const nom = data.nom.trim();
-  const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
-  const mail = mainAndExtras(data.mail, data.mailsExtra);
-  const comentari = (data.comentari ?? "").trim();
-  if (!nom && !telefon.main && !mail.main && !comentari) return;
+  const k = contacteValues(data);
+  if (!k) return;
   const cid = data.clientId && Number.isFinite(data.clientId) ? data.clientId : null;
   await sql`
     insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, ordre)
     values (
-      ${cid}, ${nom || null}, ${telefon.main}, ${mail.main}, ${telefon.extras}::text[], ${mail.extras}::text[], ${comentari || null},
+      ${cid}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari},
       coalesce((select max(ordre) + 10 from public.client_contactes where client_id = ${cid}), 10)
     )
   `;

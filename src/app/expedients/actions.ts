@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { deleteFolder, deleteStored, verifyUploaded } from "@/lib/fitxers";
+import { refFor } from "@/lib/fitxers-shared";
 import { locate } from "@/lib/geo";
 import { formatNumExpedient, nextCounter, parseNumExpedient, yearPrefix } from "@/lib/expedient-num";
 
@@ -189,5 +191,64 @@ export async function updateExpedientDatesAction(id: number, dataInici: string, 
 export async function deleteExpedientAction(id: number) {
   await requireUser();
   await sql`delete from public.expedients where id = ${id}`;
+  await deleteFolder(`expedients/${id}`);
   revalidatePath("/expedients");
+}
+
+// «Fitxers adjunts»: files attached to an expedient. The browser uploads each
+// file straight to the private store, then registers it here. The list is
+// fetched when the expedient is opened, never on the page load.
+export interface ExpedientFitxer {
+  id: number;
+  nom: string;
+  mida: number;
+  tipus: string | null;
+  ref: string;
+  created_at: string;
+}
+type FitxerRow = { id: number; nom: string; mida: number | string; tipus: string | null; pathname: string; created_at: string };
+const toFitxer = (r: FitxerRow): ExpedientFitxer => ({
+  id: r.id,
+  nom: r.nom,
+  mida: Number(r.mida),
+  tipus: r.tipus,
+  ref: refFor(r.pathname, Number(r.mida)),
+  created_at: r.created_at,
+});
+
+export async function listExpedientFitxersAction(expedientId: number): Promise<ExpedientFitxer[]> {
+  await requireUser();
+  if (!Number.isInteger(expedientId)) return [];
+  const rows = (await sql`
+    select id, nom, mida, tipus, pathname, to_char(created_at at time zone 'Europe/Madrid', 'YYYY-MM-DD') as created_at
+    from public.expedient_fitxers where expedient_id = ${expedientId}
+    order by created_at desc, id desc
+  `) as FitxerRow[];
+  return rows.map(toFitxer);
+}
+
+export async function addExpedientFitxerAction(expedientId: number, pathname: string, nom: string): Promise<ExpedientFitxer | null> {
+  await requireUser();
+  if (!Number.isInteger(expedientId)) return null;
+  const v = await verifyUploaded(pathname, `expedients/${expedientId}`);
+  if (!v) return null;
+  const rows = (await sql`
+    insert into public.expedient_fitxers (expedient_id, nom, mida, tipus, pathname)
+    select ${expedientId}, ${(nom || "").trim().slice(0, 200) || "fitxer"}, ${v.bytes}, ${v.contentType || null}, ${v.pathname}
+    where exists (select 1 from public.expedients where id = ${expedientId})
+    on conflict (pathname) do nothing
+    returning id, nom, mida, tipus, pathname, to_char(created_at at time zone 'Europe/Madrid', 'YYYY-MM-DD') as created_at
+  `) as FitxerRow[];
+  if (!rows.length) {
+    await deleteStored([v.pathname]);
+    return null;
+  }
+  return toFitxer(rows[0]);
+}
+
+export async function deleteExpedientFitxerAction(id: number): Promise<void> {
+  await requireUser();
+  if (!Number.isInteger(id)) return;
+  const rows = (await sql`delete from public.expedient_fitxers where id = ${id} returning pathname`) as { pathname: string }[];
+  await deleteStored(rows.map((r) => r.pathname));
 }

@@ -8,6 +8,9 @@ import {
   updateExpedientAction,
   type ExpedientPatch,
 } from "./actions";
+import { addExpedientFitxerAction, deleteExpedientFitxerAction, listExpedientFitxersAction, type ExpedientFitxer } from "./actions";
+import { FITXER_MAX_BYTES, fmtMida } from "@/lib/fitxers-shared";
+import { uploadFitxer } from "@/lib/fitxers-client";
 import type { Client, Dedicacio, Expedient, Tipologia } from "@/types/db";
 import { formatEur } from "@/lib/format";
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
@@ -1152,9 +1155,121 @@ function DedicacioModal({
               </table>
             </div>
           )}
+
+          <FitxersAdjunts key={expedient.id} expedientId={expedient.id} />
         </div>
       )}
     </Modal>
+  );
+}
+
+// «Fitxers adjunts»: any file (plans, contracts, photos…) up to 500 MB, kept in
+// the private file store. The list is fetched when the expedient is opened.
+function FitxersAdjunts({ expedientId }: { expedientId: number }) {
+  const [fitxers, setFitxers] = useState<ExpedientFitxer[] | null>(null);
+  const [pujant, setPujant] = useState<{ nom: string; pct: number; resten: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [drag, setDrag] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    listExpedientFitxersAction(expedientId)
+      .then((rows) => { if (alive) setFitxers(rows); })
+      .catch(() => { if (alive) setFitxers([]); });
+    return () => { alive = false; };
+  }, [expedientId]);
+
+  async function onFiles(list: FileList | null) {
+    const files = Array.from(list ?? []);
+    if (!files.length || pujant) return;
+    setError(null);
+    const fallits: string[] = [];
+    for (const [i, f] of files.entries()) {
+      if (f.size > FITXER_MAX_BYTES) { fallits.push(`«${f.name}» (més de 500 MB)`); continue; }
+      const resten = files.length - i - 1;
+      try {
+        setPujant({ nom: f.name, pct: 0, resten });
+        const up = await uploadFitxer("expedient", expedientId, f, f.name, (pct) => setPujant({ nom: f.name, pct, resten }));
+        const row = await addExpedientFitxerAction(expedientId, up.pathname, f.name);
+        if (row) setFitxers((p) => [row, ...(p ?? [])]);
+        else fallits.push(`«${f.name}»`);
+      } catch {
+        fallits.push(`«${f.name}»`);
+      }
+    }
+    setPujant(null);
+    if (fallits.length) setError(`No s'ha pogut pujar: ${fallits.join(", ")}.`);
+  }
+
+  async function onDelete(f: ExpedientFitxer) {
+    if (!confirm(`Segur que vols eliminar «${f.nom}»?`)) return;
+    setFitxers((p) => (p ?? []).filter((x) => x.id !== f.id));
+    await deleteExpedientFitxerAction(f.id);
+  }
+
+  return (
+    <div
+      className={`space-y-2 rounded-lg ${drag ? "outline-2 outline-dashed outline-offset-4 outline-[var(--color-accent)]" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); if (!drag) setDrag(true); }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrag(false); }}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); void onFiles(e.dataTransfer.files); }}
+    >
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+          Fitxers adjunts{fitxers && fitxers.length > 0 && ` (${fitxers.length})`}
+        </h4>
+        <label className={`btn-ghost px-2.5 py-1 text-sm ${pujant ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+          + Afegir fitxers
+          <input type="file" multiple className="hidden" disabled={!!pujant} onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }} />
+        </label>
+      </div>
+      {pujant && (
+        <div className="space-y-1">
+          <p className="truncate text-sm text-[var(--color-muted)]">
+            Pujant «{pujant.nom}»… {Math.round(pujant.pct)}%{pujant.resten > 0 && ` · en queden ${pujant.resten}`}
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-line)]">
+            <div className="h-full bg-[var(--color-accent)] transition-[width]" style={{ width: `${pujant.pct}%` }} />
+          </div>
+        </div>
+      )}
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      {fitxers === null ? (
+        <p className="text-sm text-[var(--color-muted)]">Carregant…</p>
+      ) : fitxers.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-[var(--color-line)] p-4 text-center text-sm text-[var(--color-muted)]">
+          Cap fitxer adjunt. Arrossega&apos;ls aquí o fes clic a «+ Afegir fitxers».
+        </p>
+      ) : (
+        <div className="table-wrap">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="th">Nom</th>
+                <th className="th w-24 text-right">Mida</th>
+                <th className="th w-28">Data</th>
+                <th className="th w-44"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fitxers.map((f) => (
+                <tr key={f.id}>
+                  <td className="td">
+                    <a href={f.ref} target="_blank" rel="noopener" className="break-all text-[var(--color-accent)] hover:underline">{f.nom}</a>
+                  </td>
+                  <td className="td text-right tabular-nums">{fmtMida(f.mida)}</td>
+                  <td className="td tabular-nums">{fmtDate(f.created_at)}</td>
+                  <td className="td whitespace-nowrap text-right">
+                    <a href={`${f.ref}&descarregar=1`} className="text-[var(--color-accent)] hover:underline">Descarregar</a>
+                    <button type="button" className="ml-4 text-red-700 hover:underline" onClick={() => void onDelete(f)}>Eliminar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { actaMediaRef, deleteFolder, deleteStored } from "@/lib/fitxers";
 import type { ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 
 async function nextActaNum(): Promise<string> {
@@ -164,39 +165,66 @@ export async function createActaContacteAction(data: { nom: string; telefon?: st
   return { nom };
 }
 
-// Media: photos + document attachments. Appended/removed one item at a time
-// (so a single large upload only travels once). No revalidatePath here — the
-// client keeps local state and the row can be very large, so we avoid
-// re-streaming the whole acta (with every image) after each upload.
-export async function addActaFotoAction(id: number, dataUrl: string) {
+// Media: photos, PDFs and audios. Each file lives in the private Blob store
+// and the acta keeps a ref to it (see lib/fitxers-shared.ts); older actes may
+// still hold base64 data URIs. Callers pass either a data URI (the phone
+// upload page, the AI plugin) or the ref of a file the browser already
+// uploaded. Appended/removed one item at a time; no revalidatePath, because
+// the page keeps its own state.
+export async function addActaFotoAction(id: number, src: string): Promise<string | null> {
   await requireUser();
-  if (!Number.isFinite(id) || !dataUrl) return;
-  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) || ${JSON.stringify([dataUrl])}::jsonb, updated_at = now() where id = ${id}`;
+  if (!Number.isFinite(id) || !src) return null;
+  const ref = await actaMediaRef(id, src, "foto.jpg");
+  if (!ref) return null;
+  await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) || ${JSON.stringify([ref])}::jsonb, updated_at = now() where id = ${id}`;
+  return ref;
 }
 export async function removeActaFotoAction(id: number, index: number) {
   await requireUser();
   if (!Number.isFinite(id) || !Number.isFinite(index)) return;
+  const old = (await sql`select fotografies ->> ${index}::int as src from public.acta where id = ${id}`) as { src: string | null }[];
   await sql`update public.acta set fotografies = coalesce(fotografies, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
+  await deleteStored([old[0]?.src]);
 }
-export async function addActaDocAction(id: number, doc: ActaDoc) {
+async function addActaFile(id: number, column: "documents" | "audios", file: ActaDoc): Promise<ActaDoc | null> {
+  if (!Number.isFinite(id) || !file?.dataUrl) return null;
+  const ref = await actaMediaRef(id, file.dataUrl, file.name);
+  if (!ref) return null;
+  const stored = { name: file.name, dataUrl: ref };
+  if (column === "documents") {
+    await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) || ${JSON.stringify([stored])}::jsonb, updated_at = now() where id = ${id}`;
+  } else {
+    await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) || ${JSON.stringify([stored])}::jsonb, updated_at = now() where id = ${id}`;
+  }
+  return stored;
+}
+async function removeActaFile(id: number, column: "documents" | "audios", index: number) {
+  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
+  if (column === "documents") {
+    const old = (await sql`select documents -> ${index}::int ->> 'dataUrl' as src from public.acta where id = ${id}`) as { src: string | null }[];
+    await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
+    await deleteStored([old[0]?.src]);
+  } else {
+    const old = (await sql`select audios -> ${index}::int ->> 'dataUrl' as src from public.acta where id = ${id}`) as { src: string | null }[];
+    await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
+    await deleteStored([old[0]?.src]);
+  }
+}
+export async function addActaDocAction(id: number, doc: ActaDoc): Promise<ActaDoc | null> {
   await requireUser();
-  if (!Number.isFinite(id) || !doc?.dataUrl) return;
-  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) || ${JSON.stringify([doc])}::jsonb, updated_at = now() where id = ${id}`;
+  return addActaFile(id, "documents", doc);
 }
 export async function removeActaDocAction(id: number, index: number) {
   await requireUser();
-  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
-  await sql`update public.acta set documents = coalesce(documents, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
+  await removeActaFile(id, "documents", index);
 }
-export async function addActaAudioAction(id: number, audio: ActaDoc) {
+export async function addActaAudioAction(id: number, audio: ActaDoc): Promise<ActaDoc | null> {
   await requireUser();
-  if (!Number.isFinite(id) || !audio?.dataUrl) return;
-  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) || ${JSON.stringify([audio])}::jsonb, updated_at = now() where id = ${id}`;
+  return addActaFile(id, "audios", audio);
 }
 export async function removeActaAudioAction(id: number, index: number) {
   await requireUser();
-  if (!Number.isFinite(id) || !Number.isFinite(index)) return;
-  await sql`update public.acta set audios = coalesce(audios, '[]'::jsonb) - ${index}::int, updated_at = now() where id = ${id}`;
+  await removeActaFile(id, "audios", index);
 }
 
 // Link an existing (unlinked) acta to a dedicació — one dedicació = one acta.
@@ -225,5 +253,6 @@ export async function deleteActaAction(formData: FormData) {
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
   await sql`delete from public.acta where id = ${id}`;
+  await deleteFolder(`actes/${id}`);
   redirect("/actes");
 }

@@ -366,11 +366,42 @@ async function renderActaDocs(a: Acta): Promise<RenderedDoc[]> {
   return out;
 }
 
-export async function openActaPdf(a: Acta, lang: ActaLang = "ca", fileName?: string) {
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
+}
+
+// Photos and PDFs kept in the file store are fetched (with the user's session)
+// and embedded, so the printed PDF and the Word file carry them inside. Older
+// actes already hold data URIs. A file that can't be fetched is left out.
+async function srcAsDataUrl(src: string): Promise<string> {
+  if (!src || src.startsWith("data:")) return src;
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return "";
+    return await blobToDataUrl(await res.blob());
+  } catch {
+    return "";
+  }
+}
+async function withEmbeddedMedia(a: Acta): Promise<Acta> {
+  const [fotografies, documents] = await Promise.all([
+    Promise.all((a.fotografies ?? []).map(srcAsDataUrl)),
+    Promise.all((a.documents ?? []).map(async (d) => ({ ...d, dataUrl: await srcAsDataUrl(d.dataUrl) }))),
+  ]);
+  return { ...a, fotografies: fotografies.filter(Boolean), documents: documents.filter((d) => d.dataUrl) };
+}
+
+export async function openActaPdf(acta: Acta, lang: ActaLang = "ca", fileName?: string) {
   // Open the window synchronously (within the click) to dodge popup blockers.
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
   w.document.write("<!DOCTYPE html><html><body style='font-family:sans-serif;padding:24px;color:#555;'>Generant document…</body></html>");
+  const a = await withEmbeddedMedia(acta);
   const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
   const [renderedDocs, sizes] = await Promise.all([renderActaDocs(a), fotoSizesOf(a)]);
   // The title is what the browser proposes as the file name when saving as PDF.
@@ -388,20 +419,14 @@ async function logoDataUri(): Promise<string> {
   const url = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
   try {
     const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result as string);
-      fr.onerror = reject;
-      fr.readAsDataURL(blob);
-    });
+    return await blobToDataUrl(await res.blob());
   } catch {
     return url;
   }
 }
 
-export async function downloadActaWord(a: Acta, lang: ActaLang = "ca", fileName?: string) {
-  const logo = await logoDataUri();
+export async function downloadActaWord(acta: Acta, lang: ActaLang = "ca", fileName?: string) {
+  const [logo, a] = await Promise.all([logoDataUri(), withEmbeddedMedia(acta)]);
   const [renderedDocs, sizes] = await Promise.all([renderActaDocs(a), fotoSizesOf(a)]);
   const head = `<style>body,table,td,th,tr,div,span,p,strong,em{font-family:${DOC_FONT};}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
   const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName ?? a.num ?? "Acta")}</title>${head}</head><body>${buildActaHtml(a, lang, logo, renderedDocs, sizes as FotoSize[])}</body></html>`;

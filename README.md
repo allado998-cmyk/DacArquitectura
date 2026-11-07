@@ -86,8 +86,9 @@ dades no conté "demo".
 
 Les pestanyes **Clients** i **Contactes** són taules amb cerca, filtre per
 inicial (A–Z) i filtres, tot al navegador (filtrar no fa cap consulta a la base
-de dades). La capçalera de la taula queda fixa en baixar, i el botó «Tornar a
-dalt» torna a l'inici. La cerca de Clients també troba els noms dels contactes
+de dades). En baixar, la barra de filtres i la capçalera de la taula queden fixes
+a dalt (al mòbil només la capçalera, perquè la barra ocupa mitja pantalla), i el
+botó «Tornar a dalt» torna a l'inici. La cerca de Clients també troba els noms dels contactes
 de cada client. A Clients, el color de Contactes i Expedients oberts s'intensifica
 com més n'hi ha. En clicar una fila s'obre la fitxa, que és on es pot editar o
 eliminar; el comentari només surt a la fitxa. En crear un client nou, s'hi poden
@@ -106,6 +107,33 @@ Els telèfons amb un nombre de xifres incorrecte surten amb un avís ⚠
 resta de números internacionals (+ o 00), entre 8 i 15. És un avís, no un
 bloqueig: en desar es demana confirmació i el número es pot guardar igualment.
 Per veure'ls tots: pestanya Contactes, filtre Telèfon → Incorrecte.
+
+## Fitxers (adjunts d'expedients, fotos, PDF i àudios de les actes)
+
+Tots els fitxers es guarden al magatzem privat de Vercel Blob
+`dac-arquitectura-fitxers` (regió `fra1`, com la base de dades). Ruta:
+`<àrea>/<carpeta>/<clau>/<nom>`, on l'àrea és `dac` (compte real) o `demo`, i la
+carpeta `actes/<id>` o `expedients/<id>`. La base de dades només en guarda
+l'enllaç (`/fitxers/…?mida=<bytes>`): les actes a les seves llistes
+`fotografies`, `documents` i `audios`, i els adjunts d'expedient a la taula
+`expedient_fitxers`.
+
+- **Pujar:** el navegador puja el fitxer directament al magatzem
+  (`/fitxers/token` només dona permís a un usuari amb sessió i per a la seva
+  àrea), i després el registra. Sense el límit de 4,5 MB de Vercel; màxim 500 MB.
+  L'enllaç del mòbil i el plugin envien base64, que l'acció desa al magatzem.
+- **Obrir:** `/fitxers/<ruta>` comprova la sessió i l'àrea i el serveix; no toca
+  la base de dades. Imatges, PDF, àudio i vídeo s'obren al navegador; la resta
+  es descarrega.
+- **Eliminar:** treure un fitxer, una acta o un expedient esborra també els
+  fitxers del magatzem (la memòria cau de Vercel pot servir-ne una còpia fins a
+  un minut).
+- **Fitxers antics:** abans, les fotos de les actes es guardaven en base64 dins la
+  base de dades. `scripts/migrate-acta-media-to-blob.mjs` les mou al magatzem
+  (`--dry-run` per comptar, `--backup=DIR` per desar-ne una còpia, `--vacuum`
+  per alliberar l'espai). La web llegeix tots dos formats.
+
+En local cal `BLOB_READ_WRITE_TOKEN` a `.env.local` (`vercel env pull` el porta).
 
 ## Mapa d'obres (Expedients → Mapa)
 

@@ -7,18 +7,12 @@ import { openActaPdf, downloadActaWord, actaTitle, ACTA_REASONS, TEMA_CATS, tema
 import { confirmaTelefons } from "@/lib/telefon";
 import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/types/db";
 import { actaFileName } from "@/lib/file-names";
+import { refFor } from "@/lib/fitxers-shared";
+import { uploadFitxer } from "@/lib/fitxers-client";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result as string);
-    fr.onerror = reject;
-    fr.readAsDataURL(file);
-  });
-}
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -28,21 +22,24 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 // Downscale/re-encode so a whole album of phone photos stays a few MB, not tens.
-async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<string> {
-  const dataUrl = await readFileAsDataUrl(file);
-  if (!file.type.startsWith("image/")) return dataUrl;
+async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  const url = URL.createObjectURL(file);
   try {
-    const img = await loadImage(dataUrl);
+    const img = await loadImage(url);
     let w = img.naturalWidth, h = img.naturalHeight;
     if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
     const canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return dataUrl;
+    if (!ctx) return file;
     ctx.drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL("image/jpeg", quality);
+    const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    return out ?? file;
   } catch {
-    return dataUrl;
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 function temaResponsables(t: ActaTema): string[] {
@@ -157,47 +154,48 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
     return actaFileName({ expedientNum: exp?.num_expedient, referencia, actaNum, data });
   }
 
-  // Media uploads. Images are downscaled client-side, and each file is stored
-  // one at a time (sequentially) so a big batch never floods the server.
+  // Media uploads. Images are downscaled in the browser; every file goes
+  // straight to the private store, one at a time, then the acta records it.
+  const uploadFailed = () => alert("No s'ha pogut pujar algun fitxer. Torna-ho a provar.");
   async function onUploadFotos(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(true);
+    let failed = false;
     for (const f of Array.from(files)) {
       try {
-        const url = await compressImage(f);
-        setFotos((p) => [...p, url]);
-        await addActaFotoAction(acta.id, url);
-      } catch { /* skip this file */ }
+        const blob = await compressImage(f);
+        const name = blob === f ? f.name : "foto.jpg";
+        const up = await uploadFitxer("acta", acta.id, blob, name);
+        const ref = await addActaFotoAction(acta.id, refFor(up.pathname, up.bytes));
+        if (ref) setFotos((p) => [...p, ref]);
+        else failed = true;
+      } catch { failed = true; }
     }
     setUploading(false);
+    if (failed) uploadFailed();
   }
   function removeFoto(i: number) { setFotos((p) => p.filter((_, j) => j !== i)); void removeActaFotoAction(acta.id, i); }
-  async function onUploadDocs(files: FileList | null) {
+  async function uploadFiles(files: FileList | null, add: (doc: ActaDoc) => Promise<ActaDoc | null>, onAdded: (doc: ActaDoc) => void) {
     if (!files || files.length === 0) return;
     setUploading(true);
+    let failed = false;
     for (const f of Array.from(files)) {
       try {
-        const url = await readFileAsDataUrl(f);
-        const doc = { name: f.name, dataUrl: url };
-        setDocs((p) => [...p, doc]);
-        await addActaDocAction(acta.id, doc);
-      } catch { /* skip this file */ }
+        const up = await uploadFitxer("acta", acta.id, f, f.name);
+        const doc = await add({ name: f.name, dataUrl: refFor(up.pathname, up.bytes) });
+        if (doc) onAdded(doc);
+        else failed = true;
+      } catch { failed = true; }
     }
     setUploading(false);
+    if (failed) uploadFailed();
+  }
+  function onUploadDocs(files: FileList | null) {
+    void uploadFiles(files, (doc) => addActaDocAction(acta.id, doc), (doc) => setDocs((p) => [...p, doc]));
   }
   function removeDoc(i: number) { setDocs((p) => p.filter((_, j) => j !== i)); void removeActaDocAction(acta.id, i); }
-  async function onUploadAudios(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    for (const f of Array.from(files)) {
-      try {
-        const url = await readFileAsDataUrl(f);
-        const audio = { name: f.name, dataUrl: url };
-        setAudios((p) => [...p, audio]);
-        await addActaAudioAction(acta.id, audio);
-      } catch { /* skip this file */ }
-    }
-    setUploading(false);
+  function onUploadAudios(files: FileList | null) {
+    void uploadFiles(files, (audio) => addActaAudioAction(acta.id, audio), (audio) => setAudios((p) => [...p, audio]));
   }
   function removeAudio(i: number) { setAudios((p) => p.filter((_, j) => j !== i)); void removeActaAudioAction(acta.id, i); }
 
@@ -552,7 +550,7 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             {fotos.map((src, i) => (
               <div key={i} className="group relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Foto ${i + 1}`} className="h-32 w-full rounded-lg border border-[var(--color-line)] object-cover" />
+                <img src={src} alt={`Foto ${i + 1}`} loading="lazy" className="h-32 w-full rounded-lg border border-[var(--color-line)] object-cover" />
                 <button className="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-semibold text-red-700 shadow hover:bg-white" onClick={() => removeFoto(i)} title="Eliminar">✕</button>
               </div>
             ))}
@@ -564,10 +562,13 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
       <section className="card">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Documents adjunts</h2>
+          <div className="flex items-center gap-2">
+          {uploading && <span className="text-xs text-[var(--color-muted)]">Pujant…</span>}
           <label className="btn cursor-pointer">
             + Afegir PDF
             <input type="file" accept="application/pdf" multiple className="hidden" onChange={(e) => { onUploadDocs(e.target.files); e.target.value = ""; }} />
           </label>
+          </div>
         </div>
         {docs.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Cap document.</p>
@@ -591,10 +592,13 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             <h2 className="text-lg font-semibold">Àudios</h2>
             <p className="text-xs text-[var(--color-muted)]">Missatges de veu per consultar aquí. No apareixen al PDF/Word.</p>
           </div>
+          <div className="flex items-center gap-2">
+          {uploading && <span className="text-xs text-[var(--color-muted)]">Pujant…</span>}
           <label className="btn cursor-pointer">
             + Afegir àudio
             <input type="file" accept="audio/*" multiple className="hidden" onChange={(e) => { onUploadAudios(e.target.files); e.target.value = ""; }} />
           </label>
+          </div>
         </div>
         {audios.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">Cap àudio.</p>

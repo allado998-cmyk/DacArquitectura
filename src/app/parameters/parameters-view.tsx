@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   createClientFullAction,
   createConcepteAltraAction,
@@ -305,6 +305,31 @@ function Heat({ n, max, scale }: { n: number; max: number; scale: Scale }) {
   );
 }
 
+// The filter bar of a long table: it stays at the top of the screen while the
+// page scrolls (from tablet width up; on a phone it would cover half the screen)
+// and tells the table's sticky header how far down to stick, right below it.
+function StickyFilters({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const panel = el?.parentElement;
+    if (!el || !panel) return;
+    const update = () => {
+      const pinned = getComputedStyle(el).position === "sticky";
+      panel.style.setProperty("--sticky-top", pinned ? `${el.offsetHeight}px` : "0px");
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  return <div ref={ref} className="sticky-filters flex flex-wrap items-end gap-3">{children}</div>;
+}
+
 // Appears once the page has scrolled past the first rows.
 function BackToTop() {
   const [show, setShow] = useState(false);
@@ -438,7 +463,7 @@ function ContactesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <StickyFilters>
         <div className="w-64">
           <label className="label">Cercar</label>
           <input className="input" placeholder="Nom, telèfon, mail, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -457,7 +482,7 @@ function ContactesPanel({
           <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels contactes mostrats"><ParamPdfIcon /> PDF</button>
           <button type="button" className="btn-primary whitespace-nowrap" onClick={() => setCreating(true)}>+ Nou contacte</button>
         </div>
-      </div>
+      </StickyFilters>
 
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap contacte encara." : "Cap resultat."}</p>
@@ -1001,7 +1026,7 @@ function ClientsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <StickyFilters>
         <div className="w-64">
           <label className="label">Cercar</label>
           <input className="input" placeholder="Client, contacte, NIF…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -1015,7 +1040,7 @@ function ClientsPanel({
           <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels clients mostrats"><ParamPdfIcon /> PDF</button>
           <button type="button" className="btn-primary whitespace-nowrap" onClick={() => setCreating(true)}>+ Nou client</button>
         </div>
-      </div>
+      </StickyFilters>
 
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{rows.length === 0 ? "Cap client encara." : "Cap resultat."}</p>

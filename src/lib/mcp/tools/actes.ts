@@ -48,13 +48,13 @@ import type { Acta, ActaAssistent, ActaSignatura, ActaTema } from "@/types/db";
 
 interface MediaInfo {
   name: string;
-  chars: number;
+  bytes: number;
 }
 
 interface ActaRow extends Acta {
   expedient_projecte: string | null;
   dedicacio: { id: number; data: string; hores: string; tasca: string | null } | null;
-  fotos_chars: number[];
+  fotos_bytes: number[];
   documents_info: MediaInfo[];
   audios_info: MediaInfo[];
 }
@@ -70,11 +70,11 @@ async function getActa(ref: { id?: number | null; num?: string | null }): Promis
             a.propera_hora, a.signatures, a.sig_do, a.sig_de, a.sig_adj_empresa, a.sig_adj_persona, a.sig_prom_empresa, a.sig_prom_persona,
             case when d.id is null then null
                  else json_build_object('id', d.id, 'data', to_char(d.data,'YYYY-MM-DD'), 'hores', d.hores::text, 'tasca', d.tasca) end as dedicacio,
-            coalesce((select json_agg(length(f #>> '{}') order by i)
-                      from jsonb_array_elements(coalesce(a.fotografies,'[]'::jsonb)) with ordinality t(f, i)), '[]'::json) as fotos_chars,
-            coalesce((select json_agg(json_build_object('name', x->>'name', 'chars', length(x->>'dataUrl')) order by i)
+            coalesce((select json_agg(case when left(f #>> '{}', 9) = '/fitxers/' then coalesce(substring(f #>> '{}' from 'mida=([0-9]+)')::bigint, 0) else (length(f #>> '{}') * 3 / 4)::bigint end order by i)
+                      from jsonb_array_elements(coalesce(a.fotografies,'[]'::jsonb)) with ordinality t(f, i)), '[]'::json) as fotos_bytes,
+            coalesce((select json_agg(json_build_object('name', x->>'name', 'bytes', case when left(x->>'dataUrl', 9) = '/fitxers/' then coalesce(substring(x->>'dataUrl' from 'mida=([0-9]+)')::bigint, 0) else (length(x->>'dataUrl') * 3 / 4)::bigint end) order by i)
                       from jsonb_array_elements(coalesce(a.documents,'[]'::jsonb)) with ordinality t(x, i)), '[]'::json) as documents_info,
-            coalesce((select json_agg(json_build_object('name', x->>'name', 'chars', length(x->>'dataUrl')) order by i)
+            coalesce((select json_agg(json_build_object('name', x->>'name', 'bytes', case when left(x->>'dataUrl', 9) = '/fitxers/' then coalesce(substring(x->>'dataUrl' from 'mida=([0-9]+)')::bigint, 0) else (length(x->>'dataUrl') * 3 / 4)::bigint end) order by i)
                       from jsonb_array_elements(coalesce(a.audios,'[]'::jsonb)) with ordinality t(x, i)), '[]'::json) as audios_info
      from public.acta a
      left join public.expedients e on e.id = a.expedient_id
@@ -106,7 +106,6 @@ async function resolveActaRef(raw: string): Promise<{ row: ActaRow | null; error
   return { row: null, error: `No s'ha trobat cap acta «${s}». Fes servir list_actes per buscar-la.` };
 }
 
-const approxBytes = (chars: number) => Math.round(chars * 0.75);
 
 function actaLabel(a: { id: number; num: string | null; tipus: string; data: string | null; projecte?: string | null }): string {
   return `${a.num ?? `#${a.id}`} (${motiuLabel(a.tipus)}, ${a.data ?? "sense data"})${a.projecte ? ` — ${a.projecte.split("\n")[0].slice(0, 80)}` : ""}`;
@@ -142,9 +141,9 @@ function describeActa(r: ActaRow) {
     propera_visita: { data: r.propera_data, hora: r.propera_hora, nota: r.propera_visita },
     signatures: signatures.map((s, index) => ({ index, titol: s.titol, persona: s.persona })),
     signatures_de_camps_antics: !(r.signatures?.length) && signatures.length > 0,
-    fotografies: (r.fotos_chars ?? []).map((c, index) => ({ index, mida: mb(approxBytes(c)) })),
-    documents: (r.documents_info ?? []).map((d, index) => ({ index, nom: d.name, mida: mb(approxBytes(d.chars)) })),
-    audios: (r.audios_info ?? []).map((d, index) => ({ index, nom: d.name, mida: mb(approxBytes(d.chars)) })),
+    fotografies: (r.fotos_bytes ?? []).map((b, index) => ({ index, mida: mb(Number(b)) })),
+    documents: (r.documents_info ?? []).map((d, index) => ({ index, nom: d.name, mida: mb(Number(d.bytes)) })),
+    audios: (r.audios_info ?? []).map((d, index) => ({ index, nom: d.name, mida: mb(Number(d.bytes)) })),
   };
 }
 
@@ -559,7 +558,7 @@ registerAction({
       acta: actaLabel(row),
       enllac: actaUploadUrl(origin, token),
       caduca_en_hores: UPLOAD_LINK_TTL_S / 3600,
-      fotografies_actuals: row.fotos_chars.length,
+      fotografies_actuals: row.fotos_bytes.length,
       per_a_l_assistent: "Dona aquest enllaç a l'usuari tal qual. Quan digui que ja ha acabat, comprova les fotos amb get_acta.",
     };
   },
@@ -827,7 +826,7 @@ registerAction({
     if ("error" in src) return { summary: "Afegir fitxer", errors: [src.error] };
     try {
       const f = await prepareFile(src.url, { expected: a.tipus, name: a.nom ?? a.fitxer?.file_name ?? null });
-      const count = f.kind === "foto" ? row.fotos_chars.length : f.kind === "document" ? row.documents_info.length : row.audios_info.length;
+      const count = f.kind === "foto" ? row.fotos_bytes.length : f.kind === "document" ? row.documents_info.length : row.audios_info.length;
       const size = f.kind === "foto" ? `${mb(f.originalBytes)} → ${mb(f.storedBytes)}, ${f.width}×${f.height}` : mb(f.storedBytes);
       return {
         summary: `Afegir ${f.kind === "foto" ? "una foto" : `«${f.name}»`} (${size}) a l'acta ${actaLabel(row)}; en tindrà ${count + 1} de ${KIND_LABEL[f.kind]}.`,
@@ -845,7 +844,7 @@ registerAction({
     else if (f.kind === "document") await callAction(() => addActaDocAction(a.acta_id, { name: f.name, dataUrl: f.dataUrl }));
     else await callAction(() => addActaAudioAction(a.acta_id, { name: f.name, dataUrl: f.dataUrl }));
     const saved = await getActa({ id: a.acta_id });
-    const list = f.kind === "foto" ? saved?.fotos_chars : f.kind === "document" ? saved?.documents_info : saved?.audios_info;
+    const list = f.kind === "foto" ? saved?.fotos_bytes : f.kind === "document" ? saved?.documents_info : saved?.audios_info;
     return { acta_id: a.acta_id, tipus: f.kind, nom: f.name, index: (list?.length ?? 1) - 1, total: list?.length ?? null, mida: mb(f.storedBytes) };
   },
 });

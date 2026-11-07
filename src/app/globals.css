@@ -125,9 +125,24 @@ html, body {
    wrapper can't scroll sideways (that would trap the header inside it), so a
    table wider than the screen scrolls the page sideways instead. */
 .table-wrap.table-sticky { overflow: visible; }
-.table-sticky thead .th {
+/* The filter bar above such a table stays in view too (StickyFilters sets
+   --sticky-top to its height so the header sticks right below it). Phones keep
+   it in the flow: there it wraps to several rows and would cover the list. */
+.sticky-filters {
   position: sticky;
   top: 0;
+  z-index: 20;
+  background: var(--color-paper);
+  padding-top: 0.5rem;
+  margin-top: -0.5rem;
+  padding-bottom: 0.5rem;
+}
+@media (max-width: 767px) {
+  .sticky-filters { position: static; }
+}
+.table-sticky thead .th {
+  position: sticky;
+  top: var(--sticky-top, 0px);
   z-index: 1;
   /* A collapsed border stays behind when the cell sticks; a shadow moves with it. */
   border-bottom: none;

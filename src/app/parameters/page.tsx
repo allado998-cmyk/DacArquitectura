@@ -25,7 +25,7 @@ export default async function ParametersPage() {
     sql`select id, nom, preu_unitat_default::text as preu_unitat_default, actiu, ordre from public.concepte_altra_despesa order by ordre, nom` as unknown as Promise<ConcepteAltraDespesa[]>,
     sql`select id, nom, ordre, created_at from public.tipologies order by ordre, nom` as unknown as Promise<Tipologia[]>,
     sql`
-      select cc.id, cc.client_id, cc.nom, cc.telefon, cc.mail, cc.telefons_extra, cc.mails_extra, cc.comentari, cc.ordre, c.nom as client_nom
+      select cc.id, cc.client_id, cc.nom, cc.telefon, cc.mail, cc.telefons_extra, cc.mails_extra, cc.comentari, cc.professio, cc.ordre, c.nom as client_nom
       from public.client_contactes cc
       left join public.clients c on c.id = cc.client_id
       order by lower(nullif(cc.nom, '')) asc nulls last, cc.id

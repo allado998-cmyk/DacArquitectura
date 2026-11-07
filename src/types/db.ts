@@ -116,6 +116,7 @@ export interface ClientContacte {
   telefons_extra: string[];
   mails_extra: string[];
   comentari: string | null;
+  professio: string | null;
   ordre: number;
   client_nom?: string | null; // joined (Contactes tab)
 }

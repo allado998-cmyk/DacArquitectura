@@ -8,10 +8,15 @@
 //   node scripts/test-calculs.mjs
 import { register } from "node:module";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 register("./mcp-test-hooks.mjs", import.meta.url);
 
-const { computeParet } = await import("../src/lib/calculs/paret.ts");
+const { computeParet, paretPerfilsValids } = await import("../src/lib/calculs/paret.ts");
 const { computeBiga } = await import("../src/lib/calculs/biga.ts");
 const { computePilar } = await import("../src/lib/calculs/pilar.ts");
 const { computeSoldadura } = await import("../src/lib/calculs/soldadura.ts");
@@ -202,6 +207,38 @@ test("incompatible and out-of-table pairs", () => {
   assert.equal(o.find((c) => c.a.t === 3.8 && c.b.t === 3.8).ok, false);
 });
 
+test("combinations left out don't count and keep their place when the profiles change", () => {
+  const all = computeSoldadura({ perfil1: "UPN 140", perfil2: "IPN 140" });
+  const some = computeSoldadura({ perfil1: "UPN 140", perfil2: "IPN 140", ocultes: ["ala|ànima", "ànima|ala"] });
+  const w = some.sections.find((s) => s.welds).welds;
+  assert.deepEqual(w.map((c) => [c.key, c.included]), [["ala|ala", true], ["ala|ànima", false], ["ànima|ala", false], ["ànima|ànima", true]]);
+  assert.deepEqual([verdict(all).total, verdict(some).total], [4, 2]);
+  const other = computeSoldadura({ perfil1: "UPN 200", perfil2: "IPN 200", ocultes: ["ala|ànima"] }).sections.find((s) => s.welds).welds;
+  assert.equal(other.find((c) => c.key === "ala|ànima").included, false);
+});
+test("no reference annex for Soldadures and Paret de càrrega", () => {
+  for (const r of [computeSoldadura({}), computeParet({})]) assert.ok(r.sections.every((s) => !s.reference?.length));
+});
+
+console.log("Paret · perfils que compleixen");
+test("the picker's list agrees with the checks, and takes the self-weight of each profile", () => {
+  const ok = paretPerfilsValids({});
+  const passes = (perfil) => computeParet({ perfil }).sections.find((s) => s.key === "comprovacio").blocks.every((b) => b.rows.every((r) => !r.check || r.check.ok));
+  assert.ok(ok.size > 0 && ok.size < 150, `${ok.size} pass`);
+  for (const name of ["UPN 320", "UPN 200", "IPE 80", "IPE 600", "HEB 300", "HEM 1000"]) assert.equal(ok.has(name), passes(name), name);
+  assert.equal(ok.has("IPE 80"), false);
+});
+test("more load means fewer profiles pass; checking them all stays quick", () => {
+  const t0 = performance.now();
+  const base = paretPerfilsValids({});
+  const ms = performance.now() - t0;
+  const heavy = paretPerfilsValids({ L: 4800 });
+  assert.ok(heavy.size < base.size, `${heavy.size} vs ${base.size}`);
+  for (const n of heavy) assert.ok(base.has(n), n);
+  assert.ok(ms < 200, `${ms.toFixed(0)} ms`);
+  console.log(`    ${base.size} profiles pass the example; with L = 4,8 m, ${heavy.size} (checked in ${ms.toFixed(0)} ms)`);
+});
+
 console.log("Catàleg");
 test("every calculation profile has the values the checks need", () => {
   for (const f of FAMILIES.filter((f) => ["ipe", "ipn", "heb", "hea", "hem", "upn"].includes(f.key)))
@@ -210,14 +247,12 @@ test("every calculation profile has the values the checks need", () => {
       for (const k of ["h", "b", "tw", "tf", "h1", "A", "Ix", "Wx", "p"]) assert.ok(typeof p[k] === "number" && p[k] > 0, `${r.name}: ${k} = ${p[k]}`);
     }
 });
-test("every errata note points at an existing row and column", () => {
-  for (const f of FAMILIES)
-    for (const key of Object.keys(f.errata ?? {})) {
-      const [row, col] = key.split("|");
-      assert.ok(f.rows.some((r) => r.name === row), `${f.key}: no row ${row}`);
-      assert.ok(col === "name" || f.columns.some((c) => c.key === col), `${f.key}: no column ${col}`);
-    }
+test("every catalogue image exists, and L and LD each have their own", () => {
+  for (const f of FAMILIES) assert.ok(existsSync(join(ROOT, "public", f.image)), `${f.key}: ${f.image}`);
+  const img = (k) => FAMILIES.find((f) => f.key === k).image;
+  assert.notEqual(img("l"), img("ld"));
 });
+test("ZF is the last profile table", () => assert.equal(FAMILIES.at(-1).key, "zf"));
 test("profile names are unique", () => {
   const seen = new Set();
   for (const f of FAMILIES) for (const r of f.rows) {

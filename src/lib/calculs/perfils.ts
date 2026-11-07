@@ -25,7 +25,6 @@ export interface PerfilFamily {
   columns: PerfilColumn[];
   rows: PerfilRow[];
   note?: string;
-  errata?: Record<string, string>; // "row|col" (col "name" for the designation) → note
 }
 export interface SoldaduraRow {
   tMin: number;

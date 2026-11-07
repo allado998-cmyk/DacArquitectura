@@ -17,10 +17,11 @@ export interface SoldaduraDades {
   gruix1: number; // mm, plate thickness when perfil1 = PLATE
   perfil2: string;
   gruix2: number;
+  ocultes: string[]; // keys of the combinations left out of the checks and the report
 }
 
 export function soldaduraDefaults(): SoldaduraDades {
-  return { perfil1: "UPN 140", gruix1: 10, perfil2: "IPN 140", gruix2: 10 };
+  return { perfil1: "UPN 140", gruix1: 10, perfil2: "IPN 140", gruix2: 10, ocultes: [] };
 }
 
 function part(label: string, t: number | null): WeldPart {
@@ -28,10 +29,14 @@ function part(label: string, t: number | null): WeldPart {
   return { label, t, aMax: row?.aMax ?? null, aMin: row?.aMin ?? null };
 }
 
-function pieceParts(perfil: string, gruix: number): WeldPart[] {
-  if (perfil === PLATE) return [part(`Xapa ${String(gruix).replace(".", ",")} mm`, gruix)];
+// The parts of a piece, each with its role ("ala", "ànima" or "xapa").
+function pieceParts(perfil: string, gruix: number): { role: string; part: WeldPart }[] {
+  if (perfil === PLATE) return [{ role: "xapa", part: part(`Xapa ${String(gruix).replace(".", ",")} mm`, gruix) }];
   const p = perfilProps(perfil);
-  return [part(`${perfil} · ala`, p?.tf ?? null), part(`${perfil} · ànima`, p?.tw ?? null)];
+  return [
+    { role: "ala", part: part(`${perfil} · ala`, p?.tf ?? null) },
+    { role: "ànima", part: part(`${perfil} · ànima`, p?.tw ?? null) },
+  ];
 }
 
 const within = (x: number, lo: number, hi: number) => x >= lo && x <= hi;
@@ -87,10 +92,14 @@ export function computeSoldadura(raw: Partial<SoldaduraDades>): CalcResult {
     ],
   };
 
-  const p1 = pieceParts(d.perfil1, g1);
-  const p2 = pieceParts(d.perfil2, g2);
+  // Every pair of parts; the user can leave some out (they don't weld there).
+  const ocultes = Array.isArray(d.ocultes) ? d.ocultes : [];
   const welds: WeldCombo[] = [];
-  for (const a of p1) for (const b of p2) welds.push(combine(a, b));
+  for (const a of pieceParts(d.perfil1, g1))
+    for (const b of pieceParts(d.perfil2, g2)) {
+      const key = `${a.role}|${b.role}`;
+      welds.push({ ...combine(a.part, b.part), key, included: !ocultes.includes(key) });
+    }
 
   const combinacions: Section = {
     key: "combinacions",
@@ -98,7 +107,6 @@ export function computeSoldadura(raw: Partial<SoldaduraDades>): CalcResult {
     enabled: true,
     blocks: [],
     welds,
-    reference: ["soldadura"],
   };
 
   return { sections: [dades, combinacions] };

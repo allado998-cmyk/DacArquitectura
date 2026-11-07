@@ -5,7 +5,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { deleteCalculAction, updateCalculAction, type CalculPatch } from "../actions";
 import { calcType } from "@/lib/calculs";
 import { allChecks, fmt, verdict, verdictText, weldResultText, type LoadsTable, type Row, type Section, type WeldCombo } from "@/lib/calculs/common";
-import { PLATE, perfilOptions } from "@/lib/calculs/perfils";
+import { PLATE, perfilOptions, perfilProps } from "@/lib/calculs/perfils";
 import { newSostre, type Sostre } from "@/lib/calculs/paret";
 import { downloadCalculWord, openCalculPdf } from "@/lib/calculs/report";
 import { calculFileName } from "@/lib/file-names";
@@ -38,6 +38,8 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
     dades: { ...t.defaults(), ...(calcul.dades ?? {}) },
   }));
   const result = useMemo(() => t.compute(doc.dades), [t, doc.dades]);
+  // For each profile input that has it: the catalogue profiles that pass right now.
+  const valids = useMemo(() => t.perfilsValids?.(doc.dades) ?? {}, [t, doc.dades]);
   const v = verdict(result);
   const failed = allChecks(result).filter((c) => !c.ok);
 
@@ -153,19 +155,22 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
               </button>
             )}
           </div>
-          <div>
-            <label className="label">Client (Base de Dades)</label>
-            <Combobox
-              options={clientOpts}
-              value={doc.client_id}
-              onChange={(id) => {
-                const c = id == null ? null : clients.find((x) => x.id === id);
-                update(c ? { client_id: c.id, client: c.nom } : { client_id: null });
-              }}
-              placeholder="Cercar client…"
-              emptyLabel="— Sense client —"
-            />
-          </div>
+          {/* Some calculations always hang off an expedient, which brings the client. */}
+          {t.clientPicker && (
+            <div>
+              <label className="label">Client (Base de Dades)</label>
+              <Combobox
+                options={clientOpts}
+                value={doc.client_id}
+                onChange={(id) => {
+                  const c = id == null ? null : clients.find((x) => x.id === id);
+                  update(c ? { client_id: c.id, client: c.nom } : { client_id: null });
+                }}
+                placeholder="Cercar client…"
+                emptyLabel="— Sense client —"
+              />
+            </div>
+          )}
         </div>
         <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Referència DAC" value={doc.referencia} onChange={(v) => update({ referencia: v })} />
@@ -199,7 +204,7 @@ export function CalculView({ calcul, expedients, clients }: { calcul: CalculEstr
       </section>
 
       {result.sections.map((s) => (
-        <SectionCard key={s.key} section={s} dades={doc.dades} setDada={setDada} onShowProfile={(name) => setRefOpen([name])} />
+        <SectionCard key={s.key} section={s} dades={doc.dades} setDada={setDada} valids={valids} onShowProfile={(name) => setRefOpen([name])} />
       ))}
 
       <div className="flex justify-end">
@@ -227,7 +232,9 @@ function Field({ label, value, onChange, className, placeholder }: { label: stri
 
 // ---- sections ----
 
-function SectionCard({ section, dades, setDada, onShowProfile }: { section: Section; dades: Dades; setDada: SetDada; onShowProfile: (name: string) => void }) {
+type Valids = Record<string, Set<string>>;
+
+function SectionCard({ section, dades, setDada, valids, onShowProfile }: { section: Section; dades: Dades; setDada: SetDada; valids: Valids; onShowProfile: (name: string) => void }) {
   return (
     <section className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-paper)] px-5 py-3">
@@ -244,7 +251,7 @@ function SectionCard({ section, dades, setDada, onShowProfile }: { section: Sect
       ) : (
         <div className="overflow-x-auto">
           {section.loads && <LoadsEditor loads={section.loads} dades={dades} setDada={setDada} />}
-          {section.welds && <WeldsTable welds={section.welds} />}
+          {section.welds && <WeldsTable welds={section.welds} dades={dades} setDada={setDada} />}
           {section.blocks.length > 0 && (
             <table className="w-full min-w-[760px] text-sm">
               <colgroup>
@@ -256,7 +263,7 @@ function SectionCard({ section, dades, setDada, onShowProfile }: { section: Sect
               </colgroup>
               <tbody>
                 {section.blocks.map((b, bi) => (
-                  <BlockRows key={bi} title={b.title} rows={b.rows} dades={dades} setDada={setDada} onShowProfile={onShowProfile} />
+                  <BlockRows key={bi} title={b.title} rows={b.rows} dades={dades} setDada={setDada} valids={valids} onShowProfile={onShowProfile} />
                 ))}
               </tbody>
             </table>
@@ -267,7 +274,7 @@ function SectionCard({ section, dades, setDada, onShowProfile }: { section: Sect
   );
 }
 
-function BlockRows({ title, rows, dades, setDada, onShowProfile }: { title?: string; rows: Row[]; dades: Dades; setDada: SetDada; onShowProfile: (name: string) => void }) {
+function BlockRows({ title, rows, dades, setDada, valids, onShowProfile }: { title?: string; rows: Row[]; dades: Dades; setDada: SetDada; valids: Valids; onShowProfile: (name: string) => void }) {
   return (
     <>
       {title && (
@@ -277,7 +284,10 @@ function BlockRows({ title, rows, dades, setDada, onShowProfile }: { title?: str
           </td>
         </tr>
       )}
-      {rows.map((r, i) => (
+      {rows.map((r, i) =>
+        r.input?.type === "profile" && r.input.byType ? (
+          <ProfileByTypeRows key={i} row={r} inputKey={r.input.key} value={String(dades[r.input.key] ?? "")} setDada={setDada} valids={valids[r.input.key]} onShowProfile={onShowProfile} />
+        ) : (
         <tr key={i} className="border-b border-[var(--color-line)] last:border-b-0">
           <td className="px-5 py-2 align-middle">
             <div>{r.label}</div>
@@ -300,7 +310,104 @@ function BlockRows({ title, rows, dades, setDada, onShowProfile }: { title?: str
           </td>
           <td className="px-5 py-2 text-right text-xs whitespace-nowrap text-[#3f7cc0] tabular-nums">{r.alt ? `= ${fmt(r.alt.value, r.alt.decimals ?? 2)} ${r.alt.unit}` : ""}</td>
         </tr>
-      ))}
+        ),
+      )}
+    </>
+  );
+}
+
+// ---- profile picked by type (paret): type, then profile, with the ones that pass ----
+
+const typeLabel = (title: string) => title.replace(/^Perfils /, "");
+const weight = (name: string) => perfilProps(name)?.p ?? Infinity;
+const lightestFirst = (names: string[]) => [...names].sort((a, b) => weight(a) - weight(b));
+const SUGGESTED = 10; // passing profiles listed for the chosen type
+
+function ProfileByTypeRows({
+  row,
+  inputKey,
+  value,
+  setDada,
+  valids,
+  onShowProfile,
+}: {
+  row: Row;
+  inputKey: string;
+  value: string;
+  setDada: SetDada;
+  valids?: Set<string>;
+  onShowProfile: (name: string) => void;
+}) {
+  const group = PROFILE_GROUPS.find((g) => g.names.includes(value));
+  const pick = (name: string) => setDada(inputKey, name);
+  // Choosing a type picks its lightest profile that passes (or its biggest, if none does).
+  function pickType(family: string) {
+    const g = PROFILE_GROUPS.find((x) => x.family === family);
+    if (g) pick(lightestFirst(g.names.filter((n) => valids?.has(n)))[0] ?? g.names[g.names.length - 1]);
+  }
+  const here = group ? lightestFirst(group.names.filter((n) => valids?.has(n))) : [];
+  const others = PROFILE_GROUPS.filter((g) => g !== group)
+    .map((g) => lightestFirst(g.names.filter((n) => valids?.has(n)))[0])
+    .filter((n): n is string => !!n);
+  const chip = (n: string, withWeight: boolean) => (
+    <button
+      key={n}
+      type="button"
+      onClick={() => pick(n)}
+      className={`rounded-full border px-2 py-0.5 ${n === value ? "border-emerald-700 bg-emerald-700 text-white" : "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}
+      title={`${fmt(weight(n), 1)} kg/m`}
+    >
+      {n}
+      {withWeight && <span className="ml-1 opacity-70">{fmt(weight(n), 1)} kg/m</span>}
+    </button>
+  );
+
+  return (
+    <>
+      <tr className="border-b-0">
+        <td className="px-5 pt-2 align-middle">{row.label}</td>
+        <td className="px-2 pt-2" />
+        <td colSpan={2} className="px-2 pt-2">
+          <div className="flex items-center gap-1">
+            <select className="input input-dada w-24 shrink-0" aria-label="Tipus de perfil" value={group?.family ?? ""} onChange={(e) => pickType(e.target.value)}>
+              {!group && <option value="">—</option>}
+              {PROFILE_GROUPS.map((g) => <option key={g.family} value={g.family}>{typeLabel(g.title)}</option>)}
+            </select>
+            <select className="input input-dada" aria-label="Perfil" value={value} onChange={(e) => pick(e.target.value)}>
+              {!group && <option value={value}>{value || "—"}</option>}
+              {group?.names.map((n) => <option key={n} value={n}>{valids?.has(n) ? `${n}  ✓ compleix` : n}</option>)}
+            </select>
+            {group && (
+              <button type="button" className="shrink-0 rounded px-1.5 py-1 text-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]" title="Veure a les taules de perfils" onClick={() => onShowProfile(value)}>
+                ⓘ
+              </button>
+            )}
+          </div>
+        </td>
+        <td />
+      </tr>
+      <tr className="border-b border-[var(--color-line)]">
+        <td colSpan={5} className="space-y-1.5 px-5 pb-3 pt-2 text-xs">
+          {valids && group && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-[var(--color-muted)]">
+                {here.length ? `${typeLabel(group.title)} que compleixen, del més lleuger al més pesant:` : `Cap ${typeLabel(group.title)} compleix amb aquestes càrregues i aquesta llum.`}
+              </span>
+              {here.slice(0, SUGGESTED).map((n) => chip(n, false))}
+              {here.length > SUGGESTED && <span className="text-[var(--color-muted)]">i {here.length - SUGGESTED} més</span>}
+            </div>
+          )}
+          {valids && others.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-[var(--color-muted)]">El més lleuger que compleix d&apos;altres tipus:</span>
+              {others.map((n) => chip(n, true))}
+            </div>
+          )}
+          {valids && !here.length && !others.length && (
+            <p className="text-red-800">Cap perfil del catàleg compleix: prova amb més perfils o revisa les càrregues i la llum.</p>
+          )}
+        </td>
+      </tr>
     </>
   );
 }
@@ -547,9 +654,12 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
 
 // ---- soldadura: combinacions ----
 
-function WeldsTable({ welds }: { welds: WeldCombo[] }) {
+function WeldsTable({ welds, dades, setDada }: { welds: WeldCombo[]; dades: Dades; setDada: SetDada }) {
   const cell = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
   const shade = (on: boolean) => (on ? "bg-[#e3e3e3] font-semibold" : "");
+  // Combinations left out (they aren't welded there): no check, not in the report.
+  const ocultes = Array.isArray(dades.ocultes) ? (dades.ocultes as string[]) : [];
+  const toggle = (key: string, include: boolean) => setDada("ocultes", include ? ocultes.filter((k) => k !== key) : [...ocultes, key]);
   return (
     <div>
       <table className="w-full min-w-[640px] text-sm">
@@ -562,31 +672,46 @@ function WeldsTable({ welds }: { welds: WeldCombo[] }) {
           </tr>
         </thead>
         <tbody>
-          {welds.map((w, i) => (
-            <Fragment key={i}>
-              {(["a", "b"] as const).map((k) => {
-                const p = w[k];
-                const isThin = w.thin === k;
-                const isThick = w.thin != null && !isThin;
-                return (
-                  <tr key={k}>
-                    <td className="px-5 py-1.5">{p.label}</td>
-                    <td className={cell}>{fmt(p.t, 2)} <span className="text-xs text-[var(--color-muted)]">mm</span></td>
-                    <td className={`${cell} ${shade(isThin)}`}>{fmt(p.aMax, 1)}</td>
-                    <td className={`${cell} pr-5 ${shade(isThick)}`}>{fmt(p.aMin, 1)}</td>
-                  </tr>
-                );
-              })}
-              <tr className="border-b-2 border-[var(--color-line)]">
-                <td colSpan={4} className="px-5 pb-2.5 pt-1">
-                  <span className="inline-flex items-center gap-2">
-                    <Badge ok={w.ok} />
-                    <span className={w.ok ? "font-medium" : "text-red-800"}>{weldResultText(w)}</span>
-                  </span>
-                </td>
-              </tr>
-            </Fragment>
-          ))}
+          {welds.map((w, i) => {
+            const included = w.included !== false;
+            return (
+              <Fragment key={w.key ?? i}>
+                {(["a", "b"] as const).map((k) => {
+                  const p = w[k];
+                  const isThin = w.thin === k;
+                  const isThick = w.thin != null && !isThin;
+                  return (
+                    <tr key={k} className={included ? "" : "text-[var(--color-muted)] opacity-50"}>
+                      <td className="px-5 py-1.5">{p.label}</td>
+                      <td className={cell}>{fmt(p.t, 2)} <span className="text-xs text-[var(--color-muted)]">mm</span></td>
+                      <td className={`${cell} ${included ? shade(isThin) : ""}`}>{fmt(p.aMax, 1)}</td>
+                      <td className={`${cell} pr-5 ${included ? shade(isThick) : ""}`}>{fmt(p.aMin, 1)}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-b-2 border-[var(--color-line)]">
+                  <td colSpan={4} className="px-5 pb-2.5 pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      {included ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Badge ok={w.ok} />
+                          <span className={w.ok ? "font-medium" : "text-red-800"}>{weldResultText(w)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-muted)]">No inclosa: no es comprova ni surt a l&apos;informe.</span>
+                      )}
+                      {w.key && (
+                        <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
+                          <input type="checkbox" checked={included} onChange={(e) => toggle(w.key!, e.target.checked)} />
+                          Incloure a l&apos;informe
+                        </label>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
       <p className="px-5 py-3 text-xs text-[var(--color-muted)]">

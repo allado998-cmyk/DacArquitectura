@@ -20,7 +20,9 @@ export interface Check {
 
 export type InputSpec =
   | { type: "num"; key: string; decimals?: number; auto?: number | null; integer?: boolean }
-  | { type: "profile"; key: string; allowPlate?: boolean } // allowPlate: also offer "Xapa" (thickness typed in)
+  // allowPlate: also offer "Xapa" (thickness typed in). byType: pick the type
+  // (IPE, UPN…) first, then the profile, with the ones that pass marked.
+  | { type: "profile"; key: string; allowPlate?: boolean; byType?: boolean }
   | { type: "select"; key: string; options: { value: string; label: string }[] };
 
 export interface Row {
@@ -61,6 +63,8 @@ export interface WeldPart {
   aMin: number | null;
 }
 export interface WeldCombo {
+  key?: string; // which parts meet, e.g. "ala|ànima": stays the same when the profiles change
+  included?: boolean; // false: left out of the checks and the report by the user
   label: string;
   a: WeldPart;
   b: WeldPart;
@@ -114,7 +118,7 @@ export function allChecks(r: CalcResult): { section: string; label: string; ok: 
   for (const s of r.sections) {
     if (!s.enabled) continue;
     for (const b of s.blocks) for (const row of b.rows) if (row.check) out.push({ section: s.title, label: row.label, ok: row.check.ok });
-    for (const w of s.welds ?? []) out.push({ section: s.title, label: w.label, ok: w.ok });
+    for (const w of s.welds ?? []) if (w.included !== false) out.push({ section: s.title, label: w.label, ok: w.ok });
   }
   return out;
 }

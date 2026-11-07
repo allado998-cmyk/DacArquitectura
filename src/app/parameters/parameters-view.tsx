@@ -121,6 +121,9 @@ export function ParametersView({
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} onCount={setShown} />}
       {tab === "ite" && <IteTarifaPanel tarifa={iteTarifa} />}
+      <datalist id={PROFESSIONS_LIST}>
+        {professioOptionsOf(contactes).map(([key, p]) => <option key={key} value={p} />)}
+      </datalist>
     </div>
   );
 }
@@ -353,6 +356,17 @@ function FilterSelect({
 // ============================================================================
 
 const SENSE_CLIENT = 0; // Client filter value for contacts with no client; real ids start at 1
+const SENSE_PROFESSIO = "\u0000sense"; // Professió filter value for contacts with none
+
+// Each profession once, however it was capitalised or accented: [folded, as first written].
+function professioOptionsOf(rows: ClientContacte[]): [string, string][] {
+  const seen = new Map<string, string>();
+  for (const c of rows) {
+    const p = c.professio?.trim();
+    if (p && !seen.has(fold(p))) seen.set(fold(p), p);
+  }
+  return [...seen].sort((a, b) => a[1].localeCompare(b[1], "ca"));
+}
 
 function ContactesPanel({
   rows,
@@ -369,6 +383,7 @@ function ContactesPanel({
   const [fMail, setFMail] = useState("");
   const [fClient, setFClient] = useState<number | null>(null);
   const [fComentari, setFComentari] = useState("");
+  const [fProfessio, setFProfessio] = useState("");
   // Track the OPEN contact by id and re-derive from rows, so it shows fresh
   // server data after saving and closes by itself once deleted.
   const [openId, setOpenId] = useState<number | null>(null);
@@ -377,6 +392,7 @@ function ContactesPanel({
 
   const clientOpts: ComboOption[] = useMemo(() => clients.map((c) => ({ id: c.id, label: c.nom })), [clients]);
   const clientFilterOpts = useMemo(() => [{ id: SENSE_CLIENT, label: "Sense client" }, ...clientOpts], [clientOpts]);
+  const professioOptions = useMemo(() => professioOptionsOf(rows), [rows]);
 
   const q = fold(query.trim());
   // Every filter but the letter; the letter bar greys out the letters with none.
@@ -385,15 +401,17 @@ function ContactesPanel({
     if (!matchesAmbSense(!!c.mail, fMail)) return false;
     if (fClient === SENSE_CLIENT ? c.client_id != null : fClient != null && c.client_id !== fClient) return false;
     if (!matchesAmbSense(!!c.comentari, fComentari)) return false;
-    return !q || fold([c.nom, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
+    if (fProfessio && (fProfessio === SENSE_PROFESSIO ? !!c.professio?.trim() : fold(c.professio).trim() !== fProfessio)) return false;
+    return !q || fold([c.nom, c.professio, c.telefon, ...c.telefons_extra, c.mail, ...c.mails_extra, c.comentari, c.client_nom].join(" ")).includes(q);
   });
   const presents = new Set(base.map((c) => inicial(c.nom)));
   const filtered = (lletra ? base.filter((c) => inicial(c.nom) === lletra) : base).sort(byNom);
   useEffect(() => onCount(filtered.length), [filtered.length, onCount]);
 
-  const hasFilters = fClient != null || !!(lletra || fTelefon || fMail || fComentari);
+  const hasFilters = fClient != null || !!(lletra || fProfessio || fTelefon || fMail || fComentari);
   function clearFilters() {
     setLletra("");
+    setFProfessio("");
     setFTelefon("");
     setFMail("");
     setFClient(null);
@@ -404,6 +422,7 @@ function ContactesPanel({
     const applied = [
       q && `Cerca: "${query.trim()}"`,
       lletra && `Inicial ${lletra}`,
+      fProfessio && (fProfessio === SENSE_PROFESSIO ? "Sense professió" : optionLabel(professioOptions, fProfessio)),
       fTelefon && (fTelefon === "incorrecte" ? "Telèfon incorrecte" : `${optionLabel(AMB_SENSE, fTelefon)} telèfon`),
       fMail && `${optionLabel(AMB_SENSE, fMail)} mail`,
       clientFilterOpts.find((o) => o.id === fClient)?.label,
@@ -412,9 +431,9 @@ function ContactesPanel({
     openListPdf({
       title: "Contactes",
       subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
-      landscape: false,
-      columns: [{ label: "Nom" }, { label: "Telèfon 1" }, { label: "Telèfon 2" }, { label: "Mail" }, { label: "Client" }],
-      rows: filtered.map((c) => [c.nom ?? "—", c.telefon ?? "—", c.telefons_extra[0] ?? "—", c.mail ?? "—", c.client_nom ?? "—"]),
+      landscape: true,
+      columns: [{ label: "Nom" }, { label: "Professió" }, { label: "Telèfon 1" }, { label: "Telèfon 2" }, { label: "Mail" }, { label: "Client" }],
+      rows: filtered.map((c) => [c.nom ?? "—", c.professio ?? "—", c.telefon ?? "—", c.telefons_extra[0] ?? "—", c.mail ?? "—", c.client_nom ?? "—"]),
     });
   }
 
@@ -426,6 +445,7 @@ function ContactesPanel({
           <input className="input" placeholder="Nom, telèfon, mail, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <Abecedari value={lletra} onChange={setLletra} presents={presents} />
+        <FilterSelect label="Professió" allLabel="Totes" value={fProfessio} onChange={setFProfessio} options={[[SENSE_PROFESSIO, "Sense professió"], ...professioOptions]} />
         <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={TELEFON_OPTIONS} />
         <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
         <div className="w-60">
@@ -448,6 +468,7 @@ function ContactesPanel({
             <thead>
               <tr>
                 <th className="th">Nom</th>
+                <th className="th">Professió</th>
                 <th className="th">Telèfon 1</th>
                 <th className="th">Telèfon 2</th>
                 <th className="th">Mail</th>
@@ -458,6 +479,7 @@ function ContactesPanel({
               {filtered.map((c) => (
                 <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setOpenId(c.id)}>
                   <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom ?? "Sense nom"}</button></td>
+                  <td className="td whitespace-nowrap">{c.professio ?? dash}</td>
                   <ContacteCells contacte={c} />
                   <td className="td whitespace-nowrap">{c.client_nom ?? dash}</td>
                 </tr>
@@ -530,6 +552,10 @@ function ContacteDetail({
       <div className="grid gap-4 sm:grid-cols-2">
         <ContacteLinks label="Telèfons" scheme="tel" main={contacte.telefon} extras={contacte.telefons_extra} avis={telefonAvis} />
         <ContacteLinks label="Mails" scheme="mailto" main={contacte.mail} extras={contacte.mails_extra} />
+        <div>
+          <div className="label">Professió</div>
+          <div className="text-sm">{contacte.professio ?? dash}</div>
+        </div>
         <div>
           <div className="label">Client</div>
           <div className="text-sm">{contacte.client_nom ?? dash}</div>
@@ -607,17 +633,18 @@ function ContacteForm({
   const [telefons, setTelefons] = useState([contacte?.telefon ?? "", ...(contacte?.telefons_extra ?? [])]);
   const [mails, setMails] = useState([contacte?.mail ?? "", ...(contacte?.mails_extra ?? [])]);
   const [comentari, setComentari] = useState(contacte?.comentari ?? "");
+  const [professio, setProfessio] = useState(contacte?.professio ?? "");
   const [clientId, setClientId] = useState<number | null>(contacte ? contacte.client_id : presetClientId ?? null);
   const [pending, startTransition] = useTransition();
 
   function save() {
-    if (![nom, comentari, ...telefons, ...mails].some((v) => v.trim())) return;
+    if (![nom, professio, comentari, ...telefons, ...mails].some((v) => v.trim())) return;
     // Only the numbers typed here: a known odd one shouldn't ask on every save.
     const saved = [contacte?.telefon, ...(contacte?.telefons_extra ?? [])];
     if (!confirmaTelefons(telefons.filter((t) => !saved.includes(t.trim())))) return;
     const [telefon, ...telefonsExtra] = telefons;
     const [mail, ...mailsExtra] = mails;
-    const patch = { nom, telefon, mail, telefonsExtra, mailsExtra, comentari };
+    const patch = { nom, professio, telefon, mail, telefonsExtra, mailsExtra, comentari };
     startTransition(async () => {
       if (contacte) {
         await updateClientContacteAction(contacte.id, patch);
@@ -636,9 +663,10 @@ function ContacteForm({
     <div className="space-y-4" onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) e.preventDefault(); }}>
       <div className="grid items-start gap-3 sm:grid-cols-2">
         <Field label="Nom"><input className="input" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom del contacte" /></Field>
-        <Field label="Client"><Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Sense client" overlay /></Field>
+        <Field label="Professió"><ProfessioInput value={professio} onChange={setProfessio} /></Field>
         <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={telefons} onChange={setTelefons} avis={telefonAvis} />
         <MultiValueField label="Mails" addLabel="+ Afegir mail" placeholder="correu@exemple.cat" type="email" values={mails} onChange={setMails} />
+        <Field label="Client"><Combobox options={clientOpts} value={clientId} onChange={setClientId} placeholder="Cerca client…" emptyLabel="Sense client" overlay /></Field>
         <div className="sm:col-span-2">
           <Field label="Comentari (opcional)"><textarea className="input" rows={3} value={comentari} onChange={(e) => setComentari(e.target.value)} placeholder="Notes lliures…" /></Field>
         </div>
@@ -650,6 +678,13 @@ function ContacteForm({
     </div>
   );
 }
+
+// Free text, suggesting the professions already in use (the list is rendered
+// once by ParametersView), so the filter doesn't split "Arquitecte" in two.
+function ProfessioInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return <input className="input" list={PROFESSIONS_LIST} value={value} onChange={(e) => onChange(e.target.value)} placeholder="p. ex. Arquitecte" />;
+}
+const PROFESSIONS_LIST = "contacte-professions";
 
 // A list of phones or mails. The first one is the main one, the one the tables
 // show; the star on any other line moves it to the top.
@@ -1117,7 +1152,7 @@ function ClientForm({
     if (!nom.trim()) return;
     if (!client && !confirmaTelefons(drafts.flatMap((d) => d.telefons))) return;
     const patch: ClientPatch = { nom, nif, carrer, ciutat, codi_postal: codiPostal };
-    const contactes: ContactePatch[] = drafts.map(({ nom, telefons: [telefon = "", ...telefonsExtra], mails: [mail = "", ...mailsExtra] }) => ({ nom, telefon, mail, telefonsExtra, mailsExtra }));
+    const contactes: ContactePatch[] = drafts.map(({ nom, professio, telefons: [telefon = "", ...telefonsExtra], mails: [mail = "", ...mailsExtra] }) => ({ nom, professio, telefon, mail, telefonsExtra, mailsExtra }));
     startTransition(async () => {
       if (client) await updateClientAction(client.id, patch);
       else await createClientFullAction(patch, contactes);
@@ -1183,6 +1218,7 @@ function ClientForm({
 interface ContacteDraft {
   key: number;
   nom: string;
+  professio: string;
   telefons: string[];
   mails: string[];
 }
@@ -1195,7 +1231,7 @@ function NewClientContactes({ drafts, onChange }: { drafts: ContacteDraft[]; onC
     <div className="border-t border-[var(--color-line)] pt-5">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Contactes</h4>
-        <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => onChange([...drafts, { key: ++draftKey, nom: "", telefons: [""], mails: [""] }])}>
+        <button type="button" className="btn-ghost px-2.5 py-1 text-sm" onClick={() => onChange([...drafts, { key: ++draftKey, nom: "", professio: "", telefons: [""], mails: [""] }])}>
           + Afegir contacte
         </button>
       </div>
@@ -1206,7 +1242,10 @@ function NewClientContactes({ drafts, onChange }: { drafts: ContacteDraft[]; onC
           {drafts.map((d) => (
             <div key={d.key} className="rounded-lg border border-[var(--color-line)] p-3">
               <div className="grid items-start gap-3 sm:grid-cols-3">
-                <Field label="Nom"><input className="input" value={d.nom} onChange={(e) => update(d.key, { nom: e.target.value })} placeholder="Nom del contacte" /></Field>
+                <div className="space-y-3">
+                  <Field label="Nom"><input className="input" value={d.nom} onChange={(e) => update(d.key, { nom: e.target.value })} placeholder="Nom del contacte" /></Field>
+                  <Field label="Professió"><ProfessioInput value={d.professio} onChange={(professio) => update(d.key, { professio })} /></Field>
+                </div>
                 <MultiValueField label="Telèfons" addLabel="+ Afegir telèfon" placeholder="Telèfon" values={d.telefons} onChange={(telefons) => update(d.key, { telefons })} avis={telefonAvis} />
                 <MultiValueField label="Mails" addLabel="+ Afegir mail" placeholder="correu@exemple.cat" type="email" values={d.mails} onChange={(mails) => update(d.key, { mails })} />
               </div>
@@ -1285,6 +1324,7 @@ function ClientContactesSection({
               <thead>
                 <tr>
                   <th className="th">Nom</th>
+                  <th className="th">Professió</th>
                   <th className="th">Telèfon 1</th>
                   <th className="th">Telèfon 2</th>
                   <th className="th">Mail</th>
@@ -1295,6 +1335,7 @@ function ClientContactesSection({
                 {list.map((ct, i) => (
                   <tr key={ct.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => onOpen(ct.id)}>
                     <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{ct.nom ?? "Sense nom"}</button></td>
+                    <td className="td whitespace-nowrap">{ct.professio ?? dash}</td>
                     <ContacteCells contacte={ct} />
                     <td className="td whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="btn-ghost px-2 py-1 text-sm disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} title="Pujar" aria-label="Pujar">↑</button>

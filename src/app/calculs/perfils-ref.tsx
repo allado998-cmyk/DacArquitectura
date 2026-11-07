@@ -1,23 +1,29 @@
 "use client";
 
 // "Perfils i soldadures": the catalogue tables David consults while
-// calculating (steel profiles, fillet-weld throats, steel grades and the
-// masonry tables of CTE DB SE-F). Shown as a tab of Càlculs and in a side
-// panel of the calculation editor, where the profiles in use are highlighted.
+// calculating (steel profiles, fillet-weld throats and steel grades). Shown as
+// a tab of Càlculs and in a side panel of the calculation editor, where the
+// profiles in use are highlighted.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FAMILIES, SOLDADURA, soldaduraPer, type PerfilFamily } from "@/lib/calculs/perfils";
-import { ACER_GRADES, ACER_PROPS, FABRICA_FK, FABRICA_GM, FABRICA_K, fmt } from "@/lib/calculs/common";
+import { ACER_GRADES, ACER_PROPS, fmt } from "@/lib/calculs/common";
 import { parseLocaleNumber } from "@/lib/format";
 
 const EXTRA_TABS = [
   { key: "soldadura", title: "Soldadures" },
   { key: "acer", title: "Acer" },
-  { key: "fabrica", title: "Fàbrica (CTE SE-F)" },
 ];
 
 function familyOf(name: string): string | null {
   return FAMILIES.find((f) => f.rows.some((r) => r.name === name))?.key ?? null;
+}
+
+// The search ignores case, spaces and dashes: "ipe200" and "IPE-200" find "IPE 200".
+const squash = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, "");
+function matchRows(f: PerfilFamily, q: string) {
+  const needle = squash(q);
+  return needle ? f.rows.filter((r) => squash(r.name).includes(needle)) : f.rows;
 }
 
 // Numbers as printed in the catalogue: keep the decimals the value has.
@@ -33,6 +39,15 @@ export function PerfilsRef({ highlight = [], initial }: { highlight?: string[]; 
   const [q, setQ] = useState("");
 
   const fam = FAMILIES.find((f) => f.key === tab) ?? null;
+
+  // A profile that isn't in the open table but is in another one (searching
+  // "IPE" with HEB open) switches to the first table that has it.
+  function search(v: string) {
+    setQ(v);
+    if (!v.trim() || (fam && matchRows(fam, v).length)) return;
+    const other = FAMILIES.find((f) => matchRows(f, v).length);
+    if (other) setTab(other.key);
+  }
 
   return (
     <div className="space-y-4">
@@ -50,10 +65,9 @@ export function PerfilsRef({ highlight = [], initial }: { highlight?: string[]; 
         ))}
       </div>
 
-      {fam && <FamilyTable fam={fam} q={q} setQ={setQ} highlight={highlight} />}
+      {fam && <FamilyTable fam={fam} q={q} onSearch={search} onSwitch={setTab} highlight={highlight} />}
       {tab === "soldadura" && <Soldadures />}
       {tab === "acer" && <Acer />}
-      {tab === "fabrica" && <Fabrica />}
     </div>
   );
 }
@@ -73,12 +87,22 @@ function Chip({ active, marked, onClick, children }: { active: boolean; marked?:
   );
 }
 
-function FamilyTable({ fam, q, setQ, highlight }: { fam: PerfilFamily; q: string; setQ: (s: string) => void; highlight: string[] }) {
-  const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase().replace(/\s+/g, " ");
-    if (!needle) return fam.rows;
-    return fam.rows.filter((r) => r.name.toLowerCase().includes(needle));
-  }, [fam, q]);
+function FamilyTable({
+  fam,
+  q,
+  onSearch,
+  onSwitch,
+  highlight,
+}: {
+  fam: PerfilFamily;
+  q: string;
+  onSearch: (s: string) => void;
+  onSwitch: (key: string) => void;
+  highlight: string[];
+}) {
+  const rows = matchRows(fam, q);
+  // Other tables with the same search, e.g. "200" is also an HEB and an HEA.
+  const elsewhere = q.trim() ? FAMILIES.filter((f) => f.key !== fam.key).map((f) => ({ f, n: matchRows(f, q).length })).filter((x) => x.n > 0) : [];
 
   // Header bands: consecutive columns sharing a group.
   const groups: { group: string; span: number }[] = [];
@@ -98,8 +122,18 @@ function FamilyTable({ fam, q, setQ, highlight }: { fam: PerfilFamily; q: string
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <input className="input w-56" placeholder="Cercar perfil… (p. ex. 200)" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input w-64" placeholder="Cercar perfil… (p. ex. IPE 200)" value={q} onChange={(e) => onSearch(e.target.value)} />
         <span className="text-xs text-[var(--color-muted)]">{rows.length} de {fam.rows.length}</span>
+        {elsewhere.length > 0 && (
+          <span className="flex flex-wrap items-center gap-1 text-xs text-[var(--color-muted)]">
+            També a:
+            {elsewhere.map(({ f, n }) => (
+              <button key={f.key} type="button" className="rounded-full border border-[var(--color-line)] bg-white px-2 py-0.5 text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]" onClick={() => onSwitch(f.key)}>
+                {f.title.replace(/^Perfils /, "")} ({n})
+              </button>
+            ))}
+          </span>
+        )}
         {fam.image && (
           <a href={fam.image} target="_blank" rel="noreferrer" className="ml-auto text-sm text-[var(--color-accent)] hover:underline">
             Veure la taula original ↗
@@ -130,26 +164,15 @@ function FamilyTable({ fam, q, setQ, highlight }: { fam: PerfilFamily; q: string
           <tbody>
             {rows.map((r) => {
               const hl = highlight.includes(r.name);
-              const nameNote = fam.errata?.[`${r.name}|name`];
               return (
                 <tr key={r.name} ref={hl ? hlRef : undefined} className={hl ? "bg-amber-100" : "odd:bg-white even:bg-[var(--color-paper)]"}>
                   <td className={`sticky left-0 whitespace-nowrap px-3 py-1 font-semibold ${hl ? "bg-amber-100" : "bg-inherit"}`}>
                     {r.name}
                     {r.extra && <span className="ml-1 text-[var(--color-muted)]" title={fam.note}>*</span>}
-                    {nameNote && <span className="ml-1 cursor-help font-normal text-amber-700" title={nameNote}>⚠</span>}
                   </td>
-                  {r.v.map((v, i) => {
-                    const note = fam.errata?.[`${r.name}|${fam.columns[i]?.key}`];
-                    return (
-                      <td
-                        key={i}
-                        title={note}
-                        className={`whitespace-nowrap px-2 py-1 text-right ${note ? "cursor-help bg-amber-100 text-amber-900 underline decoration-amber-600 decoration-dotted" : ""}`}
-                      >
-                        {cell(v)}
-                      </td>
-                    );
-                  })}
+                  {r.v.map((v, i) => (
+                    <td key={i} className="whitespace-nowrap px-2 py-1 text-right">{cell(v)}</td>
+                  ))}
                   {hasAvail && <td className="px-2 py-1 text-center text-[var(--color-muted)]">{r.avail ?? ""}</td>}
                 </tr>
               );
@@ -157,10 +180,8 @@ function FamilyTable({ fam, q, setQ, highlight }: { fam: PerfilFamily; q: string
           </tbody>
         </table>
       </div>
+      {rows.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap perfil amb «{q.trim()}».</p>}
       {fam.note && <p className="text-xs text-[var(--color-muted)]">* {fam.note}</p>}
-      {fam.errata && Object.keys(fam.errata).length > 0 && (
-        <p className="text-xs text-amber-800">⚠ Les cel·les marcades no quadren amb la resta de la fila (probable errata del catàleg, es mostren tal com estan impreses) o eren dubtoses a la foto. Passa-hi el ratolí per veure el valor coherent.</p>
-      )}
       {fam.legend.length > 0 && (
         <dl className="grid gap-x-6 gap-y-0.5 text-xs text-[var(--color-muted)] sm:grid-cols-2">
           {fam.legend.map((l, i) => (
@@ -277,84 +298,6 @@ function Prop({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-[var(--color-line)] bg-white px-3 py-2">
       <div className="text-xs text-[var(--color-muted)]">{label}</div>
       <div className="font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-export function Fabrica() {
-  return (
-    <div className="space-y-5 text-sm">
-      <div>
-        <p className="mb-1 font-medium">CTE DB SE-F, annex C · Resistència característica a compressió</p>
-        <p className="mb-2 text-[var(--color-muted)]">
-          f<sub>k</sub> = K · f<sub>b</sub><sup>0,65</sup> · f<sub>m</sub><sup>0,25</sup>, amb f<sub>m</sub> no superior a 20 N/mm² ni a 2·f<sub>b</sub>. Resistència de càlcul f<sub>d</sub> = f<sub>k</sub> / γ<sub>M</sub>.
-        </p>
-        <div className="table-wrap inline-block">
-          <table className="table-compact tabular-nums">
-            <thead>
-              <tr>
-                <th className="th">Tipus de fàbrica</th>
-                <th className="th text-right">K</th>
-              </tr>
-            </thead>
-            <tbody>
-              {FABRICA_K.map((k) => (
-                <tr key={k.label}>
-                  <td className="td">{k.label}</td>
-                  <td className="td text-right">{fmt(k.k)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <p className="mb-2 font-medium">CTE DB SE-F, taula 4.4 · Resistència característica a la compressió de fàbriques usuals f<sub>k</sub> (N/mm²)</p>
-        <div className="table-wrap">
-          <table className="table-compact tabular-nums">
-            <thead>
-              <tr>
-                <th className="th">f<sub>b</sub> (N/mm²)</th>
-                {FABRICA_FK.cols.map((c, i) => <th key={i} className="th text-right">{fmt(c.fb, 0)}</th>)}
-              </tr>
-              <tr>
-                <th className="th">f<sub>m</sub> (N/mm²)</th>
-                {FABRICA_FK.cols.map((c, i) => <th key={i} className="th text-right">{fmt(c.fm, c.fm % 1 ? 1 : 0)}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {FABRICA_FK.rows.map((r) => (
-                <tr key={r.label}>
-                  <td className="td">{r.label}</td>
-                  {r.fk.map((v, i) => <td key={i} className="td text-right">{v}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <p className="mb-2 font-medium">CTE DB SE-F, taula 4.8 · Coeficients parcials de seguretat γ<sub>M</sub></p>
-        <div className="table-wrap">
-          <table className="table-compact tabular-nums">
-            <thead>
-              <tr>
-                <th className="th">Situacions persistents i transitòries · categoria de l&apos;execució</th>
-                {FABRICA_GM.head.map((h) => <th key={h} className="th text-right">{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {FABRICA_GM.rows.map((r) => (
-                <tr key={r.label}>
-                  <td className="td">{r.label}</td>
-                  {r.v.map((v, i) => <td key={i} className="td text-right">{v == null ? "" : fmt(v)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">{FABRICA_GM.note}</p>
-      </div>
     </div>
   );
 }

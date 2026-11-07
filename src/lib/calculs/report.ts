@@ -127,8 +127,11 @@ function loadsTable(t: LoadsTable): string {
 // Soldadura: each pair of parts as two rows (thickness, max, min) and the
 // resulting throat. As in David's sheet, the max of the thinner part and the
 // min of the thicker one are shaded.
-function weldsTable(welds: WeldCombo[]): string {
-  const th = (s: string, align = "right") => `<td bgcolor="#f3f3f3" style="border:${BD};padding:3px 6px;font-size:8.5px;font-weight:bold;text-transform:uppercase;text-align:${align};background:#f3f3f3;">${s}</td>`;
+function weldsTable(all: WeldCombo[]): string {
+  // Only the combinations the user kept.
+  const welds = all.filter((w) => w.included !== false);
+  if (!welds.length) return `<p style="font-size:9.5px;color:#555;margin:4px 0 0;">Cap combinació inclosa.</p>`;
+  const th =(s: string, align = "right") => `<td bgcolor="#f3f3f3" style="border:${BD};padding:3px 6px;font-size:8.5px;font-weight:bold;text-transform:uppercase;text-align:${align};background:#f3f3f3;">${s}</td>`;
   const shade = (on: boolean) => (on ? ` bgcolor="#d9d9d9"` : "");
   const val = (v: number | null, on: boolean) =>
     `<td${shade(on)} style="border:${BD};padding:3px 6px;font-size:9.5px;text-align:right;white-space:nowrap;${on ? "background:#d9d9d9;font-weight:bold;" : ""}">${fmt(v, 1)}</td>`;

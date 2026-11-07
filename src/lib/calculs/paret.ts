@@ -28,7 +28,7 @@ import {
   fabricaRows,
   num,
 } from "./common";
-import { perfilProps } from "./perfils";
+import { perfilOptions, perfilProps } from "./perfils";
 
 export interface Sostre {
   nom: string;
@@ -248,7 +248,7 @@ export function computeParet(raw: Partial<ParetDades>): CalcResult {
         title: "Dades del perfil",
         rows: [
           { label: "Nombre de perfils", value: nPerfils, unit: "ut", decimals: 0, input: { type: "num", key: "nPerfils", decimals: 0, integer: true } },
-          { label: "Perfil", value: d.perfil, input: { type: "profile", key: "perfil" } },
+          { label: "Perfil", value: d.perfil, input: { type: "profile", key: "perfil", byType: true } },
         ],
       },
       {
@@ -331,7 +331,6 @@ export function computeParet(raw: Partial<ParetDades>): CalcResult {
     key: "fabrica",
     title: "Paret de càrrega de suport",
     enabled: true,
-    reference: ["fabrica"],
     blocks: [
       {
         rows: [
@@ -526,4 +525,17 @@ export function computeParet(raw: Partial<ParetDades>): CalcResult {
   };
 
   return { sections: [carregues, perfil, comprovacio, fabrica, optA, optB, optC, optE] };
+}
+
+// The beams that pass every check of "Comprovació del perfil d'estintolament"
+// (E.L.S. and E.L.U.) with the current loads, span and number of profiles,
+// each tried in turn with its own catalogue self-weight (unless typed in).
+export function paretPerfilsValids(raw: Partial<ParetDades>): Set<string> {
+  const ok = new Set<string>();
+  for (const g of perfilOptions())
+    for (const name of g.names) {
+      const s = computeParet({ ...raw, perfil: name }).sections.find((x) => x.key === "comprovacio");
+      if (s && s.blocks.every((b) => b.rows.every((r) => !r.check || r.check.ok))) ok.add(name);
+    }
+  return ok;
 }

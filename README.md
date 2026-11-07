@@ -97,6 +97,10 @@ Un contacte pot tenir diversos telèfons i mails. `telefon` i `mail` són sempre
 els **principals** (els que mostren les taules i llegeixen les actes i el
 plugin); la resta van a `telefons_extra` i `mails_extra` (migració 0044).
 
+Cada contacte té també una **professió** (`professio`, migració 0045), text
+lliure amb suggeriments de les que ja hi ha, que surt com a columna i filtre a
+Contactes. El filtre agrupa les que només difereixen en majúscules o accents.
+
 Els telèfons amb un nombre de xifres incorrecte surten amb un avís ⚠
 (`src/lib/telefon.ts`): sense prefix, o amb +34 / 0034, han de tenir 9 xifres; la
 resta de números internacionals (+ o 00), entre 8 i 15. És un avís, no un
@@ -122,20 +126,29 @@ s'exporta com a informe de justificació en **Word** i **PDF**.
 - **Estintolament paret de càrrega**: estat de càrregues ponderat, comprovació
   del perfil (E.L.S. i E.L.U.), recolzament als extrems (A connectors, B daus,
   C brancals) i esnelles. Cada opció es pot treure del càlcul i de l'informe.
+  El perfil es tria per tipus (IPE, UPN…) i després la mida; el selector marca
+  els que passen totes les comprovacions del perfil amb les càrregues i la llum
+  actuals (`paretPerfilsValids`), i en canviar de tipus tria el més lleuger
+  que compleix.
 - **Recolzament biga**: daus de formigó i connectors a partir de l'esforç tallant.
 - **Base pilar estintolament**: tensió sota la base amb repartiment a 60°.
 - **Compatibilitat soldadures**: gola compatible entre ala i ànima de dos perfils
-  (o una xapa) segons la taula de valors límit.
+  (o una xapa) segons la taula de valors límit. Cada combinació es pot treure
+  (no es comprova ni surt a l'informe).
 
 L'encapçalament (referència, projecte, adreça, ciutat i client) s'omple des de
-l'expedient i es pot vincular a un client de la Base de Dades.
+l'expedient. Recolzament biga i Base pilar també es poden vincular a un client
+de la Base de Dades; Paret de càrrega i Soldadures només van per expedient.
+L'annex «Valors de referència» només surt als informes de Recolzament biga i
+Base pilar.
 
 La pestanya **Perfils i soldadures** (i el botó «Taules de perfils» de cada
 càlcul) mostra les taules del catàleg: IPE, IPN, HEB, HEA, HEM, UPN, T, L, LD,
-ZF, tubs, rodons, soldadures, acers i les taules de fàbrica del CTE DB SE-F.
-Estan transcrites a `src/lib/calculs/perfils/*.json` a partir de les fotos del
-catàleg (`public/calculs/perfils/`); les cel·les que no quadren amb la resta de
-la fila hi surten marcades amb una nota (`perfils-data.ts`).
+tubs, rodons, ZF, soldadures i acers. Estan transcrites a
+`src/lib/calculs/perfils/*.json` a partir de les fotos del catàleg
+(`public/calculs/perfils/`, una per taula; les d'HEB, HEA i HEM comparteixen
+full). La cerca troba el perfil a qualsevol taula: si no és a l'oberta, salta a
+la que el té.
 
 Diferències amb els fulls de càlcul, a propòsit (detall a `src/lib/calculs/paret.ts`):
 cada comprovació es fa contra el valor que s'hi mostra (alguns OK!/NO! de l'Excel

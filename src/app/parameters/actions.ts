@@ -43,8 +43,8 @@ export async function createClientFullAction(data: ClientPatch, contactes: Conta
   const values = (Array.isArray(contactes) ? contactes : []).map(contacteValues).filter((v): v is NonNullable<typeof v> => v !== null);
   for (const [i, k] of values.entries()) {
     await sql`
-      insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, ordre)
-      values (${clientId}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari}, ${(i + 1) * 10})
+      insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, professio, ordre)
+      values (${clientId}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari}, ${k.professio}, ${(i + 1) * 10})
     `;
   }
   revalidatePath("/parameters");
@@ -81,6 +81,7 @@ export interface ContactePatch {
   telefonsExtra: string[];
   mailsExtra: string[];
   comentari?: string;
+  professio?: string; // left out = keep what is stored
 }
 
 // Trims, drops blanks and repeats. If the main value is blank, the next one
@@ -96,8 +97,9 @@ function contacteValues(data: ContactePatch) {
   const telefon = mainAndExtras(data.telefon, data.telefonsExtra);
   const mail = mainAndExtras(data.mail, data.mailsExtra);
   const comentari = (data.comentari ?? "").trim();
-  if (!nom && !telefon.main && !mail.main && !comentari) return null;
-  return { nom: nom || null, telefon, mail, comentari: comentari || null };
+  const professio = (data.professio ?? "").trim();
+  if (!nom && !telefon.main && !mail.main && !comentari && !professio) return null;
+  return { nom: nom || null, telefon, mail, comentari: comentari || null, professio: professio || null };
 }
 
 export async function updateClientContacteAction(id: number, data: ContactePatch) {
@@ -111,7 +113,8 @@ export async function updateClientContacteAction(id: number, data: ContactePatch
       mail = ${mail.main},
       telefons_extra = ${telefon.extras}::text[],
       mails_extra = ${mail.extras}::text[],
-      comentari = ${(data.comentari ?? "").trim() || null}
+      comentari = ${(data.comentari ?? "").trim() || null},
+      professio = case when ${data.professio === undefined}::boolean then professio else ${(data.professio ?? "").trim() || null} end
     where id = ${id}
   `;
   revalidatePath("/parameters");
@@ -141,9 +144,9 @@ export async function createContacteAction(data: ContactePatch & { clientId?: nu
   if (!k) return;
   const cid = data.clientId && Number.isFinite(data.clientId) ? data.clientId : null;
   await sql`
-    insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, ordre)
+    insert into public.client_contactes (client_id, nom, telefon, mail, telefons_extra, mails_extra, comentari, professio, ordre)
     values (
-      ${cid}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari},
+      ${cid}, ${k.nom}, ${k.telefon.main}, ${k.mail.main}, ${k.telefon.extras}::text[], ${k.mail.extras}::text[], ${k.comentari}, ${k.professio},
       coalesce((select max(ordre) + 10 from public.client_contactes where client_id = ${cid}), 10)
     )
   `;

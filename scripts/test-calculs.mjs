@@ -228,6 +228,67 @@ test("combinations left out don't count and keep their place when the profiles c
   const other = computeSoldadura({ perfil1: "UPN 200", perfil2: "IPN 200", ocultes: ["ala|ànima"] }).sections.find((s) => s.welds).welds;
   assert.equal(other.find((c) => c.key === "ala|ànima").included, false);
 });
+console.log("Gola soldadura (Gola_IPE270_encastada.xlsx / Gola_IPE270_articulada.xlsx)");
+const gola = (r) => r.sections.find((s) => s.key === "gola");
+const golaVal = (r, label, block) => val({ sections: [gola(r)] }, label, block).value;
+test("encastada, IPE 270 on a UPN 280: every value of the sheet", () => {
+  // Combinations kept as in the sheet: flange–flange and web–web.
+  const r = computeSoldadura({ perfil1: "IPE 270", perfil2: "UPN 280", ocultes: ["ala|ànima", "ànima|ala"], unio: "encastada", factor: 9.81, vz: 6.306, my: 3.606, nx: 0.01 });
+  const g = gola(r);
+  assert.equal(g.title, "Gola de soldadura · Unió encastada");
+  near(val({ sections: [g] }, "Esforç tallant").alt.value, 61.86186, 1e-6, "V");
+  near(val({ sections: [g] }, "Moment flector").alt.value, 35.37486, 1e-6, "M");
+  near(val({ sections: [g] }, "Axial").alt.value, 0.0981, 1e-6, "N");
+  near(golaVal(r, "Resistència de càlcul"), 222.78928034611442, 1e-9, "fvw,d");
+  assert.deepEqual(["Cantell", "Amplada", "Gruix de l'ànima", "Gruix de les ales", "Radi"].map((l) => golaVal(r, l)), [270, 135, 6.6, 10.2, 15]);
+  near(golaVal(r, "Força a l'ala per moment"), 136.16189376443418, 1e-9, "F M");
+  near(golaVal(r, "Força total"), 136.21094376443418, 1e-9, "F");
+  assert.deepEqual([golaVal(r, "Longitud cordó exterior"), golaVal(r, "Longitud eficaç cordó interior"), golaVal(r, "Opció 1 · longitud total")], [135, 43, 221]);
+  near(golaVal(r, "Opció 1 · gola per càlcul"), 2.7664666410284604, 1e-9, "a1");
+  near(golaVal(r, "Opció 2 · gola per càlcul"), 4.5288083530910352, 1e-9, "a2");
+  assert.deepEqual([golaVal(r, "Opció 1 · gola segons"), golaVal(r, "Opció 2 · gola segons")], [3, 5]);
+  assert.equal(golaVal(r, "Longitud eficaç cordó ànima"), 210);
+  near(golaVal(r, "Gola per càlcul", "Ànima (resisteix V)"), 0.66111862576296387, 1e-9, "a web");
+  assert.equal(golaVal(r, "Gola segons càlcul", "Ànima (resisteix V)"), 3);
+  assert.deepEqual(["Ales · gola mínima", "Ales · gola màxima", "Ànima · gola mínima", "Ànima · gola màxima"].map((l) => golaVal(r, l)), [5, 7, 4, 4.5]);
+  const finals = g.blocks.at(-1).rows;
+  assert.deepEqual(finals.map((x) => [x.value, x.check.ok]), [[5, true], [5, true], [4, true]]);
+  assert.ok(g.figure.svg.includes("Unió a UPN 280") && g.figure.svg.includes("135 + 2 × 43 = 221 mm"));
+});
+test("articulada, IPE 270 on a 10 mm plate: M = 0 whatever was typed, and every value of the sheet", () => {
+  const r = computeSoldadura({ perfil1: "IPE 270", perfil2: "Xapa", gruix2: 10, unio: "articulada", vz: 3.916, my: 5, nx: 0 });
+  assert.equal(gola(r).title, "Gola de soldadura · Unió articulada");
+  near(val({ sections: [gola(r)] }, "Esforç tallant").alt.value, 38.41596, 1e-6, "V");
+  assert.equal(golaVal(r, "Moment flector"), 0);
+  assert.equal(golaVal(r, "Força total"), 0);
+  assert.deepEqual([golaVal(r, "Opció 1 · gola segons"), golaVal(r, "Opció 2 · gola segons")], [3, 3]);
+  near(golaVal(r, "Gola per càlcul", "Ànima (resisteix V)"), 0.41055194076875456, 1e-9, "a web");
+  assert.deepEqual(["Ales · gola mínima", "Ales · gola màxima", "Ànima · gola mínima", "Ànima · gola màxima"].map((l) => golaVal(r, l)), [4, 7, 4, 4.5]);
+  assert.deepEqual(gola(r).blocks.at(-1).rows.map((x) => [x.value, x.check.ok]), [[4, true], [4, true], [4, true]]);
+});
+test("the throat to use fails when the calculation passes the maximum compatible", () => {
+  const r = computeSoldadura({ perfil1: "IPE 270", perfil2: "UPN 280", ocultes: ["ala|ànima", "ànima|ala"], unio: "encastada", vz: 6.306, my: 6, nx: 0 });
+  const [o1, o2] = gola(r).blocks.at(-1).rows;
+  assert.ok(o2.value > 7 && o2.check.ok === false, `opció 2 = ${o2.value}`);
+  assert.ok(o1.check.ok, `opció 1 = ${o1.value}`);
+});
+test("gola: IPN root radius is tw; geometry can be overridden; non-I profile 1 explains instead", () => {
+  assert.equal(golaVal(computeSoldadura({ perfil1: "IPN 180", perfil2: "Xapa" }), "Radi"), 6.9);
+  assert.equal(golaVal(computeSoldadura({ perfil1: "IPE 270", gb: 140 }), "Longitud cordó exterior"), 140);
+  const u = gola(computeSoldadura({ perfil1: "UPN 140", perfil2: "IPN 140" }));
+  assert.equal(u.figure, undefined);
+  assert.match(u.blocks[0].rows[1].label, /perfil en I o H/);
+});
+test("the chosen joint type and the drawing are in the report", () => {
+  const r = computeSoldadura({ perfil1: "IPE 270", perfil2: "UPN 280", unio: "articulada", vz: 3.916 });
+  const html = buildCalculHtml({ tipus: "soldadura", num: "CE-26-002", data: "2026-11-07" }, r, { logo: "/logo.jpg" });
+  assert.ok(html.includes("Gola de soldadura · Unió articulada"));
+  assert.ok(html.includes("Justificació gola de soldadura i compatibilitat entre soldadures"));
+  assert.ok(html.includes("<svg ") && html.includes("Opció 2 · només cordó exterior"));
+  const word = buildCalculHtml({ tipus: "soldadura", num: "CE-26-002", data: "2026-11-07" }, r, { logo: "/logo.jpg", figures: { gola: "data:image/png;base64,AAA" } });
+  assert.ok(word.includes('src="data:image/png;base64,AAA"') && !word.includes("<svg "));
+});
+
 test("no annex in any report", () => {
   const calcs = [["paret", computeParet({})], ["biga", computeBiga({})], ["pilar", computePilar({})], ["soldadura", computeSoldadura({})]];
   for (const [tipus, r] of calcs) {

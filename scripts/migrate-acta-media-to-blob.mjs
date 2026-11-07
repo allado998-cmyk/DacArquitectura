@@ -82,8 +82,18 @@ if (dry || !todo.length) process.exit(0);
 if (args.backup) await mkdir(args.backup, { recursive: true });
 let moved = 0, skipped = 0;
 for (const [i, c] of todo.entries()) {
-  const [row] = await sql`select id, updated_at::text as updated_at, fotografies, documents, audios from public.acta where id = ${c.id}`;
-  if (!row) continue;
+  // One item at a time: a whole row can pass Neon's 64 MB response limit.
+  const [head] = await sql`
+    select id, updated_at::text as updated_at,
+           jsonb_array_length(coalesce(fotografies,'[]'::jsonb)) as nf,
+           jsonb_array_length(coalesce(documents,'[]'::jsonb)) as nd,
+           jsonb_array_length(coalesce(audios,'[]'::jsonb)) as na
+    from public.acta where id = ${c.id}`;
+  if (!head) continue;
+  const row = { id: Number(head.id), updated_at: head.updated_at, fotografies: [], documents: [], audios: [] };
+  for (let i = 0; i < head.nf; i++) row.fotografies.push((await sql`select fotografies -> ${i}::int as x from public.acta where id = ${c.id}`)[0].x);
+  for (let i = 0; i < head.nd; i++) row.documents.push((await sql`select documents -> ${i}::int as x from public.acta where id = ${c.id}`)[0].x);
+  for (let i = 0; i < head.na; i++) row.audios.push((await sql`select audios -> ${i}::int as x from public.acta where id = ${c.id}`)[0].x);
   if (args.backup) {
     await writeFile(join(args.backup, `acta-${row.id}.json.gz`), gzipSync(JSON.stringify({ id: row.id, fotografies: row.fotografies, documents: row.documents, audios: row.audios })));
   }

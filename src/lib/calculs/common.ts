@@ -15,7 +15,7 @@ export const NMM2_TO_KGCM2 = 100 / G;
 
 export interface Check {
   ok: boolean;
-  op: "<" | ">";
+  op: "<" | ">" | "≤";
   limit: number | null;
   unit?: string;
   decimals?: number;
@@ -55,10 +55,19 @@ export interface Section {
   blocks: Block[];
   loads?: LoadsTable; // paret: "Estat de càrregues ponderat"
   welds?: WeldCombo[]; // soldadura: one entry per pair of welded parts
+  figure?: Figure; // a drawing under the section (editor and report)
 }
 
 // Soldadura: a part of a piece (ala / ànima of a profile, or a plate) with
 // the throat limits of the fillet-weld table for its thickness.
+// An SVG drawing generated from the results (plain markup, no scripts).
+export interface Figure {
+  svg: string;
+  width: number; // px, at which it is laid out in the report
+  height: number;
+  alt: string;
+}
+
 export interface WeldPart {
   label: string; // "UPN 140 · ala"
   t: number | null; // mm
@@ -166,8 +175,10 @@ export function div(a: number | null, b: number | null): number | null {
   return a / b;
 }
 
-export function check(value: number | null, op: "<" | ">", limit: number | null, unit?: string, decimals?: number): Check {
-  const ok = value != null && limit != null && Number.isFinite(value) && Number.isFinite(limit) && (op === "<" ? value < limit : value > limit);
+export function check(value: number | null, op: "<" | ">" | "≤", limit: number | null, unit?: string, decimals?: number): Check {
+  const ok =
+    value != null && limit != null && Number.isFinite(value) && Number.isFinite(limit) &&
+    (op === "<" ? value < limit : op === "≤" ? value <= limit + 1e-9 : value > limit);
   return { ok, op, limit, unit, decimals };
 }
 

@@ -6,6 +6,19 @@
 
 import type { CalculEstructural } from "@/types/db";
 import { type CalcResult, type LoadsTable, type Row, type Section, type WeldCombo, allChecks, fmt, verdict, verdictText, weldResultText } from "./common";
+
+// Figures print 560 px wide: inline SVG in the PDF window, a PNG in Word (which
+// does not show inline SVG); see downloadCalculWord.
+const FIGURE_W = 560;
+function figureHtml(s: Section, assets: ReportAssets): string {
+  if (!s.figure) return "";
+  const png = assets.figures?.[s.key];
+  const h = Math.round((FIGURE_W * s.figure.height) / s.figure.width);
+  const inner = png
+    ? `<img src="${png}" alt="${esc(s.figure.alt)}" width="${FIGURE_W}" height="${h}" style="width:${FIGURE_W}px;height:auto;" />`
+    : s.figure.svg.replace("<svg ", `<svg style="width:${FIGURE_W}px;height:auto;" `).replace(/ style="width:100%;[^"]*"/, "");
+  return `<div style="text-align:center;margin:8px 0 0;page-break-inside:avoid;">${inner}</div>`;
+}
 import { calcType } from "./index";
 
 const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
@@ -171,6 +184,7 @@ function summary(r: CalcResult): string {
 
 export interface ReportAssets {
   logo: string;
+  figures?: Record<string, string>; // section key → PNG data URI (Word)
 }
 
 export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets: ReportAssets): string {
@@ -201,7 +215,7 @@ export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets
 
   const sections = result.sections
     .filter((s) => s.enabled)
-    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + (s.welds ? weldsTable(s.welds) : ""))
+    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads) : "") + (s.welds ? weldsTable(s.welds) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + figureHtml(s, assets))
     .join("");
 
   return `
@@ -259,15 +273,41 @@ export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName
   setTimeout(() => w.print(), 500);
 }
 
+// SVG → PNG data URI at twice the print size, on white.
+async function svgToPng(svg: string, width: number, height: number): Promise<string | null> {
+  try {
+    const img = new Image();
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadCalculWord(c: CalculEstructural, result: CalcResult, fileName: string) {
   const logo = await toDataUri("/logo.jpg");
+  const figures: Record<string, string> = {};
+  for (const s of result.sections) {
+    if (!s.enabled || !s.figure) continue;
+    const png = await svgToPng(s.figure.svg, FIGURE_W, Math.round((FIGURE_W * s.figure.height) / s.figure.width));
+    if (png) figures[s.key] = png;
+  }
   // Word reads the @page rule for paper size and margins from a named section.
   const head = `<style>
     @page WordSection1 { size: 21cm 29.7cm; margin: 1.5cm 1.5cm 1.5cm 1.5cm; }
     div.WordSection1 { page: WordSection1; }
     body,table,td,th,tr,div,span,p,b{font-family:${DOC_FONT};}
   </style>`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo })}</div></body></html>`;
+  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo, figures })}</div></body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

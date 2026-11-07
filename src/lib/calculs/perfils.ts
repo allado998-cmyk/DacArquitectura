@@ -48,6 +48,7 @@ export interface PerfilProps {
   b: number | null; // mm
   tw: number | null; // web thickness (e), mm
   tf: number | null; // flange thickness (e1), mm
+  r1: number | null; // root radius (IPE, HE…); for IPN and UPN the table gives the toe radius here
   h1: number | null; // straight part of the web, mm
   A: number | null; // cm²
   Ix: number | null; // cm⁴
@@ -74,6 +75,7 @@ for (const f of FAMILIES) {
       b: at(r, "b"),
       tw: at(r, "tw"),
       tf: at(r, "tf"),
+      r1: at(r, "r1"),
       h1: at(r, "h1"),
       A: at(r, "A"),
       Ix: at(r, "Ix"),

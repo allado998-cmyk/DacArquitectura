@@ -162,7 +162,14 @@ s'exporta com a informe de justificació en **Word** i **PDF**.
 - **Base pilar estintolament**: tensió sota la base amb repartiment a 60°, a
   dos costats o a un de sol quan el pilar és a l'extrem de la paret (CTE DB
   SE-F figura 5.7).
-- **Compatibilitat soldadures**: gola compatible entre ala i ànima de dos perfils
+- **Gola soldadura i compatibilitat** (abans «Compatibilitat soldadures»): a sota de
+  la compatibilitat, la gola per càlcul d'una **unió encastada** o **articulada**
+  (articulada: M = 0), dels fulls `Gola_IPE270_encastada/articulada.xlsx`: ales
+  amb cordó perimetral (opció 1) o només exterior (opció 2), ànima amb 2 cordons.
+  La gola a adoptar és la més gran entre el càlcul i la mínima compatible de les
+  combinacions incloses, i no pot passar de la màxima. Inclou un dibuix de les
+  dues opcions amb les xifres reals (SVG; PNG a l'informe Word).
+- **Compatibilitat**: gola compatible entre ala i ànima de dos perfils
   (o una xapa) segons la taula de valors límit. Cada combinació es pot treure
   (no es comprova ni surt a l'informe).
 

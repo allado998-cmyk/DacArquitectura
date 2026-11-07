@@ -223,8 +223,9 @@ function Soldadures() {
         </a>
       </div>
       <p className="text-sm font-medium">Valors límit de la gola d&apos;una soldadura en angle</p>
-      <div className="max-h-[60vh] overflow-auto rounded-lg border border-[var(--color-line)] bg-white">
-        <table className="min-w-full text-sm tabular-nums">
+      {/* As wide as its content, so each thickness sits close to its throats. */}
+      <div className="max-h-[60vh] w-fit max-w-full overflow-auto rounded-lg border border-[var(--color-line)] bg-white">
+        <table className="text-sm tabular-nums">
           <thead className="sticky top-0 bg-[var(--color-accent)] text-white">
             <tr>
               <th className="px-3 py-1.5 text-left font-semibold">Gruix de la peça (mm)</th>

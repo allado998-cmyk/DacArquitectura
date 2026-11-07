@@ -282,24 +282,23 @@ function Abecedari({ value, onChange, presents }: { value: string; onChange: (v:
 }
 
 type Rgb = [number, number, number];
-const VERD: Rgb = [31, 77, 63]; // --color-accent
-const BLAU: Rgb = [3, 105, 161];
+// Each scale runs from a medium shade (a count of 1) to a deep one (the largest):
+// both ends dark enough for white numbers (contrast ≥ 4,5).
+type Scale = { from: Rgb; to: Rgb };
+const VERMELL: Scale = { from: [220, 38, 38], to: [127, 29, 29] }; // red-600 → red-900
+const BLAU: Scale = { from: [3, 105, 161], to: [8, 47, 73] }; // sky-700 → sky-950
 
-const linear = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
-const luminance = ([r, g, b]: number[]) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
-
-// A count as a pill whose colour deepens with the value, relative to the
-// largest in the table, so the busiest rows stand out. 0 stays plain.
-function Heat({ n, max, rgb }: { n: number; max: number; rgb: Rgb }) {
+// A count as a pill, white number, whose colour deepens with the value relative
+// to the largest in the table, so the busiest rows stand out. 0 stays plain.
+function Heat({ n, max, scale }: { n: number; max: number; scale: Scale }) {
   if (!n) return <span className="tabular-nums text-[var(--color-muted)]">0</span>;
   // Square root, so 1 and 3 still look different when the largest is 20.
-  const t = 0.18 + 0.82 * Math.sqrt(n / Math.max(n, max));
-  const bg = rgb.map((c) => Math.round(255 + (c - 255) * t));
+  const t = Math.sqrt(n / Math.max(n, max));
+  const bg = scale.from.map((c, i) => Math.round(c + (scale.to[i] - c) * t));
   return (
     <span
-      className="inline-block min-w-8 rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums"
-      // White text only where it has enough contrast; dark text on the pale ones.
-      style={{ backgroundColor: `rgb(${bg.join(",")})`, color: luminance(bg) < 0.19 ? "#fff" : "#111" }}
+      className="inline-block min-w-8 rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums text-white"
+      style={{ backgroundColor: `rgb(${bg.join(",")})` }}
     >
       {n}
     </span>
@@ -1044,10 +1043,10 @@ function ClientsPanel({
                     <td className="td whitespace-nowrap">{c.ciutat ?? dash}</td>
                     {/* Centred, except while a search lists the matching contacts beside the count. */}
                     <td className={`td whitespace-nowrap ${hits.length ? "" : "text-center"}`}>
-                      <Heat n={contactesByClient.get(c.id)?.length ?? 0} max={maxContactes} rgb={BLAU} />
+                      <Heat n={contactesByClient.get(c.id)?.length ?? 0} max={maxContactes} scale={BLAU} />
                       {hits.length > 0 && <span className="ml-2 text-[var(--color-muted)]">{hits.map((k) => k.nom).join(", ")}</span>}
                     </td>
-                    <td className="td text-center"><Heat n={s?.oberts ?? 0} max={maxOberts} rgb={VERD} /></td>
+                    <td className="td text-center"><Heat n={s?.oberts ?? 0} max={maxOberts} scale={VERMELL} /></td>
                     <td className="td text-center tabular-nums">{s?.n ?? 0}</td>
                   </tr>
                 );

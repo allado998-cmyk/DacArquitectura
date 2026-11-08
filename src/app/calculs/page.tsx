@@ -30,7 +30,7 @@ export default async function CalculsPage({ searchParams }: { searchParams: Prom
       <AppNav current="calculs" />
       <main className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 py-8">
         <h1 className="text-2xl font-semibold tracking-tight mb-1">Càlculs</h1>
-        <p className="text-sm text-[var(--color-muted)] mb-6">Justificacions de càlcul d&apos;estintolaments i taules de perfils.</p>
+        <p className="text-sm text-[var(--color-muted)] mb-6">Justificacions de càlcul (estintolaments, biguetes, inèrcies i soldadures) i taules de perfils.</p>
         <CalculsView calculs={calculs} expedients={expedients} initialTab={tab} />
       </main>
     </>

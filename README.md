@@ -108,6 +108,17 @@ resta de números internacionals (+ o 00), entre 8 i 15. És un avís, no un
 bloqueig: en desar es demana confirmació i el número es pot guardar igualment.
 Per veure'ls tots: pestanya Contactes, filtre Telèfon → Incorrecte.
 
+## Tarifes (Base de Dades)
+
+Després dels catàlegs, quatre pestanyes de tarifes, cadascuna amb el seu
+**Any** (editable, per saber de quin any és la tarifa) i el botó «Desar tarifa»:
+**Tarifa Mínima Benzina** (preu del litre × consum / 100 + desgast per km),
+**Tarifa Mínima Hora** ((sou + lloguer amb IVA) / (dies × hores)), **Tarifes
+CHB, CEE i CCA** (línies individuals i compostes, amb (*) = dificultat afegida
+del 15 al 25 %) i **Tarifa ITE**. Taules `tarifa_minima` i `tarifa_certificat`
+(migració 0048; `ite_tarifa.any_tarifa` també); fórmules a `src/lib/tarifes.ts`,
+que fa servir també l'eina `catalegs` del plugin (només lectura).
+
 ## Fitxers (adjunts d'expedients, fotos, PDF i àudios de les actes)
 
 Tots els fitxers es guarden al magatzem privat de Vercel Blob
@@ -148,8 +159,20 @@ ubicació. Columnes: `adreca`, `maps_url`, `lat`, `lng` (migració 0042).
 ## Càlculs (justificacions de càlcul)
 
 La pàgina **Càlculs** substitueix els fulls de càlcul de l'estudi. Cada càlcul
-es desa (taula `calcul_estructural`, migració 0043), recalcula en viu i
-s'exporta com a informe de justificació en **Word** i **PDF**.
+es desa (taula `calcul_estructural`, migracions 0043 i 0047), recalcula en viu i
+s'exporta com a informe de justificació en **Word** i **PDF**, en **català o
+castellà** («Castellà | Català» al costat dels botons, com a les actes): el
+càlcul i l'editor són sempre en català i l'informe es tradueix sencer
+(`src/lib/calculs/i18n.ts`: frases exactes i patrons per als textos fets de
+peces; un test falla si algun text que pot sortir a l'informe no té versió en
+castellà).
+
+El menú agrupa els tipus a l'esquerra (desplegable al mòbil): **Estintolaments**
+(paret, biga, base pilar), **Biguetes**, **Inèrcies**, **Soldadures** i
+**Referència** (Perfils i soldadures), amb el nombre de càlculs de cada tipus.
+**Tots els càlculs** els llista tots amb el tipus, per cercar sense saber-lo.
+Cada tipus és un `CalcType` amb el seu grup (`src/lib/calculs/index.ts`); les
+famílies noves es registren a `biguetes.ts` i `inercies.ts`.
 
 - **Estintolament paret de càrrega**: estat de càrregues ponderat, comprovació
   del perfil (E.L.S. i E.L.U.), recolzament als extrems (A connectors, B daus,
@@ -172,6 +195,16 @@ s'exporta com a informe de justificació en **Word** i **PDF**.
 - **Compatibilitat**: gola compatible entre ala i ànima de dos perfils
   (o una xapa) segons la taula de valors límit. Cada combinació es pot treure
   (no es comprova ni surt a l'informe).
+- **Biguetes** (`bigueta-acer.ts`, `bigueta-fusta.ts`, estat de càrregues
+  comú a `bigueta-carregues.ts`): **bigueta d'acer estàndard** (perfil per tipus
+  amb els que compleixen marcats), **d'ala estreta** (perfils Torras o IPN, o
+  dades a mà) i **de fusta i resistència al foc** (classes C14–D70 a
+  `biguetes/fusta-classes.json`, fletxes per integritat, confort i aparença, i
+  foc pel mètode de la secció reduïda). Els errors dels fulls originals estan
+  explicats a la capçalera de cada fitxer.
+- **Inèrcies** (`inercies.ts`, dibuix a `inercies-figura.ts`): suma d'inèrcies
+  (Steiner) **entre perfils**, **entre pletines** i **entre perfils i pletina**,
+  comparada amb el perfil necessari.
 
 L'encapçalament (referència, projecte, adreça, ciutat i client) s'omple des de
 l'expedient: els càlculs van per expedient, sense triar client a part. La fitxa
@@ -200,7 +233,7 @@ miraven una altra cel·la), la reacció als extrems és Q·L/2 (l'Excel la rebai
 un ~2 %) i el pes propi del perfil surt del catàleg si no s'escriu.
 
 Tests sense base de dades (comparen amb els valors dels fulls de càlcul):
-`npm run test:calculs`.
+`npm run test:calculs` (els tres fitxers: `test-calculs`, `-biguetes` i `-inercies`).
 
 ## Plugin de ChatGPT i Claude
 

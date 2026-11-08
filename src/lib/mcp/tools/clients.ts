@@ -14,7 +14,8 @@ import { telefonsAmbAvis } from "@/lib/telefon";
 import { id, registerAction, shortText, type Plan } from "../core";
 import { findClient, lastInsertedId, listTasques, resolveClient, searchClients } from "../data";
 import { callAction } from "../shared";
-import type { ClientContacte } from "@/types/db";
+import { TARIFA_MINIMA_DEFAULT, tarifaBenzina, tarifaHora } from "@/lib/tarifes";
+import type { ClientContacte, TarifaMinima } from "@/types/db";
 
 async function getContacte(idv: number): Promise<(ClientContacte & { client_nom: string | null }) | null> {
   const rows = (await sql`
@@ -88,17 +89,32 @@ registerAction({
   kind: "read",
   name: "catalegs",
   domain: "clients",
-  description: "Catàlegs: categories, tipologies, tasques de dedicació, tipus de fita, conceptes d'honoraris i tarifa ITE.",
+  description:
+    "Catàlegs: categories, tipologies, tasques de dedicació, tipus de fita, conceptes d'honoraris i tarifes (ITE, mínima benzina €/km, mínima hora €/hora, certificats CHB / CEE / CCA), cadascuna amb el seu any.",
   schema: z.object({}),
   async run() {
-    const [tipologies, tasques, fitaTipus, directa, altra, ite] = await Promise.all([
+    const [tipologies, tasques, fitaTipus, directa, altra, ite, minima, certificats] = await Promise.all([
       sql`select id, nom from public.tipologies order by ordre, nom`,
       listTasques(),
       sql`select id, nom, forma, color from public.fita_tipus order by nom`,
       sql`select id, nom, preu_hora_default::text as preu_hora, actiu from public.concepte_despesa_directa order by ordre, nom`,
       sql`select id, nom, preu_unitat_default::text as preu_unitat, actiu from public.concepte_altra_despesa order by ordre, nom`,
-      sql`select preu_1::text as preu_1, preu_2::text as preu_2, preu_3::text as preu_3, increment::text as increment from public.ite_tarifa where id = 1`,
+      sql`select any_tarifa as "any", preu_1::text as preu_1, preu_2::text as preu_2, preu_3::text as preu_3, increment::text as increment from public.ite_tarifa where id = 1`,
+      sql`
+        select benzina_any, preu_litre::text as preu_litre, consum_100km::text as consum_100km, desgast_km::text as desgast_km,
+               hora_any, sou::text as sou, lloguer::text as lloguer, lloguer_iva::text as lloguer_iva, dies_mes::text as dies_mes, hores_dia::text as hores_dia,
+               certificats_any, dificultat_min::text as dificultat_min, dificultat_max::text as dificultat_max
+        from public.tarifa_minima where id = 1`,
+      sql`select grup, concepte, preu::text as preu, dificultat from public.tarifa_certificat order by ordre, id`,
     ]);
+    const t = (minima as TarifaMinima[])[0] ?? TARIFA_MINIMA_DEFAULT;
+    const n = (s: string) => Number(s);
+    const round = (v: number | null, d: number) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 10 ** d) / 10 ** d);
+    const benzina = tarifaBenzina({ preu_litre: n(t.preu_litre), consum_100km: n(t.consum_100km), desgast_km: n(t.desgast_km) });
+    const hora = tarifaHora({ sou: n(t.sou), lloguer: n(t.lloguer), lloguer_iva: n(t.lloguer_iva), dies_mes: n(t.dies_mes), hores_dia: n(t.hores_dia) });
+    const linies = certificats as { grup: string; concepte: string; preu: string; dificultat: boolean }[];
+    const certificat = (grup: string) =>
+      linies.filter((l) => l.grup === grup).map((l) => ({ concepte: l.concepte, preu_mes_iva: l.preu, dificultat_afegida: l.dificultat }));
     return {
       categories: CATEGORIES.map((c) => ({ code: c.code, label: c.label })),
       tipus_expedient: ["privat", "public"],
@@ -109,6 +125,30 @@ registerAction({
       conceptes_despesa_directa: directa,
       conceptes_altra_despesa: altra,
       ite_tarifa: (ite as unknown[])[0] ?? null,
+      tarifa_minima_benzina: {
+        any: t.benzina_any,
+        preu_litre: t.preu_litre,
+        consum_100km_litres: t.consum_100km,
+        cost_benzina_km: round(benzina.benzinaKm, 3),
+        cost_desgast_manteniment_km: t.desgast_km,
+        total_km: round(benzina.totalKm, 3),
+      },
+      tarifa_minima_hora: {
+        any: t.hora_any,
+        sou_mes: t.sou,
+        lloguer_mes_sense_iva: t.lloguer,
+        iva_lloguer_pct: t.lloguer_iva,
+        lloguer_mes_amb_iva: round(hora.lloguerAmbIva, 2),
+        total_mes: round(hora.total, 2),
+        hores_minimes_mes: round(hora.hores, 2),
+        cost_hora: round(hora.costHora, 2),
+      },
+      tarifes_certificats: {
+        any: t.certificats_any,
+        nota: `Imports mínims + IVA. (*) dificultat afegida: incrementar del ${n(t.dificultat_min)} al ${n(t.dificultat_max)} %.`,
+        individuals: certificat("individual"),
+        compostes: certificat("composta"),
+      },
     };
   },
 });

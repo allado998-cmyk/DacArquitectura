@@ -1,0 +1,11 @@
+{
+ "title": "Bigues laminades d'ala estreta · Torras Herrería y Construcciones, S. A.",
+ "note": "Transcrit de la imatge del catàleg Torras que David posa al full Comprovació Bigueta d'Acer Ala Estreta.xls. h, b, d (gruix de l'ànima), t (gruix de l'ala), h1, c (gramil), d1 (Ø màx. del forat): mm; p: kg/m; A: cm²; Ix, Iy: cm⁴; Wx, Wy: cm³; ix, iy: cm.",
+ "rows": [
+  { "name": "Torras 130", "h": 130, "b": 50, "d": 6.2, "t": 9.5, "h1": 100, "p": 12.6, "c": 28, "d1": 9.5, "A": 16.38, "Ix": 442, "Wx": 68, "ix": 5.19, "Iy": 18, "Wy": 7, "iy": 1.05 },
+  { "name": "Torras 160", "h": 160, "b": 50, "d": 6.5, "t": 10, "h1": 120, "p": 16, "c": 28, "d1": 9.5, "A": 20.4, "Ix": 768, "Wx": 96, "ix": 6.13, "Iy": 20, "Wy": 8, "iy": 0.99 },
+  { "name": "Torras 180", "h": 180, "b": 55, "d": 6.8, "t": 11, "h1": 140, "p": 18, "c": 30, "d1": 11, "A": 22.84, "Ix": 1089, "Wx": 121, "ix": 6.9, "Iy": 30, "Wy": 11, "iy": 1.15 },
+  { "name": "Torras 200", "h": 200, "b": 62, "d": 6.8, "t": 11, "h1": 160, "p": 20, "c": 33, "d1": 11, "A": 25.74, "Ix": 1590, "Wx": 159, "ix": 7.85, "Iy": 39, "Wy": 13, "iy": 1.23 },
+  { "name": "Torras 220", "h": 220, "b": 70, "d": 8, "t": 12.8, "h1": 170, "p": 26, "c": 36, "d1": 14, "A": 33.4, "Ix": 2321, "Wx": 211, "ix": 8.34, "Iy": 63, "Wy": 18, "iy": 1.37 }
+ ]
+}

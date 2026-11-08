@@ -592,7 +592,9 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
                       <NumInput value={s[ln.qKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.qKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" decimals={2} />
                     ) : ln.qKey ? (
                       <NumInput value={dades[ln.qKey]} onChange={(n) => setDada(ln.qKey!, n)} auto={ln.qAuto} className="input-sm" decimals={2} />
-                    ) : null;
+                    ) : (
+                      <span className="flex-1 text-right tabular-nums">{fmt(ln.q)}</span>
+                    );
                   const gammaInput =
                     ln.gammaKey && s && si != null ? (
                       <NumInput value={s[ln.gammaKey as keyof Sostre]} onChange={(n) => setSostre(si, { [ln.gammaKey!]: n ?? 0 } as Partial<Sostre>)} className="input-sm" decimals={2} />
@@ -622,6 +624,11 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
                           <div className="flex items-center gap-1">
                             <NumInput value={s.amplada} onChange={(n) => setSostre(si, { amplada: n ?? 0 })} className="input-sm" />
                             <span className="text-xs text-[var(--color-muted)]">m</span>
+                          </div>
+                        ) : ln.widthKey ? (
+                          <div className="flex items-center gap-1">
+                            <NumInput value={dades[ln.widthKey]} onChange={(n) => setDada(ln.widthKey!, n ?? 0)} className="input-sm" />
+                            <span className="text-xs text-[var(--color-muted)]">{ln.widthUnit ?? "m"}</span>
                           </div>
                         ) : ln.width != null ? (
                           <span className="text-[var(--color-muted)]">{fmt(ln.width)} {ln.widthUnit}</span>
@@ -657,9 +664,14 @@ function LoadsEditor({ loads, dades, setDada }: { loads: LoadsTable; dades: Dade
         </tbody>
       </table>
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-        <button type="button" className="btn-ghost" onClick={() => setDada("sostres", [...sostres, newSostre(sostres.length + 1)])}>
-          + Afegir sostre
-        </button>
+        {/* Only the calculations that keep a list of floors (paret) can add one. */}
+        {Array.isArray(dades.sostres) ? (
+          <button type="button" className="btn-ghost" onClick={() => setDada("sostres", [...sostres, newSostre(sostres.length + 1)])}>
+            + Afegir sostre
+          </button>
+        ) : (
+          <span />
+        )}
         <span className="text-xs text-[var(--color-muted)]">Q ELS = sense majorar · Q ELU = majorada</span>
       </div>
     </div>

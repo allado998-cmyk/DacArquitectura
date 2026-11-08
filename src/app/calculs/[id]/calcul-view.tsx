@@ -9,6 +9,7 @@ import { PLATE, perfilOptions, perfilProps } from "@/lib/calculs/perfils";
 import { newSostre, type Sostre } from "@/lib/calculs/paret";
 import { AJUDA, type AuxImage } from "@/lib/calculs/ajuda";
 import { downloadCalculWord, openCalculPdf } from "@/lib/calculs/report";
+import { type CalcLang, tr } from "@/lib/calculs/i18n";
 import { calculFileName } from "@/lib/file-names";
 import { parseLocaleNumber } from "@/lib/format";
 import { Combobox } from "@/components/combobox";
@@ -109,7 +110,8 @@ export function CalculView({ calcul, expedients }: { calcul: CalculEstructural; 
 
   const [generating, setGenerating] = useState(false);
   const live = (): CalculEstructural => ({ ...calcul, ...doc });
-  const fileName = () => calculFileName({ fileTitle: t.fileTitle, referencia: doc.referencia, versio: doc.versio, data: doc.data });
+  const [docLang, setDocLang] = useState<CalcLang>("ca");
+  const fileName = () => calculFileName({ fileTitle: tr(t.fileTitle, docLang), referencia: doc.referencia, versio: doc.versio, data: doc.data });
 
   const expedientOpts = expedients.map((e) => ({ id: e.id, label: e.num_expedient, sub: e.projecte ?? undefined }));
 
@@ -124,6 +126,18 @@ export function CalculView({ calcul, expedients }: { calcul: CalculEstructural; 
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-xs ${saveError ? "text-red-700" : "text-[var(--color-muted)]"}`}>{saveError ? "No s'ha pogut desar" : unsaved ? "Desant…" : "Desat"}</span>
           <button type="button" className="btn-ghost" onClick={() => setRefOpen(profilesInUse)}>Taules de perfils</button>
+          <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-line)] text-sm" title="Idioma de l'informe generat">
+            {(["es", "ca"] as const).map((lng) => (
+              <button
+                key={lng}
+                type="button"
+                onClick={() => setDocLang(lng)}
+                className={`px-3 py-1.5 ${docLang === lng ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}
+              >
+                {lng === "es" ? "Castellà" : "Català"}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             className="btn-ghost"
@@ -131,7 +145,7 @@ export function CalculView({ calcul, expedients }: { calcul: CalculEstructural; 
             onClick={async () => {
               setGenerating(true);
               try {
-                await downloadCalculWord(live(), result, fileName());
+                await downloadCalculWord(live(), result, fileName(), docLang);
               } finally {
                 setGenerating(false);
               }
@@ -139,7 +153,7 @@ export function CalculView({ calcul, expedients }: { calcul: CalculEstructural; 
           >
             Word
           </button>
-          <button type="button" className="btn-primary" onClick={() => openCalculPdf(live(), result, fileName())}>PDF / Imprimir</button>
+          <button type="button" className="btn-primary" onClick={() => openCalculPdf(live(), result, fileName(), docLang)}>PDF / Imprimir</button>
         </div>
       </div>
 

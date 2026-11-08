@@ -20,6 +20,7 @@ function figureHtml(s: Section, assets: ReportAssets): string {
   return `<div style="text-align:center;margin:8px 0 0;page-break-inside:avoid;">${inner}</div>`;
 }
 import { calcType } from "./index";
+import { type CalcLang, tr, translateResult } from "./i18n";
 
 const DOC_FONT = "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic', 'Avant Garde', 'Trebuchet MS', sans-serif";
 const BD = "1px solid #c9c9c9";
@@ -85,13 +86,14 @@ function rowsTable(blocks: Section["blocks"]): string {
   </table>`;
 }
 
-function loadsTable(t: LoadsTable): string {
+function loadsTable(t: LoadsTable, lang: CalcLang): string {
+  const L = (s: string) => tr(s, lang);
   const th = (s: string, align = "right") => `<td bgcolor="#f3f3f3" style="border:${BD};padding:3px 6px;font-size:8.5px;font-weight:bold;text-transform:uppercase;text-align:${align};background:#f3f3f3;">${s}</td>`;
   const td = (inner: string, opts: { input?: boolean; bold?: boolean; align?: string } = {}) =>
     `<td${opts.input ? ` bgcolor="${INPUT_BG}"` : ""} style="border:${BD};padding:3px 6px;font-size:9.5px;text-align:${opts.align ?? "right"};white-space:nowrap;${opts.input ? `background:${INPUT_BG};color:#9a1b1b;` : ""}${opts.bold ? "font-weight:bold;" : ""}">${inner}</td>`;
-  let rows = `<tr>${th("Concepte", "left")}${th("Càrrega")}${th("Amplària")}${th("Càrrega s/majorar")}${th("Coef.")}${th("Càrrega majorada")}${th("Conversió")}</tr>`;
+  let rows = `<tr>${th(L("Concepte"), "left")}${th(L("Càrrega"))}${th(L("Amplària"))}${th(L("Càrrega s/majorar"))}${th(L("Coef."))}${th(L("Càrrega majorada"))}${th(L("Conversió"))}</tr>`;
   for (const g of t.groups) {
-    rows += `<tr><td colspan="7" bgcolor="#eef2f7" style="border:${BD};padding:3px 7px;font-size:9px;font-weight:bold;color:#2f5d8f;text-transform:uppercase;background:#eef2f7;">${esc(g.title)}${g.count != null ? ` <span style="color:#444;">· nombre ${fmt(g.count, Number.isInteger(g.count) ? 0 : 2)} ut</span>` : ""}</td></tr>`;
+    rows += `<tr><td colspan="7" bgcolor="#eef2f7" style="border:${BD};padding:3px 7px;font-size:9px;font-weight:bold;color:#2f5d8f;text-transform:uppercase;background:#eef2f7;">${esc(g.title)}${g.count != null ? ` <span style="color:#444;">· ${L("nombre")} ${fmt(g.count, Number.isInteger(g.count) ? 0 : 2)} ${L("ut")}</span>` : ""}</td></tr>`;
     for (const l of g.lines) {
       if (l.heading) {
         rows += `<tr><td colspan="7" style="border:${BD};padding:2px 7px;font-size:8.5px;font-style:italic;color:#555;">${esc(l.heading)}</td></tr>`;
@@ -125,7 +127,7 @@ function loadsTable(t: LoadsTable): string {
     }
   }
   rows += `<tr>
-    <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;background:#d9d9d9;">TOTAL ESTAT DE CÀRREGUES SOBRE EL PERFIL</td>
+    <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;background:#d9d9d9;">${L("TOTAL ESTAT DE CÀRREGUES SOBRE EL PERFIL")}</td>
     <td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td><td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td>
     <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;text-align:right;white-space:nowrap;background:#d9d9d9;">${fmt(t.totalUnf)} kN/ml</td>
     <td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td>
@@ -133,21 +135,22 @@ function loadsTable(t: LoadsTable): string {
     <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;text-align:right;white-space:nowrap;color:${ALT};background:#d9d9d9;">${fmt((t.totalFac * 1000) / 9.81)} kg/ml</td>
   </tr>`;
   return `<table style="width:100%;border-collapse:collapse;">${rows}</table>
-    <p style="font-size:8.5px;color:#555;margin:3px 0 0;">Q ELS = ${fmt(t.totalUnf)} kN/ml (càrregues sense majorar) · Q ELU = ${fmt(t.totalFac)} kN/ml (càrregues majorades).</p>`;
+    <p style="font-size:8.5px;color:#555;margin:3px 0 0;">Q ELS = ${fmt(t.totalUnf)} kN/ml (${L("càrregues sense majorar")}) · Q ELU = ${fmt(t.totalFac)} kN/ml (${L("càrregues majorades")}).</p>`;
 }
 
 // Soldadura: each pair of parts as two rows (thickness, max, min) and the
 // resulting throat. As in David's sheet, the max of the thinner part and the
 // min of the thicker one are shaded.
-function weldsTable(all: WeldCombo[]): string {
+function weldsTable(all: WeldCombo[], lang: CalcLang): string {
+  const L = (s: string) => tr(s, lang);
   // Only the combinations the user kept.
   const welds = all.filter((w) => w.included !== false);
-  if (!welds.length) return `<p style="font-size:9.5px;color:#555;margin:4px 0 0;">Cap combinació inclosa.</p>`;
+  if (!welds.length) return `<p style="font-size:9.5px;color:#555;margin:4px 0 0;">${L("Cap combinació inclosa.")}</p>`;
   const th =(s: string, align = "right") => `<td bgcolor="#f3f3f3" style="border:${BD};padding:3px 6px;font-size:8.5px;font-weight:bold;text-transform:uppercase;text-align:${align};background:#f3f3f3;">${s}</td>`;
   const shade = (on: boolean) => (on ? ` bgcolor="#d9d9d9"` : "");
   const val = (v: number | null, on: boolean) =>
     `<td${shade(on)} style="border:${BD};padding:3px 6px;font-size:9.5px;text-align:right;white-space:nowrap;${on ? "background:#d9d9d9;font-weight:bold;" : ""}">${fmt(v, 1)}</td>`;
-  let rows = `<tr>${th("Peça", "left")}${th("Gruix")}${th("Gola màxima")}${th("Gola mínima")}</tr>`;
+  let rows = `<tr>${th(L("Peça"), "left")}${th(L("Gruix"))}${th(L("Gola màxima"))}${th(L("Gola mínima"))}</tr>`;
   for (const w of welds) {
     for (const key of ["a", "b"] as const) {
       const p = w[key];
@@ -160,13 +163,13 @@ function weldsTable(all: WeldCombo[]): string {
         ${val(p.aMin, isThick)}
       </tr>`;
     }
-    rows += `<tr><td colspan="4" style="border:${BD};border-bottom:2px solid #999;padding:3px 6px;font-size:9.5px;">${badge(w.ok)} <b>${esc(weldResultText(w))}</b></td></tr>`;
+    rows += `<tr><td colspan="4" style="border:${BD};border-bottom:2px solid #999;padding:3px 6px;font-size:9.5px;">${badge(w.ok)} <b>${esc(L(weldResultText(w)))}</b></td></tr>`;
   }
   return `<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><colgroup><col style="width:46%"><col style="width:18%"><col style="width:18%"><col style="width:18%"></colgroup>${rows}</table>
-    <p style="font-size:8.5px;color:#555;margin:3px 0 0;">La gola màxima de la peça més prima ha d'estar dins del marge de la més gruixuda, i la gola mínima de la més gruixuda dins del marge de la més prima.</p>`;
+    <p style="font-size:8.5px;color:#555;margin:3px 0 0;">${esc(L("La gola màxima de la peça més prima ha d'estar dins del marge de la més gruixuda, i la gola mínima de la més gruixuda dins del marge de la més prima."))}</p>`;
 }
 
-function summary(r: CalcResult): string {
+function summary(r: CalcResult, lang: CalcLang): string {
   const checks = allChecks(r);
   const v = verdict(r);
   const rows = checks
@@ -178,7 +181,7 @@ function summary(r: CalcResult): string {
       </tr>`,
     )
     .join("");
-  const head = `<p style="font-size:11px;font-weight:bold;margin:6px 0;color:${v.ok ? OK_BG : v.total ? NO_BG : "#555"};">${esc(verdictText(v))}</p>`;
+  const head = `<p style="font-size:11px;font-weight:bold;margin:6px 0;color:${v.ok ? OK_BG : v.total ? NO_BG : "#555"};">${esc(tr(verdictText(v), lang))}</p>`;
   return head + `<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><colgroup><col style="width:38%"><col style="width:50%"><col style="width:12%"></colgroup>${rows}</table>`;
 }
 
@@ -187,19 +190,22 @@ export interface ReportAssets {
   figures?: Record<string, string>; // section key → PNG data URI (Word)
 }
 
-export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets: ReportAssets): string {
+// lang: "es" prints the report in Spanish (see i18n.ts); the calculation itself is the same.
+export function buildCalculHtml(c: CalculEstructural, raw: CalcResult, assets: ReportAssets, lang: CalcLang = "ca"): string {
   const t = calcType(c.tipus);
+  const L = (s: string) => tr(s, lang);
+  const result = translateResult(raw, lang);
   const general = [
-    ["Referència DAC", c.referencia, true],
-    ["Projecte", c.projecte, false],
-    ["Adreça", c.adreca, false],
-    ["Ciutat", c.ciutat, false],
-    ["Client", c.client, true],
-    ["Arquitecte", c.arquitecte, false],
-    [t.situacioLabel, c.situacio, true],
-    ["Referència element", c.element, false],
-    ["Data", shortDate(c.data), false],
-    ["Versió càlcul", c.versio, true],
+    [L("Referència DAC"), c.referencia, true],
+    [L("Projecte"), c.projecte, false],
+    [L("Adreça"), c.adreca, false],
+    [L("Ciutat"), c.ciutat, false],
+    [L("Client"), c.client, true],
+    [L("Arquitecte"), c.arquitecte, false],
+    [L(t.situacioLabel), c.situacio, true],
+    [L("Referència element"), c.element, false],
+    [L("Data"), shortDate(c.data), false],
+    [L("Versió càlcul"), c.versio, true],
   ] as const;
   const dades = `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
     <colgroup><col style="width:28%"><col style="width:72%"></colgroup>
@@ -215,7 +221,7 @@ export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets
 
   const sections = result.sections
     .filter((s) => s.enabled)
-    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads) : "") + (s.welds ? weldsTable(s.welds) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + figureHtml(s, assets))
+    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads, lang) : "") + (s.welds ? weldsTable(s.welds, lang) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + figureHtml(s, assets))
     .join("");
 
   return `
@@ -225,13 +231,13 @@ export function buildCalculHtml(c: CalculEstructural, result: CalcResult, assets
       <td style="text-align:right;"><img src="${assets.logo}" alt="DAC arquitectura" width="150" height="59" style="width:150px;height:auto;display:inline-block;" /></td>
     </tr></table>
     <table style="width:100%;border-collapse:collapse;margin-top:6px;"><tr>
-      <td bgcolor="#bfbfbf" style="padding:6px 8px;font-size:12px;font-weight:bold;text-transform:uppercase;background:#bfbfbf;">${esc(t.reportTitle)}</td>
+      <td bgcolor="#bfbfbf" style="padding:6px 8px;font-size:12px;font-weight:bold;text-transform:uppercase;background:#bfbfbf;">${esc(L(t.reportTitle))}</td>
     </tr></table>
-    ${bar("Dades generals")}
+    ${bar(L("Dades generals"))}
     ${dades}
     ${sections}
-    ${bar("Resum de les comprovacions")}
-    ${summary(result)}
+    ${bar(L("Resum de les comprovacions"))}
+    ${summary(result, lang)}
   </div>`;
 }
 
@@ -252,12 +258,12 @@ async function toDataUri(path: string): Promise<string> {
   }
 }
 
-export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName: string) {
+export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName: string, lang: CalcLang = "ca") {
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
   const origin = window.location.origin;
-  const footer = `${calcType(c.tipus).reportTitle} · ${c.num ?? ""}`.replace(/"/g, "'");
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>
+  const footer = `${tr(calcType(c.tipus).reportTitle, lang)} · ${c.num ?? ""}`.replace(/"/g, "'");
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName)}</title>
     <style>
       @page { size: A4 portrait; margin: 1.2cm 1.2cm 1.5cm;
         @bottom-left { content: "${esc(footer)}"; font-size: 7pt; color: #777; font-family: Arial, sans-serif; }
@@ -265,7 +271,7 @@ export function openCalculPdf(c: CalculEstructural, result: CalcResult, fileName
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { margin: 0; }
       tr { page-break-inside: avoid; }
-    </style></head><body>${buildCalculHtml(c, result, { logo: `${origin}/logo.jpg` })}</body></html>`;
+    </style></head><body>${buildCalculHtml(c, result, { logo: `${origin}/logo.jpg` }, lang)}</body></html>`;
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -293,10 +299,10 @@ async function svgToPng(svg: string, width: number, height: number): Promise<str
   }
 }
 
-export async function downloadCalculWord(c: CalculEstructural, result: CalcResult, fileName: string) {
+export async function downloadCalculWord(c: CalculEstructural, result: CalcResult, fileName: string, lang: CalcLang = "ca") {
   const logo = await toDataUri("/logo.jpg");
   const figures: Record<string, string> = {};
-  for (const s of result.sections) {
+  for (const s of translateResult(result, lang).sections) {
     if (!s.enabled || !s.figure) continue;
     const png = await svgToPng(s.figure.svg, FIGURE_W, Math.round((FIGURE_W * s.figure.height) / s.figure.width));
     if (png) figures[s.key] = png;
@@ -307,7 +313,7 @@ export async function downloadCalculWord(c: CalculEstructural, result: CalcResul
     div.WordSection1 { page: WordSection1; }
     body,table,td,th,tr,div,span,p,b{font-family:${DOC_FONT};}
   </style>`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo, figures })}</div></body></html>`;
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(fileName)}</title>${head}</head><body><div class="WordSection1">${buildCalculHtml(c, result, { logo, figures }, lang)}</div></body></html>`;
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

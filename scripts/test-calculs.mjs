@@ -289,6 +289,65 @@ test("the chosen joint type and the drawing are in the report", () => {
   assert.ok(word.includes('src="data:image/png;base64,AAA"') && !word.includes("<svg "));
 });
 
+console.log("Informe en castellà");
+const { esKnown } = await import("../src/lib/calculs/i18n.ts");
+const { CALC_TYPES } = await import("../src/lib/calculs/index.ts");
+// Every text a calculation can print, across its options (each select option,
+// each section toggle on and off, plates where a profile input allows them).
+function reportTexts(t) {
+  const texts = new Set();
+  const add = (v) => { if (typeof v === "string" && v.trim()) texts.add(v.trim()); };
+  const collect = (r) => {
+    for (const s of r.sections) {
+      add(s.title);
+      for (const b of s.blocks) {
+        add(b.title);
+        for (const row of b.rows) {
+          add(row.label); add(row.formula); add(row.unit); add(row.check?.unit); add(row.alt?.unit);
+          if (typeof row.value === "string" && row.input?.type !== "profile") add(row.value);
+          if (row.input?.type === "select") for (const o of row.input.options) add(o.label);
+        }
+      }
+      for (const w of s.welds ?? []) { add(w.label); add(w.note); }
+      for (const g of s.loads?.groups ?? []) {
+        add(g.title); add(g.total?.label);
+        for (const l of g.lines) { add(l.heading); add(l.line?.label); add(l.line?.qUnit); add(l.line?.widthUnit); add(l.param?.label); add(l.param?.unit); }
+      }
+      if (s.figure) { add(s.figure.alt); for (const m of s.figure.svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)) add(m[1].replace(/&amp;/g, "&")); }
+    }
+  };
+  const base = t.defaults();
+  const r0 = t.compute(base);
+  const toggles = r0.sections.map((x) => x.toggle).filter(Boolean);
+  const allOn = { ...base, ...Object.fromEntries(toggles.map((k) => [k, true])) };
+  const variants = [base, allOn, ...toggles.map((k) => ({ ...allOn, [k]: false }))];
+  for (const x of t.compute(allOn).sections) for (const b of x.blocks) for (const row of b.rows) {
+    if (row.input?.type === "select") for (const o of row.input.options) variants.push({ ...allOn, [row.input.key]: o.value });
+    if (row.input?.type === "profile" && row.input.allowPlate) variants.push({ ...allOn, [row.input.key]: "Xapa" });
+  }
+  for (const v of variants) collect(t.compute(v));
+  for (const k of ["tab", "reportTitle", "fileTitle", "situacioLabel"]) add(t[k]);
+  return texts;
+}
+test("every text a calculation can print has a Spanish version", () => {
+  const missing = [];
+  for (const t of CALC_TYPES) for (const x of reportTexts(t)) if (esKnown(x) == null) missing.push(`${t.tipus}: ${x}`);
+  assert.deepEqual(missing, []);
+});
+test("the Spanish report: titles, rows, weld pairs, drawing and chrome", () => {
+  const r = computeSoldadura({ perfil1: "IPE 270", perfil2: "UPN 280", unio: "articulada", vz: 3.916 });
+  const html = buildCalculHtml({ tipus: "soldadura", num: "CE-26-002", data: "2026-11-07" }, r, { logo: "/logo.jpg" }, "es");
+  for (const es of ["Justificación garganta de soldadura y compatibilidad entre soldaduras", "Datos generales", "Garganta de soldadura · Unión articulada",
+    "IPE 270 · ala con UPN 280 · ala", "Unión a UPN 280", "Opción 1 · cordón perimetral", "Cara exterior del ala", "Resumen de las comprobaciones", "comprobaciones."])
+    assert.ok(html.includes(es), es);
+  for (const ca of ["Dades generals", "Resum de les comprovacions", "Gola de soldadura", " amb UPN", "Unió a "]) assert.ok(!html.includes(ca), ca);
+  const paret = buildCalculHtml({ tipus: "paret", num: "CE-26-001", data: "2026-11-07" }, computeParet(paretInputs), { logo: "/logo.jpg" }, "es");
+  for (const es of ["Justificación de cálculo de viga de apeo de muro de carga", "Estado de cargas ponderado", "TOTAL ESTADO DE CARGAS SOBRE EL PERFIL", "Forjado tipo 1"])
+    assert.ok(paret.includes(es), es);
+  // Catalan stays exactly as before
+  assert.ok(buildCalculHtml({ tipus: "soldadura", num: "CE-26-002", data: "2026-11-07" }, r, { logo: "/logo.jpg" }).includes("Gola de soldadura · Unió articulada"));
+});
+
 test("no annex in any report", () => {
   const calcs = [["paret", computeParet({})], ["biga", computeBiga({})], ["pilar", computePilar({})], ["soldadura", computeSoldadura({})]];
   for (const [tipus, r] of calcs) {

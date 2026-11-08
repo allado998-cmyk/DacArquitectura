@@ -106,7 +106,7 @@ function loadsTable(t: LoadsTable, lang: CalcLang): string {
       const ln = l.line!;
       rows += `<tr>
         ${td(esc(ln.label), { align: "left" })}
-        ${td(`${fmt(ln.q)} ${esc(ln.qUnit)}`, { input: true })}
+        ${td(`${fmt(ln.q)} ${esc(ln.qUnit)}`, { input: !!ln.qKey })}
         ${td(ln.width == null ? "" : `${fmt(ln.width)} ${esc(ln.widthUnit ?? "m")}`, { input: !!ln.widthKey })}
         ${td(`${fmt(ln.unf)} kN/ml`)}
         ${td(fmt(ln.gamma), { input: !!ln.gammaKey })}

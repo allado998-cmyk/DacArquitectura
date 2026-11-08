@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 // Mix a hex colour with white by `amt` (0..1) to build soft gradients.
 export function lighten(hex: string, amt = 0.45): string {
@@ -174,6 +174,264 @@ export function LineChart({
       </div>
     </div>
   );
+}
+
+// ----------------------------------------------------------------------------
+// Evolution over the years: one or more lines over a shared x (the years).
+// ----------------------------------------------------------------------------
+
+export interface TrendSeries {
+  label: string;
+  color: string; // the entity's own colour (a category keeps its donut colour)
+  values: number[]; // one per label
+}
+
+// Round axis steps (1, 2 or 5 × 10ⁿ), about `count` of them, covering [min, max].
+function niceTicks(min: number, max: number, count = 4): number[] {
+  const span = max - min || Math.abs(max) || 1;
+  const raw = span / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const lo = Math.floor(min / step) * step;
+  const hi = Math.ceil(max / step) * step || step;
+  const ticks: number[] = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+  return ticks;
+}
+
+const PAD = { l: 64, r: 20, t: 18, b: 28 };
+
+// Lines with a hairline grid and a y-axis; hovering (or the arrow keys, once
+// focused) puts a crosshair on the nearest year and lists every series there.
+// Two or more series get a legend; one series is named by the card's title and
+// carries its last value at the end of the line. «Veure les dades» opens the
+// numbers as a table, so nothing depends on colour or hovering alone.
+export function TrendChart({
+  labels,
+  series,
+  fmt,
+  fmtAxis = fmt,
+  height = 240,
+  totalLabel,
+}: {
+  labels: string[];
+  series: TrendSeries[];
+  fmt: (n: number) => string;
+  fmtAxis?: (n: number) => string;
+  height?: number;
+  totalLabel?: string; // when set, the tooltip and the table add a total row/column
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const [hoverState, setHover] = useState<number | null>(null);
+  const n = labels.length;
+  const empty = n === 0 || series.length === 0;
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    setWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [empty]);
+
+  if (empty) return <Empty />;
+  const hover = hoverState != null && hoverState < n ? hoverState : null;
+
+  const all = series.flatMap((s) => s.values);
+  const ticks = niceTicks(Math.min(0, ...all), Math.max(0, ...all));
+  const lo = ticks[0];
+  const hi = ticks[ticks.length - 1];
+  const plotW = Math.max(width - PAD.l - PAD.r, 1);
+  const plotH = height - PAD.t - PAD.b;
+  const step = n > 1 ? plotW / (n - 1) : 0;
+  const x = (i: number) => PAD.l + (n > 1 ? i * step : plotW / 2);
+  const y = (v: number) => PAD.t + plotH - ((v - lo) / (hi - lo || 1)) * plotH;
+  // Year labels at least ~44 px apart; the last one always shows.
+  const every = n > 1 ? Math.max(1, Math.ceil(44 / step)) : 1;
+  const showLabel = (i: number) => i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2);
+  const allMarkers = n <= 16;
+  const single = series.length === 1;
+  const total = (i: number) => series.reduce((s, x) => s + (x.values[i] ?? 0), 0);
+
+  function pick(clientX: number) {
+    const rect = box.current?.getBoundingClientRect();
+    if (!rect) return;
+    const i = n > 1 ? Math.round((clientX - rect.left - PAD.l) / step) : 0;
+    setHover(Math.min(n - 1, Math.max(0, i)));
+  }
+
+  const tipLeft = hover != null && x(hover) > width * 0.6;
+
+  return (
+    <div>
+      {!single && (
+        <ul className="mb-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+          {series.map((s) => (
+            <li key={s.label} className="flex items-center gap-2">
+              <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: s.color }} />
+              <span>{s.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div
+        ref={box}
+        className="relative outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] rounded-md"
+        style={{ height }}
+        tabIndex={0}
+        role="img"
+        aria-label={`${series.map((s) => s.label).join(", ")}, ${labels[0]}–${labels[n - 1]}. Fletxes per moure's per anys.`}
+        onPointerMove={(e) => pick(e.clientX)}
+        onPointerDown={(e) => pick(e.clientX)}
+        onPointerLeave={() => setHover(null)}
+        onFocus={() => setHover((h) => h ?? n - 1)}
+        onBlur={() => setHover(null)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft") { e.preventDefault(); setHover((h) => Math.max(0, (h ?? n) - 1)); }
+          if (e.key === "ArrowRight") { e.preventDefault(); setHover((h) => Math.min(n - 1, (h ?? -1) + 1)); }
+          if (e.key === "Escape") setHover(null);
+        }}
+      >
+        {width > 0 && (
+          <svg width={width} height={height} className="block" aria-hidden="true">
+            {ticks.map((t) => (
+              <g key={t}>
+                <line x1={PAD.l} x2={width - PAD.r} y1={y(t)} y2={y(t)} stroke="var(--color-line)" strokeWidth={1} />
+                <text x={PAD.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--color-muted)" className="tabular-nums">{fmtAxis(t)}</text>
+              </g>
+            ))}
+            {labels.map((l, i) => showLabel(i) && (
+              <text key={l} x={x(i)} y={height - 8} textAnchor="middle" fontSize={11} fill="var(--color-muted)" className="tabular-nums">{l}</text>
+            ))}
+            {hover != null && <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={PAD.t + plotH} stroke="var(--color-muted)" strokeWidth={1} opacity={0.5} />}
+            {series.map((s) => (
+              <path
+                key={s.label}
+                d={s.values.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ")}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ))}
+            {series.map((s) =>
+              s.values.map((v, i) =>
+                allMarkers || i === hover ? (
+                  <circle key={`${s.label}-${i}`} cx={x(i)} cy={y(v)} r={i === hover ? 5 : 4} fill={s.color} stroke="#fff" strokeWidth={2} />
+                ) : null,
+              ),
+            )}
+            {single && hover == null && (
+              <text x={x(n - 1)} y={y(series[0].values[n - 1])} dy={-12} textAnchor={n > 1 ? "end" : "middle"} fontSize={12} fontWeight={600} fill="var(--color-ink)" className="tabular-nums">
+                {fmt(series[0].values[n - 1])}
+              </text>
+            )}
+          </svg>
+        )}
+        {hover != null && width > 0 && (
+          <div
+            className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-xs shadow-lg"
+            style={{ top: PAD.t, ...(tipLeft ? { right: width - x(hover) + 12 } : { left: x(hover) + 12 }) }}
+          >
+            <div className="mb-1.5 font-semibold text-[var(--color-ink)]">{labels[hover]}</div>
+            <ul className="space-y-1">
+              {series.map((s) => (
+                <li key={s.label} className="flex items-center gap-2 whitespace-nowrap">
+                  <span className="inline-block h-0.5 w-3 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="font-semibold tabular-nums text-[var(--color-ink)]">{fmt(s.values[hover] ?? 0)}</span>
+                  <span className="text-[var(--color-muted)]">{s.label}</span>
+                </li>
+              ))}
+              {totalLabel && !single && (
+                <li className="flex items-center gap-2 whitespace-nowrap border-t border-[var(--color-line)] pt-1">
+                  <span className="inline-block w-3" />
+                  <span className="font-semibold tabular-nums text-[var(--color-ink)]">{fmt(total(hover))}</span>
+                  <span className="text-[var(--color-muted)]">{totalLabel}</span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+      <details className="mt-3 text-xs">
+        <summary className="cursor-pointer select-none text-[var(--color-muted)] hover:text-[var(--color-ink)]">Veure les dades</summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr>
+                <th className="py-1 pr-3 text-left font-semibold text-[var(--color-muted)]">Any</th>
+                {series.map((s) => <th key={s.label} className="py-1 pr-3 text-right font-semibold text-[var(--color-muted)]">{s.label}</th>)}
+                {totalLabel && !single && <th className="py-1 text-right font-semibold text-[var(--color-muted)]">{totalLabel}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {labels.map((l, i) => (
+                <tr key={l} className="border-t border-[var(--color-line)]">
+                  <td className="py-1 pr-3 tabular-nums">{l}</td>
+                  {series.map((s) => <td key={s.label} className="py-1 pr-3 text-right tabular-nums">{fmt(s.values[i] ?? 0)}</td>)}
+                  {totalLabel && !single && <td className="py-1 text-right font-semibold tabular-nums">{fmt(total(i))}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+// «Resum» / «Evolució per anys» switch at the top of a statistics tab.
+export function StatsViews<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [T, string][] }) {
+  return (
+    <div className="inline-flex rounded-lg border border-[var(--color-line)] bg-white p-1" role="tablist">
+      {options.map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={value === v}
+          onClick={() => onChange(v)}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium ${value === v ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Year range (from / to) as two selects; picking a start after the end (or the
+// reverse) moves the other one along, so the range is never empty.
+export function YearRange({ years, from, to, onChange }: { years: string[]; from: string; to: string; onChange: (from: string, to: string) => void }) {
+  return (
+    <>
+      <div>
+        <label className="label">Des de</label>
+        <select className="input w-28" value={from} onChange={(e) => onChange(e.target.value, e.target.value > to ? e.target.value : to)}>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="label">Fins a</label>
+        <select className="input w-28" value={to} onChange={(e) => onChange(e.target.value < from ? e.target.value : from, e.target.value)}>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+    </>
+  );
+}
+
+// Every year from the first to the last, gaps included (a year with nothing
+// still shows, at 0, so the lines don't skip it).
+export function yearSpan(years: Iterable<string>): string[] {
+  const nums = [...years].map(Number).filter((y) => Number.isFinite(y) && y > 1900);
+  if (nums.length === 0) return [];
+  const out: string[] = [];
+  for (let y = Math.min(...nums); y <= Math.max(...nums); y++) out.push(String(y));
+  return out;
 }
 
 // Horizontal gradient bars with a value pill at the end of each bar.

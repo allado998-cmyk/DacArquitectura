@@ -18,8 +18,8 @@ import type { Factura, FacturaSuplit, FacturaConcepte } from "@/types/db";
 import { formatEur, formatDataCa } from "@/lib/format";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { ChartCard, GradientDonut, HBarChart, KpiCard, lighten } from "@/components/charts";
-import { CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
+import { ChartCard, GradientDonut, HBarChart, KpiCard, StatsViews, TrendChart, YearRange, lighten, yearSpan, type TrendSeries } from "@/components/charts";
+import { CATEGORIES, CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
 import { openStatsPdf } from "@/lib/pdf";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 import { facturaFileName } from "@/lib/file-names";
@@ -491,7 +491,17 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="label">Any</label>
-          <select className="input w-28" value={fAny} onChange={(e) => setFAny(e.target.value)}>
+          <select
+            className="input w-28"
+            value={fAny}
+            onChange={(e) => {
+              setFAny(e.target.value);
+              // A past (or future) year has nothing to do with what's still to invoice:
+              // «Propera facturació» hides by itself (the eye in the summary shows it
+              // again); back on the current year or «Tots», it shows.
+              setHideProperes(e.target.value !== "" && e.target.value !== today.slice(0, 4));
+            }}
+          >
             <option value="">Tots</option>
             {anys.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
@@ -1001,7 +1011,119 @@ function SuplitRow({ row }: { row: FacturaSuplit }) {
 const TRIM_COLORS = ["#0ea5e9", "#16a34a", "#f59e0b", "#8b5cf6"]; // T1..T4
 const MONTHS_CA_SHORT = ["gen", "feb", "mar", "abr", "mai", "jun", "jul", "ago", "set", "oct", "nov", "des"];
 
+type StatsView = "resum" | "evolucio";
+
 function StatsPanel({ factures, today }: { factures: Factura[]; today: string }) {
+  const [view, setView] = useState<StatsView>("resum");
+  return (
+    <div className="space-y-6">
+      <StatsViews value={view} onChange={setView} options={[["resum", "Resum"], ["evolucio", "Evolució per anys"]]} />
+      {view === "resum" ? <StatsResum factures={factures} today={today} /> : <StatsEvolucio factures={factures} today={today} />}
+    </div>
+  );
+}
+
+// Thousands as "k €" on the axis: 125.000 € → "125 k€".
+function eurAxis(v: number) {
+  if (Math.abs(v) >= 1000) return `${(v / 1000).toLocaleString("ca-ES", { maximumFractionDigits: 1 })} k€`;
+  return `${v.toLocaleString("ca-ES")} €`;
+}
+
+const SENSE_COLOR = "#9ca3af";
+
+// «Evolució per anys»: the base imposable of the emeses, year by year, in total,
+// by the linked expedient's categoria and by its tipus, between two years.
+function StatsEvolucio({ factures, today }: { factures: Factura[]; today: string }) {
+  const emeses = useMemo(() => factures.filter((f) => f.estat === "emesa" && f.data), [factures]);
+  const years = useMemo(() => yearSpan(emeses.map((f) => f.data!.slice(0, 4))), [emeses]);
+  const thisYear = today.slice(0, 4);
+  const lastYear = years.filter((y) => y <= thisYear).pop() ?? years[years.length - 1] ?? thisYear;
+  const [range, setRange] = useState<[string, string]>([years[0] ?? thisYear, lastYear]);
+  const [from, to] = range;
+  const labels = years.filter((y) => y >= from && y <= to);
+  const idx = new Map(labels.map((y, i) => [y, i]));
+
+  const zero = () => labels.map(() => 0);
+  const total = zero();
+  const count = zero();
+  const byCat = new Map<string, number[]>();
+  const byTipus = new Map<string, number[]>();
+  for (const f of emeses) {
+    const i = idx.get(f.data!.slice(0, 4));
+    if (i == null) continue;
+    const base = n(f.preu);
+    total[i] += base;
+    count[i] += 1;
+    const cat = f.expedient_categoria && CATEGORY_BY_CODE[f.expedient_categoria] ? f.expedient_categoria : "";
+    (byCat.get(cat) ?? byCat.set(cat, zero()).get(cat)!)[i] += base;
+    const tip = f.expedient_tipus === "privat" || f.expedient_tipus === "public" ? f.expedient_tipus : "";
+    (byTipus.get(tip) ?? byTipus.set(tip, zero()).get(tip)!)[i] += base;
+  }
+  // Fixed order and colours (those of the donuts in «Resum»); only the ones with invoices.
+  const catSeries: TrendSeries[] = [
+    ...CATEGORIES.filter((c) => byCat.has(c.code)).map((c) => ({ label: c.label, color: c.color, values: byCat.get(c.code)! })),
+    ...(byCat.has("") ? [{ label: "Sense categoria", color: SENSE_COLOR, values: byCat.get("")! }] : []),
+  ];
+  const tipusSeries: TrendSeries[] = [
+    ...(["privat", "public"] as const).filter((k) => byTipus.has(k)).map((k) => ({ label: TIPUS[k].label, color: TIPUS[k].color, values: byTipus.get(k)! })),
+    ...(byTipus.has("") ? [{ label: "Sense tipus", color: SENSE_COLOR, values: byTipus.get("")! }] : []),
+  ];
+
+  const sum = total.reduce((s, v) => s + v, 0);
+  const best = labels.length ? labels[total.indexOf(Math.max(...total))] : "";
+  const rangeLabel = from === to ? `Any ${from}` : `${from}–${to}`;
+
+  function exportPdf() {
+    const perYear = (ss: TrendSeries[]) => labels.map((y, i) => [y, ...ss.map((s) => formatEur(s.values[i])), formatEur(total[i])]);
+    openStatsPdf({
+      title: "Facturació — Evolució per anys",
+      subtitle: `${rangeLabel} · base imposable de les factures emeses`,
+      landscape: true,
+      kpis: [
+        { label: "Total facturat (base)", value: formatEur(sum) },
+        { label: "Mitjana per any", value: formatEur(labels.length ? sum / labels.length : 0) },
+        { label: "Millor any", value: best ? `${best} · ${formatEur(Math.max(...total))}` : "—" },
+      ],
+      tables: [
+        { title: "Facturació per any", columns: [{ label: "Any" }, { label: "Factures", align: "right" }, { label: "Base", align: "right" }], rows: labels.map((y, i) => [y, String(count[i]), formatEur(total[i])]) },
+        { title: "Base per categoria", columns: [{ label: "Any" }, ...catSeries.map((s) => ({ label: s.label, align: "right" as const })), { label: "Total", align: "right" }], rows: perYear(catSeries) },
+        { title: "Base per tipus", columns: [{ label: "Any" }, ...tipusSeries.map((s) => ({ label: s.label, align: "right" as const })), { label: "Total", align: "right" }], rows: perYear(tipusSeries) },
+      ],
+    });
+  }
+
+  if (years.length === 0) return <p className="text-sm text-[var(--color-muted)]">Encara no hi ha cap factura emesa.</p>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
+        <YearRange years={years} from={from} to={to} onChange={(a, b) => setRange([a, b])} />
+        <button type="button" className="btn-ghost text-sm" onClick={() => setRange([years[0], lastYear])}>Tots els anys</button>
+        <button type="button" className="btn-ghost ml-auto inline-flex shrink-0 items-center gap-1.5" onClick={exportPdf} title="Genera un PDF de l'evolució">
+          <FactPdfIcon /> PDF
+        </button>
+      </div>
+
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
+        <KpiCard label="Total facturat (base)" value={formatEur(sum)} accent="#0ea5e9" hint={rangeLabel} />
+        <KpiCard label="Mitjana per any" value={formatEur(labels.length ? sum / labels.length : 0)} accent="#1f4d3f" hint={`${labels.length} ${labels.length === 1 ? "any" : "anys"}`} />
+        <KpiCard label="Millor any" value={best || "—"} accent="#f59e0b" hint={best ? formatEur(Math.max(...total)) : undefined} />
+      </div>
+
+      <ChartCard title="Facturació per any" meta="base imposable">
+        <TrendChart labels={labels} series={[{ label: "Base facturada", color: "#0284c7", values: total }]} fmt={formatEur} fmtAxis={eurAxis} />
+      </ChartCard>
+      <ChartCard title="Base per categoria" meta="per any · categoria de l'expedient">
+        <TrendChart labels={labels} series={catSeries} fmt={formatEur} fmtAxis={eurAxis} totalLabel="Total" height={280} />
+      </ChartCard>
+      <ChartCard title="Base per tipus" meta="per any · privat / públic">
+        <TrendChart labels={labels} series={tipusSeries} fmt={formatEur} fmtAxis={eurAxis} totalLabel="Total" />
+      </ChartCard>
+    </div>
+  );
+}
+
+function StatsResum({ factures, today }: { factures: Factura[]; today: string }) {
   const [fAny, setFAny] = useState(today.slice(0, 4));
   const [fTrim, setFTrim] = useState("");
   const [fClient, setFClient] = useState("");

@@ -6,6 +6,7 @@ import { createCalculAction, deleteCalculAction, duplicateCalculAction } from ".
 import { CALC_GROUPS, CALC_TYPES, calcType, type CalcTipus } from "@/lib/calculs";
 import { verdict } from "@/lib/calculs/common";
 import { PerfilsRef } from "./perfils-ref";
+import { BackToTop, StickyFilters } from "@/components/sticky-filters";
 
 export interface CalculRow {
   id: number;
@@ -73,13 +74,14 @@ export function CalculsView({ calculs, expedients, initialTab }: { calculs: Calc
       </div>
 
       {/* laptop and up: sidebar */}
-      <nav aria-label="Tipus de càlcul" className="hidden lg:sticky lg:top-4 lg:block">
+      {/* Stays in view while the list scrolls; scrolls by itself if the screen is shorter than the menu. */}
+      <nav aria-label="Tipus de càlcul" className="hidden lg:sticky lg:top-4 lg:block lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
         <NavItem active={tab === "tots"} onClick={() => setTab("tots")} count={calculs.length} strong>
           Tots els càlculs
         </NavItem>
         {MENU.map((g) => (
-          <div key={g.title} className="mt-4">
-            <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">{g.title}</div>
+          <div key={g.title} className="mt-5">
+            <div className="mb-1 border-b border-[var(--color-line)] px-3 pb-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-accent)]">{g.title}</div>
             {g.items.map((it) => (
               <NavItem key={it.tab} active={tab === it.tab} onClick={() => setTab(it.tab)} count={count(it.tab)}>
                 {it.label}
@@ -141,18 +143,17 @@ function CalcList({ tipus, rows, expedients }: { tipus: CalcTipus | "tots"; rows
   }, [withVerdict, q, all]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">{t ? t.tab : "Tots els càlculs"}</h2>
-          <p className="max-w-3xl text-sm text-[var(--color-muted)]">{t ? t.desc : "Tots els càlculs de tots els tipus. Tria un tipus al menú per veure'n només els d'aquell tipus."}</p>
-        </div>
+    <div className="space-y-4">
+      {/* Title, search and «Nou càlcul» stay at the top while the list scrolls, with the
+          table's header right below them (as in «Base de Dades»). */}
+      <StickyFilters className="items-center">
+        <h2 className="mr-auto text-lg font-semibold">{t ? t.tab : "Tots els càlculs"}</h2>
+        <input className="input w-72" placeholder={all ? "Cercar a tots els càlculs…" : "Cercar…"} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cercar" />
         <button className="btn-primary" onClick={() => setModal(true)}>+ Nou càlcul</button>
-      </div>
+      </StickyFilters>
+      <p className="max-w-3xl text-sm text-[var(--color-muted)]">{t ? t.desc : "Tots els càlculs de tots els tipus. Tria un tipus al menú per veure'n només els d'aquell tipus."}</p>
 
-      <input className="input w-72" placeholder={all ? "Cercar a tots els càlculs…" : "Cercar…"} value={q} onChange={(e) => setQ(e.target.value)} />
-
-      <div className="table-wrap">
+      <div className="table-wrap table-sticky">
         <table className="w-full">
           <thead>
             <tr>
@@ -216,6 +217,7 @@ function CalcList({ tipus, rows, expedients }: { tipus: CalcTipus | "tots"; rows
           </tbody>
         </table>
       </div>
+      <BackToTop />
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(false)}>

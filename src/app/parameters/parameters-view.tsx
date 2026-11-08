@@ -47,6 +47,7 @@ import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
+import { BackToTop, StickyFilters } from "@/components/sticky-filters";
 
 type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques" | "benzina" | "hora" | "certificats" | "ite";
 
@@ -620,7 +621,7 @@ function Abecedari({ value, onChange, presents }: { value: string; onChange: (v:
               disabled={!has && !active}
               title={l === "#" ? "Comença amb un número o un altre signe" : undefined}
               onClick={() => onChange(active ? "" : l)}
-              className={`h-9 w-6 text-sm ${
+              className={`h-9 w-[22px] text-sm ${
                 active
                   ? "bg-[var(--color-accent)] font-semibold text-white"
                   : has
@@ -661,69 +662,28 @@ function Heat({ n, max, scale }: { n: number; max: number; scale: Scale }) {
   );
 }
 
-// The filter bar of a long table: it stays at the top of the screen while the
-// page scrolls (from tablet width up; on a phone it would cover half the screen)
-// and tells the table's sticky header how far down to stick, right below it.
-function StickyFilters({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    const panel = el?.parentElement;
-    if (!el || !panel) return;
-    const update = () => {
-      const pinned = getComputedStyle(el).position === "sticky";
-      panel.style.setProperty("--sticky-top", pinned ? `${el.offsetHeight}px` : "0px");
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener("resize", update);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", update);
-    };
-  }, []);
-  return <div ref={ref} className="sticky-filters flex flex-wrap items-end gap-3">{children}</div>;
-}
-
-// Appears once the page has scrolled past the first rows.
-function BackToTop() {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 400);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  if (!show) return null;
-  return (
-    <button
-      type="button"
-      className="fixed bottom-6 right-6 z-40 rounded-full bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white shadow-lg hover:opacity-90"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-    >
-      ↑ Tornar a dalt
-    </button>
-  );
-}
-
+// selectClass fixes the width of a select whose options can be long (the
+// browser sizes a select to its longest option); the chosen one is cut with "…".
 function FilterSelect({
   label,
   value,
   onChange,
   options,
   allLabel = "Tots",
+  selectClass = "",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: [string, string][];
   allLabel?: string;
+  selectClass?: string;
 }) {
+  const chosen = options.find(([v]) => v === value)?.[1];
   return (
     <div>
       <label className="label">{label}</label>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select className={`input ${selectClass}`} value={value} onChange={(e) => onChange(e.target.value)} title={selectClass ? chosen : undefined}>
         <option value="">{allLabel}</option>
         {options.map(([v, text]) => <option key={v} value={v}>{text}</option>)}
       </select>
@@ -820,15 +780,16 @@ function ContactesPanel({
   return (
     <div className="space-y-4">
       <StickyFilters>
-        <div className="w-64">
+        {/* Widths fixed so the whole bar fits in one row on a 1920 px screen, «Netejar» included. */}
+        <div className="w-52">
           <label className="label">Cercar</label>
           <input className="input" placeholder="Nom, telèfon, mail, client…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <Abecedari value={lletra} onChange={setLletra} presents={presents} />
-        <FilterSelect label="Professió" allLabel="Totes" value={fProfessio} onChange={setFProfessio} options={[[SENSE_PROFESSIO, "Sense professió"], ...professioOptions]} />
+        <FilterSelect label="Professió" allLabel="Totes" value={fProfessio} onChange={setFProfessio} options={[[SENSE_PROFESSIO, "Sense professió"], ...professioOptions]} selectClass="w-36" />
         <FilterSelect label="Telèfon" value={fTelefon} onChange={setFTelefon} options={TELEFON_OPTIONS} />
         <FilterSelect label="Mail" value={fMail} onChange={setFMail} options={AMB_SENSE} />
-        <div className="w-60">
+        <div className="w-52">
           <label className="label">Client</label>
           <Combobox options={clientFilterOpts} value={fClient} onChange={setFClient} placeholder="Cerca client…" emptyLabel="Tots" />
         </div>
@@ -848,7 +809,7 @@ function ContactesPanel({
             <thead>
               <tr>
                 <th className="th">Nom</th>
-                <th className="th">Professió</th>
+                <th className="th w-44">Professió</th>
                 <th className="th">Telèfon 1</th>
                 <th className="th">Telèfon 2</th>
                 <th className="th">Mail</th>
@@ -859,9 +820,11 @@ function ContactesPanel({
               {filtered.map((c) => (
                 <tr key={c.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => setOpenId(c.id)}>
                   <td className="td whitespace-nowrap font-medium"><button type="button" className="text-left">{c.nom ?? "Sense nom"}</button></td>
-                  <td className="td whitespace-nowrap">{c.professio ?? dash}</td>
+                  {/* A long profession is cut with "…" (whole on hover), and a long client name
+                      wraps, so the table fits the screen without scrolling sideways. */}
+                  <td className="td max-w-44 truncate" title={c.professio ?? undefined}>{c.professio ?? dash}</td>
                   <ContacteCells contacte={c} />
-                  <td className="td whitespace-nowrap">{c.client_nom ?? dash}</td>
+                  <td className="td min-w-40">{c.client_nom ?? dash}</td>
                 </tr>
               ))}
             </tbody>
@@ -1366,8 +1329,8 @@ function ClientsPanel({
       q && `Cerca: "${query.trim()}"`,
       lletra && `Inicial ${lletra}`,
       fCiutat,
-      optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
       fContactes && `${optionLabel(AMB_SENSE, fContactes)} contactes`,
+      optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
     ].filter(Boolean).join(" · ");
     openListPdf({
       title: "Clients",
@@ -1390,8 +1353,8 @@ function ClientsPanel({
         </div>
         <Abecedari value={lletra} onChange={setLletra} presents={presents} />
         <FilterSelect label="Ubicació" allLabel="Totes" value={fCiutat} onChange={setFCiutat} options={ciutats.map((c) => [c, c])} />
-        <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
         <FilterSelect label="Contactes" value={fContactes} onChange={setFContactes} options={AMB_SENSE} />
+        <FilterSelect label="Expedients" value={fExpedients} onChange={setFExpedients} options={EXPEDIENTS_OPTIONS} />
         {hasFilters && <button type="button" className="btn-ghost" onClick={clearFilters}>Netejar</button>}
         <div className="ml-auto flex items-center gap-3">
           <button type="button" className="btn-ghost inline-flex items-center gap-1.5" onClick={exportPdf} title="Genera un PDF dels clients mostrats"><ParamPdfIcon /> PDF</button>
@@ -1429,7 +1392,7 @@ function ClientsPanel({
                       {hits.length > 0 && <span className="ml-2 text-[var(--color-muted)]">{hits.map((k) => k.nom).join(", ")}</span>}
                     </td>
                     <td className="td text-center"><Heat n={s?.oberts ?? 0} max={maxOberts} scale={VERMELL} /></td>
-                    <td className="td text-center tabular-nums">{s?.n ?? 0}</td>
+                    <td className={`td text-center tabular-nums ${s?.n ? "font-bold" : "text-[var(--color-muted)]"}`}>{s?.n ?? 0}</td>
                   </tr>
                 );
               })}

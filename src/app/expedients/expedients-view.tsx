@@ -16,7 +16,8 @@ import { formatEur } from "@/lib/format";
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/lib/expedients";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
-import { ChartCard, GradientDonut, HBarChart, KpiCard } from "@/components/charts";
+import { ChartCard, GradientDonut, HBarChart, KpiCard, StatsViews, TrendChart, YearRange, yearSpan, type TrendSeries } from "@/components/charts";
+import { openStatsPdf } from "@/lib/pdf";
 import { googleMapsHref } from "@/lib/geo";
 import dynamic from "next/dynamic";
 import type { MapGroup } from "./expedients-map";
@@ -1306,16 +1307,123 @@ function medianOf(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+type StatsView = "resum" | "evolucio";
+
 function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipologies: Tipologia[]; dedicByExp: Map<number, Dedicacio[]> }) {
-  const [fAny, setFAny] = useState(String(new Date().getFullYear()));
+  const [view, setView] = useState<StatsView>("resum");
+  return (
+    <div className="space-y-6">
+      <StatsViews value={view} onChange={setView} options={[["resum", "Resum"], ["evolucio", "Evolució per anys"]]} />
+      {view === "resum" ? <StatsResum rows={rows} tipologies={tipologies} dedicByExp={dedicByExp} /> : <StatsEvolucio rows={rows} />}
+    </div>
+  );
+}
+
+// «Evolució per anys»: expedients opened each year (the year of the number,
+// "26-…" → 2026), the clients they were for, and how many of those clients
+// were new that year (no expedient in an earlier year). Only expedients linked
+// to a client count towards the clients.
+function StatsEvolucio({ rows }: { rows: Expedient[] }) {
+  const years = useMemo(() => yearSpan(rows.map((r) => anyOf(r.num_expedient))), [rows]);
+  const thisYear = String(new Date().getFullYear());
+  const lastYear = years.filter((y) => y <= thisYear).pop() ?? years[years.length - 1] ?? thisYear;
+  const [range, setRange] = useState<[string, string]>([years[0] ?? thisYear, lastYear]);
+  const [from, to] = range;
+  const labels = years.filter((y) => y >= from && y <= to);
+  const idx = new Map(labels.map((y, i) => [y, i]));
+
+  // A client's first year over ALL the expedients, so «nou» means new to the studio.
+  const firstYear = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const r of rows) {
+      const y = anyOf(r.num_expedient);
+      if (r.client_id == null || y === "—") continue;
+      if (!m.has(r.client_id) || y < m.get(r.client_id)!) m.set(r.client_id, y);
+    }
+    return m;
+  }, [rows]);
+
+  const expedients = labels.map(() => 0);
+  const clients = labels.map(() => new Set<number>());
+  const inRange = new Set<number>();
+  let senseClient = 0;
+  for (const r of rows) {
+    const i = idx.get(anyOf(r.num_expedient));
+    if (i == null) continue;
+    expedients[i] += 1;
+    if (r.client_id == null) senseClient += 1;
+    else { clients[i].add(r.client_id); inRange.add(r.client_id); }
+  }
+  const nous = labels.map((y, i) => [...clients[i]].filter((id) => firstYear.get(id) === y).length);
+  const series: TrendSeries[] = [
+    { label: "Expedients", color: "#2a78d6", values: expedients },
+    { label: "Clients", color: "#eb6834", values: clients.map((s) => s.size) },
+    { label: "Clients nous", color: "#1baf7a", values: nous },
+  ];
+  const totalExp = expedients.reduce((s, v) => s + v, 0);
+  const totalNous = nous.reduce((s, v) => s + v, 0);
+  const rangeLabel = from === to ? `Any ${from}` : `${from}–${to}`;
+  const mitjana = labels.length ? totalExp / labels.length : 0;
+  const fmtN = (v: number) => v.toLocaleString("ca-ES");
+
+  function exportPdf() {
+    openStatsPdf({
+      title: "Expedients — Evolució per anys",
+      subtitle: `${rangeLabel} · per any del número d'expedient`,
+      kpis: [
+        { label: "Expedients", value: fmtN(totalExp) },
+        { label: "Mitjana per any", value: mitjana.toLocaleString("ca-ES", { maximumFractionDigits: 1 }) },
+        { label: "Clients diferents", value: fmtN(inRange.size) },
+        { label: "Clients nous", value: fmtN(totalNous) },
+      ],
+      tables: [
+        {
+          title: "Per any",
+          columns: [{ label: "Any" }, { label: "Expedients", align: "right" }, { label: "Clients", align: "right" }, { label: "Clients nous", align: "right" }],
+          rows: labels.map((y, i) => [y, fmtN(expedients[i]), fmtN(clients[i].size), fmtN(nous[i])]),
+        },
+      ],
+    });
+  }
+
+  if (years.length === 0) return <p className="text-sm text-[var(--color-muted)]">Encara no hi ha cap expedient.</p>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
+        <YearRange years={years} from={from} to={to} onChange={(a, b) => setRange([a, b])} />
+        <button type="button" className="btn-ghost text-sm" onClick={() => setRange([years[0], lastYear])}>Tots els anys</button>
+        <button type="button" className="btn-ghost ml-auto inline-flex shrink-0 items-center gap-1.5" onClick={exportPdf} title="Genera un PDF de l'evolució">
+          <PdfIcon /> PDF
+        </button>
+      </div>
+
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Expedients" value={fmtN(totalExp)} accent="#2a78d6" hint={rangeLabel} />
+        <KpiCard label="Mitjana per any" value={mitjana.toLocaleString("ca-ES", { maximumFractionDigits: 1 })} accent="#1f4d3f" hint={`${labels.length} ${labels.length === 1 ? "any" : "anys"}`} />
+        <KpiCard label="Clients diferents" value={fmtN(inRange.size)} accent="#eb6834" hint={senseClient ? `${fmtN(senseClient)} expedients sense client vinculat` : "al període"} />
+        <KpiCard label="Clients nous" value={fmtN(totalNous)} accent="#1baf7a" hint="primer expedient al període" />
+      </div>
+
+      <ChartCard title="Expedients i clients per any" meta="per any del número d'expedient">
+        <TrendChart labels={labels} series={series} fmt={fmtN} height={280} />
+      </ChartCard>
+    </div>
+  );
+}
+
+function StatsResum({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipologies: Tipologia[]; dedicByExp: Map<number, Dedicacio[]> }) {
+  // Year range of the expedient numbers; both start on the current year.
+  const [fDes, setFDes] = useState(String(new Date().getFullYear()));
+  const [fFins, setFFins] = useState(String(new Date().getFullYear()));
   const [fEstat, setFEstat] = useState("");
   const [fCategoria, setFCategoria] = useState("");
   const [fTipologia, setFTipologia] = useState("");
   const [fTipus, setFTipus] = useState("");
   const [fCiutat, setFCiutat] = useState("");
 
-  const anys = useMemo(
-    () => Array.from(new Set(rows.map((r) => anyOf(r.num_expedient)))).sort().reverse(),
+  const anysAsc = useMemo(
+    () => Array.from(new Set(rows.map((r) => anyOf(r.num_expedient)).filter((a) => a !== "—"))).sort(),
     [rows],
   );
   const ciutats = useMemo(
@@ -1329,7 +1437,9 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
   const filtered = useMemo(
     () =>
       rows.filter((r) => {
-        if (fAny && anyOf(r.num_expedient) !== fAny) return false;
+        const any = anyOf(r.num_expedient);
+        if (fDes && (any === "—" || any < fDes)) return false;
+        if (fFins && (any === "—" || any > fFins)) return false;
         if (fEstat && r.estat !== fEstat) return false;
         if (fCategoria && r.categoria !== fCategoria) return false;
         if (fTipologia && String(r.tipologia_id ?? "") !== fTipologia) return false;
@@ -1337,7 +1447,7 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
         if (fCiutat && (r.ciutat ?? "").trim() !== fCiutat) return false;
         return true;
       }),
-    [rows, fAny, fEstat, fCategoria, fTipologia, fTipus, fCiutat],
+    [rows, fDes, fFins, fEstat, fCategoria, fTipologia, fTipus, fCiutat],
   );
 
   const total = filtered.length;
@@ -1420,7 +1530,7 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
   const rankAvgDiff = rankN ? rankTotalDiff / rankN : 0;
 
   const filterSummary = [
-    fAny && `Any ${fAny}`,
+    fDes && fDes === fFins ? `Any ${fDes}` : (fDes || fFins) && `${fDes || "…"}–${fFins || "…"}`,
     fEstat && (fEstat === "obert" ? "Oberts" : "Tancats"),
     fCategoria && (CATEGORY_BY_CODE[fCategoria]?.label ?? fCategoria),
     fTipologia && tipologies.find((t) => String(t.id) === fTipologia)?.nom,
@@ -1456,8 +1566,10 @@ function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
       {/* Filtres */}
       <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="grid flex-1 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <FilterSelect label="Any" value={fAny} onChange={setFAny} options={anys.map((a) => [a, a])} />
+          <div className="grid flex-1 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {/* A start after the end (or the reverse) moves the other one along. */}
+            <FilterSelect label="Des de" value={fDes} onChange={(v) => { setFDes(v); if (v && fFins && v > fFins) setFFins(v); }} options={anysAsc.map((a) => [a, a])} />
+            <FilterSelect label="Fins a" value={fFins} onChange={(v) => { setFFins(v); if (v && fDes && v < fDes) setFDes(v); }} options={anysAsc.map((a) => [a, a])} />
             <FilterSelect label="Estat" value={fEstat} onChange={setFEstat} options={[["obert", "Oberts"], ["tancat", "Tancats"]]} />
             <FilterSelect label="Categoria" value={fCategoria} onChange={setFCategoria} options={CATEGORIES.map((c) => [c.code, c.label])} />
             <FilterSelect label="Tipologia" value={fTipologia} onChange={setFTipologia} options={tipologies.map((t) => [String(t.id), t.nom])} />

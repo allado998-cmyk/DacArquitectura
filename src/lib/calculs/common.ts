@@ -7,7 +7,10 @@
 import type { AuxImage } from "./ajuda";
 import { AJUDA } from "./ajuda";
 
-export type CalcTipus = "paret" | "biga" | "pilar" | "soldadura";
+export type CalcTipus =
+  | "paret" | "biga" | "pilar" | "soldadura"
+  | "bigueta-acer" | "bigueta-acer-ala" | "bigueta-fusta"
+  | "inercies-perfils" | "inercies-pletines" | "inercies-perfil-pletina";
 
 // The spreadsheets convert kg ↔ N with 9,81 (and kg/cm² ↔ N/mm² with 100/9,81).
 export const G = 9.81;

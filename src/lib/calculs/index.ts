@@ -5,11 +5,18 @@ import { computeParet, paretDefaults, paretPerfilsValids } from "./paret";
 import { computeBiga, bigaDefaults } from "./biga";
 import { computePilar, pilarDefaults } from "./pilar";
 import { computeSoldadura, soldaduraDefaults } from "./soldadura";
+import { BIGUETES } from "./biguetes";
+import { INERCIES } from "./inercies";
 
 export type { CalcTipus } from "./common";
 
+// How the «Càlculs» menu groups the types.
+export type CalcGroup = "Estintolaments" | "Biguetes" | "Inèrcies" | "Soldadures";
+export const CALC_GROUPS: CalcGroup[] = ["Estintolaments", "Biguetes", "Inèrcies", "Soldadures"];
+
 export interface CalcType {
   tipus: CalcTipus;
+  group: CalcGroup;
   tab: string; // tab / list label
   reportTitle: string; // printed title of the justification
   fileTitle: string; // exported file name prefix (the original spreadsheet name)
@@ -21,9 +28,10 @@ export interface CalcType {
   perfilsValids?: (dades: Record<string, unknown>) => Record<string, Set<string>>;
 }
 
-export const CALC_TYPES: CalcType[] = [
+const BASE_TYPES: CalcType[] = [
   {
     tipus: "paret",
+    group: "Estintolaments",
     tab: "Estintolament paret de càrrega",
     reportTitle: "Justificació de càlcul biga d'estintolament paret de càrrega",
     fileTitle: "Justificació de Càlcul Estintolament Paret de Càrrega",
@@ -35,6 +43,7 @@ export const CALC_TYPES: CalcType[] = [
   },
   {
     tipus: "biga",
+    group: "Estintolaments",
     tab: "Recolzament biga",
     reportTitle: "Justificació comprovació recolzament biga amb daus o connectors",
     fileTitle: "Justificació Comprovació Recolzament Biga amb Daus o Connectors",
@@ -45,6 +54,7 @@ export const CALC_TYPES: CalcType[] = [
   },
   {
     tipus: "pilar",
+    group: "Estintolaments",
     tab: "Base pilar estintolament",
     reportTitle: "Justificació comprovació recolzament base pilar estintolament",
     fileTitle: "Justificació Comprovació Recolzament Base Pilar Estintolament",
@@ -55,6 +65,7 @@ export const CALC_TYPES: CalcType[] = [
   },
   {
     tipus: "soldadura",
+    group: "Soldadures",
     tab: "Gola soldadura i compatibilitat",
     reportTitle: "Justificació gola de soldadura i compatibilitat entre soldadures",
     fileTitle: "Justificació Gola Soldadura i Compatibilitat",
@@ -64,6 +75,11 @@ export const CALC_TYPES: CalcType[] = [
     compute: (d) => computeSoldadura(d),
   },
 ];
+
+// Every type, in menu order (the first one is the fallback for unknown types).
+export const CALC_TYPES: CalcType[] = [...BASE_TYPES, ...BIGUETES, ...INERCIES].sort(
+  (a, b) => CALC_GROUPS.indexOf(a.group) - CALC_GROUPS.indexOf(b.group),
+);
 
 export function calcType(tipus: string): CalcType {
   return CALC_TYPES.find((t) => t.tipus === tipus) ?? CALC_TYPES[0];

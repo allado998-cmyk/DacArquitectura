@@ -27,7 +27,12 @@ const ORANGE = "#d4572a";
 const GREEN = "#1d9a72";
 const INK = "#1f2933";
 const MUTED = "#5b6670";
-const FONT = "Segoe UI, Helvetica, Arial, sans-serif";
+// The opening tag is one plain string on purpose: written as a template with the
+// constants above substituted in, the production compiler dropped everything after
+// the last substitution (the tag came out cut and the drawing empty).
+const OPEN =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" width="1000" height="660" font-family="Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-label="Opcions de soldadura de les ales i l’ànima" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto;">' +
+  '<rect width="1000" height="660" fill="#fff"/>';
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const mm = (n: number | null, d = 1) => (n == null ? "—" : `${fmt(n, d)} mm`);
@@ -89,14 +94,13 @@ export function golaFigure(d: GolaFiguraDades): Figure {
   const legendY = H - 28;
   const legend =
     `<line x1="120" y1="${legendY}" x2="180" y2="${legendY}" stroke="${ORANGE}" stroke-width="8" stroke-linecap="round"/>` +
-    `<text x="192" y="${legendY + 7}" font-size="19" fill="${MUTED}">Cara exterior d'ala</text>` +
+    `<text x="192" y="${legendY + 7}" font-size="19" fill="${MUTED}">Cara exterior d’ala</text>` +
     `<line x1="420" y1="${legendY}" x2="480" y2="${legendY}" stroke="${ORANGE}" stroke-width="7" stroke-dasharray="14 7"/>` +
-    `<text x="492" y="${legendY + 7}" font-size="19" fill="${MUTED}">Cara interior d'ala</text>` +
+    `<text x="492" y="${legendY + 7}" font-size="19" fill="${MUTED}">Cara interior d’ala</text>` +
     `<line x1="710" y1="${legendY}" x2="770" y2="${legendY}" stroke="${GREEN}" stroke-width="7" stroke-linecap="round"/>` +
     `<text x="782" y="${legendY + 7}" font-size="19" fill="${MUTED}">Ànima (2 cares)</text>`;
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="${FONT}" role="img" aria-label="Opcions de soldadura de les ales i l'ànima" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto;">` +
-    `<rect width="${W}" height="${H}" fill="#fff"/>` +
+    OPEN +
     panel(250, d, true) +
     panel(750, d, false) +
     legend +

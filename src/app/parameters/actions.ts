@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import type { TarifaCertificat } from "@/types/db";
 
 // Clients -------------------------------------------------------------------
 
@@ -214,7 +215,7 @@ export async function deleteTascaAction(id: number) {
 
 // ITE tariff (price tiers) --------------------------------------------------
 
-export async function updateIteTarifaAction(patch: { preu_1?: number; preu_2?: number; preu_3?: number; increment?: number }) {
+export async function updateIteTarifaAction(patch: { preu_1?: number; preu_2?: number; preu_3?: number; increment?: number; any?: number }) {
   await requireUser();
   await sql`
     insert into public.ite_tarifa (id) values (1) on conflict (id) do nothing
@@ -226,11 +227,115 @@ export async function updateIteTarifaAction(patch: { preu_1?: number; preu_2?: n
       preu_2 = coalesce(${num(patch.preu_2)}::numeric, preu_2),
       preu_3 = coalesce(${num(patch.preu_3)}::numeric, preu_3),
       increment = coalesce(${num(patch.increment)}::numeric, increment),
+      any_tarifa = coalesce(${anyTarifa(patch.any)}::int, any_tarifa),
       updated_at = now()
     where id = 1
   `;
   revalidatePath("/parameters");
   revalidatePath("/honoraris");
+}
+
+// Tarifes mínimes: benzina, hora, certificats CHB / CEE / CCA -----------------
+// Inputs only (public.tarifa_minima, id = 1); results come from @/lib/tarifes.
+// A value left out, or not a valid one, keeps what is stored.
+
+const anyTarifa = (v: number | undefined) => (Number.isInteger(v) && v! >= 1900 && v! <= 2200 ? v! : null);
+const positiu = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+
+async function ensureTarifaMinima() {
+  await sql`insert into public.tarifa_minima (id) values (1) on conflict (id) do nothing`;
+}
+
+export async function updateTarifaBenzinaAction(patch: { any?: number; preu_litre?: number; consum_100km?: number; desgast_km?: number }) {
+  await requireUser();
+  await ensureTarifaMinima();
+  await sql`
+    update public.tarifa_minima set
+      benzina_any = coalesce(${anyTarifa(patch.any)}::int, benzina_any),
+      preu_litre = coalesce(${positiu(patch.preu_litre)}::numeric, preu_litre),
+      consum_100km = coalesce(${positiu(patch.consum_100km)}::numeric, consum_100km),
+      desgast_km = coalesce(${positiu(patch.desgast_km)}::numeric, desgast_km),
+      updated_at = now()
+    where id = 1
+  `;
+  revalidatePath("/parameters");
+}
+
+export async function updateTarifaHoraAction(patch: { any?: number; sou?: number; lloguer?: number; lloguer_iva?: number; dies_mes?: number; hores_dia?: number }) {
+  await requireUser();
+  await ensureTarifaMinima();
+  await sql`
+    update public.tarifa_minima set
+      hora_any = coalesce(${anyTarifa(patch.any)}::int, hora_any),
+      sou = coalesce(${positiu(patch.sou)}::numeric, sou),
+      lloguer = coalesce(${positiu(patch.lloguer)}::numeric, lloguer),
+      lloguer_iva = coalesce(${positiu(patch.lloguer_iva)}::numeric, lloguer_iva),
+      dies_mes = coalesce(${positiu(patch.dies_mes)}::numeric, dies_mes),
+      hores_dia = coalesce(${positiu(patch.hores_dia)}::numeric, hores_dia),
+      updated_at = now()
+    where id = 1
+  `;
+  revalidatePath("/parameters");
+}
+
+export interface TarifaCertificatPatch {
+  id: number | null; // null = a new line
+  grup: "individual" | "composta";
+  concepte: string;
+  preu: number;
+  dificultat: boolean;
+}
+
+// Saves «Tarifes CHB, CEE i CCA» as a whole: the year, the (*) percentages and
+// every line, in the order given. Lines left out are deleted, lines without an
+// id are added. Returns the stored lines, so the page picks up the new ids.
+export async function saveTarifesCertificatsAction(data: {
+  any?: number;
+  dificultat_min?: number;
+  dificultat_max?: number;
+  linies: TarifaCertificatPatch[];
+}): Promise<TarifaCertificat[]> {
+  await requireUser();
+  const linies = (Array.isArray(data.linies) ? data.linies : [])
+    .map((l) => ({
+      id: Number.isInteger(l?.id) ? l.id : null,
+      grup: l?.grup === "composta" ? "composta" : "individual",
+      concepte: String(l?.concepte ?? "").trim(),
+      preu: positiu(l?.preu) ?? 0,
+      dificultat: l?.dificultat === true,
+    }))
+    .filter((l) => l.concepte)
+    .map((l, i) => ({ ...l, ordre: (i + 1) * 10 }));
+  await ensureTarifaMinima();
+  await sql`
+    update public.tarifa_minima set
+      certificats_any = coalesce(${anyTarifa(data.any)}::int, certificats_any),
+      dificultat_min = coalesce(${positiu(data.dificultat_min)}::numeric, dificultat_min),
+      dificultat_max = coalesce(${positiu(data.dificultat_max)}::numeric, dificultat_max),
+      updated_at = now()
+    where id = 1
+  `;
+  // One statement, so the lines never end up half saved.
+  await sql`
+    with input as (
+      select * from jsonb_to_recordset(${JSON.stringify(linies)}::jsonb)
+        as x(id bigint, grup text, concepte text, preu numeric, dificultat boolean, ordre int)
+    ), esborrades as (
+      delete from public.tarifa_certificat t
+      where not exists (select 1 from input i where i.id = t.id)
+    ), canviades as (
+      update public.tarifa_certificat t
+      set grup = i.grup, concepte = i.concepte, preu = i.preu, dificultat = i.dificultat, ordre = i.ordre
+      from input i where i.id = t.id
+    )
+    insert into public.tarifa_certificat (grup, concepte, preu, dificultat, ordre)
+    select i.grup, i.concepte, i.preu, i.dificultat, i.ordre from input i
+    where i.id is null or not exists (select 1 from public.tarifa_certificat t where t.id = i.id)
+  `;
+  revalidatePath("/parameters");
+  return (await sql`
+    select id, grup, concepte, preu::text as preu, dificultat from public.tarifa_certificat order by ordre, id
+  `) as TarifaCertificat[];
 }
 
 // Concepte Despesa Directa --------------------------------------------------

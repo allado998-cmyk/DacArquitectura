@@ -22,6 +22,9 @@ import {
   updateClientContacteAction,
   updateConcepteAltraAction,
   updateConcepteDirectaAction,
+  saveTarifesCertificatsAction,
+  updateTarifaBenzinaAction,
+  updateTarifaHoraAction,
   type ClientPatch,
   type ContactePatch,
 } from "./actions";
@@ -32,17 +35,20 @@ import type {
   ConcepteAltraDespesa,
   ConcepteDespesaDirecta,
   IteTarifa,
+  TarifaCertificat,
+  TarifaMinima,
   Tasca,
   Tipologia,
 } from "@/types/db";
-import { formatEur, formatEurPrecise } from "@/lib/format";
+import { formatEur, formatEurPrecise, parseLocaleNumber } from "@/lib/format";
+import { ambDificultat, tarifaBenzina, tarifaHora } from "@/lib/tarifes";
 import { openListPdf } from "@/lib/pdf";
 import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
 
-type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques" | "ite";
+type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques" | "benzina" | "hora" | "certificats" | "ite";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
 
@@ -63,6 +69,8 @@ export function ParametersView({
   contactes,
   tasques,
   iteTarifa,
+  tarifaMinima,
+  tarifesCertificats,
 }: {
   clients: Client[];
   clientStats: ClientStats[];
@@ -72,6 +80,8 @@ export function ParametersView({
   contactes: ClientContacte[];
   tasques: Tasca[];
   iteTarifa: IteTarifa;
+  tarifaMinima: TarifaMinima;
+  tarifesCertificats: TarifaCertificat[];
 }) {
   const [tab, setTab] = useState<Tab>("clients");
   // The active tab's count reflects its filtered/shown rows.
@@ -104,14 +114,24 @@ export function ParametersView({
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--color-line)]">
-        <TabBtn current={tab} value="clients" onClick={changeTab}>Clients ({cnt("clients", clients.length)})</TabBtn>
-        <TabBtn current={tab} value="contactes" onClick={changeTab}>Contactes ({cnt("contactes", contactes.length)})</TabBtn>
-        <TabBtn current={tab} value="tipologies" onClick={changeTab}>Tipologies ({cnt("tipologies", tipologies.length)})</TabBtn>
-        <TabBtn current={tab} value="tasques" onClick={changeTab}>Tasques ({cnt("tasques", tasques.length)})</TabBtn>
-        <TabBtn current={tab} value="directes" onClick={changeTab}>Despeses Directes ({cnt("directes", conceptesDirectes.length)})</TabBtn>
-        <TabBtn current={tab} value="altres" onClick={changeTab}>Altres Despeses ({cnt("altres", conceptesAltres.length)})</TabBtn>
-        <TabBtn current={tab} value="ite" onClick={changeTab}>Tarifa ITE</TabBtn>
+      {/* Catalogues and tariffs are two groups: when the row is too narrow the
+          tariffs move to a row of their own, and on a phone the tabs wrap
+          inside each group. Every tab draws its own underline, so each row has one. */}
+      <div className="mb-6 flex flex-wrap gap-x-6 gap-y-2">
+        <div className="flex flex-wrap">
+          <TabBtn current={tab} value="clients" onClick={changeTab}>Clients ({cnt("clients", clients.length)})</TabBtn>
+          <TabBtn current={tab} value="contactes" onClick={changeTab}>Contactes ({cnt("contactes", contactes.length)})</TabBtn>
+          <TabBtn current={tab} value="tipologies" onClick={changeTab}>Tipologies ({cnt("tipologies", tipologies.length)})</TabBtn>
+          <TabBtn current={tab} value="tasques" onClick={changeTab}>Tasques ({cnt("tasques", tasques.length)})</TabBtn>
+          <TabBtn current={tab} value="directes" onClick={changeTab}>Despeses Directes ({cnt("directes", conceptesDirectes.length)})</TabBtn>
+          <TabBtn current={tab} value="altres" onClick={changeTab}>Altres Despeses ({cnt("altres", conceptesAltres.length)})</TabBtn>
+        </div>
+        <div className="flex flex-wrap">
+          <TabBtn current={tab} value="benzina" onClick={changeTab}>Tarifa Mínima Benzina</TabBtn>
+          <TabBtn current={tab} value="hora" onClick={changeTab}>Tarifa Mínima Hora</TabBtn>
+          <TabBtn current={tab} value="certificats" onClick={changeTab}>Tarifes CHB, CEE i CCA</TabBtn>
+          <TabBtn current={tab} value="ite" onClick={changeTab}>Tarifa ITE</TabBtn>
+        </div>
       </div>
 
       {tab === "clients" && <ClientsPanel rows={clients} contactes={contactes} contactesByClient={contactesByClient} ciutats={ciutats} statsByClient={statsByClient} onCount={setShown} />}
@@ -120,6 +140,9 @@ export function ParametersView({
       {tab === "tasques" && <TasquesPanel rows={tasques} onCount={setShown} />}
       {tab === "directes" && <ConceptesDirectesPanel rows={conceptesDirectes} onCount={setShown} />}
       {tab === "altres" && <ConceptesAltresPanel rows={conceptesAltres} onCount={setShown} />}
+      {tab === "benzina" && <TarifaBenzinaPanel tarifa={tarifaMinima} />}
+      {tab === "hora" && <TarifaHoraPanel tarifa={tarifaMinima} />}
+      {tab === "certificats" && <TarifesCertificatsPanel tarifa={tarifaMinima} linies={tarifesCertificats} />}
       {tab === "ite" && <IteTarifaPanel tarifa={iteTarifa} />}
       <datalist id={PROFESSIONS_LIST}>
         {professioOptionsOf(contactes).map(([key, p]) => <option key={key} value={p} />)}
@@ -129,32 +152,368 @@ export function ParametersView({
 }
 
 // ============================================================================
+// Tarifes: Benzina, Hora, CHB / CEE / CCA and ITE. Each one says which year it
+// is for («Any»), and is saved with its «Desar tarifa» button.
+// ============================================================================
+
+const numOrNull = (s: string | null | undefined) => {
+  const n = parseFloat(s ?? "");
+  return Number.isFinite(n) ? n : null;
+};
+const decText = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+// "—" for a value that can't be worked out yet (a blank input).
+const fmtNum = (n: number, max: number, min = max) =>
+  Number.isFinite(n) ? n.toLocaleString("ca-ES", { minimumFractionDigits: min, maximumFractionDigits: max }) : "—";
+
+// A number typed with a comma, as in David's sheets ("1,392"). Reports null
+// while blank or unreadable (or not a whole number, for `integer`).
+function DecInput({
+  value,
+  onChange,
+  label,
+  integer,
+  className,
+}: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+  label: string;
+  integer?: boolean;
+  className?: string;
+}) {
+  const [text, setText] = useState(decText(value));
+  return (
+    <input
+      className={`input text-right tabular-nums ${className ?? ""}`}
+      inputMode={integer ? "numeric" : "decimal"}
+      aria-label={label}
+      value={text}
+      onBlur={() => setText(decText(value))}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = parseLocaleNumber(e.target.value);
+        onChange(Number.isFinite(n) && n >= 0 && (!integer || Number.isInteger(n)) ? n : null);
+      }}
+    />
+  );
+}
+
+const anyInvalid = (any: number | null) => (any == null || any < 1900 || any > 2200 ? "Indica l'any de la tarifa." : null);
+
+// «Any»: which year the tariff is for.
+function AnyTarifa({ value, onChange }: { value: number | null; onChange: (n: number | null) => void }) {
+  return (
+    <label className="block w-28">
+      <span className="label">Any</span>
+      <DecInput integer label="Any" value={value} onChange={onChange} className="font-semibold" />
+    </label>
+  );
+}
+
+// Save state of a tariff tab. `snapshot` is what the tab shows now; `save`
+// stores it and returns the snapshot of what is stored, so «Canvis sense
+// desar» shows whenever the two differ.
+function useDesarTarifa(snapshot: string, save: () => Promise<string>) {
+  const [stored, setStored] = useState(snapshot);
+  const [estat, setEstat] = useState<"" | "desat" | "error">("");
+  const [pending, startTransition] = useTransition();
+  function desar() {
+    setEstat("");
+    startTransition(async () => {
+      try {
+        setStored(await save());
+        setEstat("desat");
+      } catch {
+        setEstat("error");
+      }
+    });
+  }
+  return { desar, pending, estat, dirty: snapshot !== stored };
+}
+
+function DesarTarifa({
+  desar,
+  pending,
+  estat,
+  dirty,
+  invalid,
+}: ReturnType<typeof useDesarTarifa> & { invalid: string | null }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button type="button" className="btn-primary" onClick={desar} disabled={pending || !!invalid}>Desar tarifa</button>
+      {pending ? <span className="text-sm text-[var(--color-muted)]">Desant…</span>
+        : invalid ? <span className="text-sm text-red-700">{invalid}</span>
+        : estat === "error" ? <span className="text-sm text-red-700">No s&apos;ha pogut desar. Torna-ho a provar.</span>
+        : dirty ? <span className="text-sm text-amber-700">Canvis sense desar</span>
+        : estat === "desat" ? <span className="text-sm text-green-700">Desat ✓</span>
+        : null}
+    </div>
+  );
+}
+
+// The tariffs laid out like David's sheets: one line per value, inputs tinted
+// like the yellow cells, results computed as he types.
+function Fulla({ children }: { children: React.ReactNode }) {
+  return <div className="divide-y divide-[var(--color-line)] overflow-hidden rounded-lg border border-[var(--color-line)] bg-white">{children}</div>;
+}
+
+function FullaFila({ label, hint, unit, strong, children }: { label: string; hint?: string; unit: string; strong?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 ${strong ? "bg-[var(--color-accent-soft)]" : ""}`}>
+      <div className="min-w-0 flex-1 basis-56">
+        <div className={`text-sm ${strong ? "font-semibold text-[var(--color-accent)]" : ""}`}>{label}</div>
+        {hint && <div className="text-xs text-[var(--color-muted)]">{hint}</div>}
+      </div>
+      <div className="ml-auto flex items-center gap-2">
+        <div className="w-28">{children}</div>
+        <span className="w-14 text-sm text-[var(--color-muted)]">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function Entrada({ label, hint, unit, value, onChange }: { label: string; hint?: string; unit: string; value: number | null; onChange: (n: number | null) => void }) {
+  return (
+    <FullaFila label={label} hint={hint} unit={unit}>
+      <DecInput label={label} value={value} onChange={onChange} className="input-dada" />
+    </FullaFila>
+  );
+}
+
+function Resultat({ label, hint, unit, value, strong }: { label: string; hint?: string; unit: string; value: string; strong?: boolean }) {
+  return (
+    <FullaFila label={label} hint={hint} unit={unit} strong={strong}>
+      <div className={`px-3 text-right tabular-nums ${strong ? "text-lg font-semibold text-[var(--color-accent)]" : "font-medium"}`}>
+        {value}
+      </div>
+    </FullaFila>
+  );
+}
+
+const faltenValors = (...vs: (number | null)[]) => (vs.some((v) => v == null) ? "Omple tots els valors." : null);
+
+function TarifaBenzinaPanel({ tarifa }: { tarifa: TarifaMinima }) {
+  const [any, setAny] = useState<number | null>(tarifa.benzina_any);
+  const [preuLitre, setPreuLitre] = useState(numOrNull(tarifa.preu_litre));
+  const [consum, setConsum] = useState(numOrNull(tarifa.consum_100km));
+  const [desgast, setDesgast] = useState(numOrNull(tarifa.desgast_km));
+  const snapshot = JSON.stringify([any, preuLitre, consum, desgast]);
+  const d = useDesarTarifa(snapshot, async () => {
+    await updateTarifaBenzinaAction({ any: any ?? undefined, preu_litre: preuLitre ?? undefined, consum_100km: consum ?? undefined, desgast_km: desgast ?? undefined });
+    return snapshot;
+  });
+  const r = tarifaBenzina({ preu_litre: preuLitre ?? NaN, consum_100km: consum ?? NaN, desgast_km: desgast ?? NaN });
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <AnyTarifa value={any} onChange={setAny} />
+      <Fulla>
+        <Entrada label="Preu litre" unit="€/litre" value={preuLitre} onChange={setPreuLitre} />
+        <Entrada label="Consum cada 100 km" unit="litres" value={consum} onChange={setConsum} />
+        <Resultat label="Mínim cost benzina km" hint="(preu litre × consum) / 100" unit="€/km" value={fmtNum(r.benzinaKm, 3)} strong />
+        <Entrada label="Mínim cost desgast i manteniment km" unit="€/km" value={desgast} onChange={setDesgast} />
+        <Resultat label="Total mínim km" hint="benzina + desgast i manteniment" unit="€/km" value={fmtNum(r.totalKm, 3)} />
+      </Fulla>
+      <DesarTarifa {...d} invalid={anyInvalid(any) ?? faltenValors(preuLitre, consum, desgast)} />
+    </div>
+  );
+}
+
+function TarifaHoraPanel({ tarifa }: { tarifa: TarifaMinima }) {
+  const [any, setAny] = useState<number | null>(tarifa.hora_any);
+  const [sou, setSou] = useState(numOrNull(tarifa.sou));
+  const [lloguer, setLloguer] = useState(numOrNull(tarifa.lloguer));
+  const [iva, setIva] = useState(numOrNull(tarifa.lloguer_iva));
+  const [dies, setDies] = useState(numOrNull(tarifa.dies_mes));
+  const [hores, setHores] = useState(numOrNull(tarifa.hores_dia));
+  const snapshot = JSON.stringify([any, sou, lloguer, iva, dies, hores]);
+  const d = useDesarTarifa(snapshot, async () => {
+    await updateTarifaHoraAction({
+      any: any ?? undefined,
+      sou: sou ?? undefined,
+      lloguer: lloguer ?? undefined,
+      lloguer_iva: iva ?? undefined,
+      dies_mes: dies ?? undefined,
+      hores_dia: hores ?? undefined,
+    });
+    return snapshot;
+  });
+  const r = tarifaHora({ sou: sou ?? NaN, lloguer: lloguer ?? NaN, lloguer_iva: iva ?? NaN, dies_mes: dies ?? NaN, hores_dia: hores ?? NaN });
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <AnyTarifa value={any} onChange={setAny} />
+      <Fulla>
+        <Entrada label="Sou" unit="€/mes" value={sou} onChange={setSou} />
+        <Entrada label="Lloguer despatx (sense IVA)" unit="€/mes" value={lloguer} onChange={setLloguer} />
+        <Entrada label="IVA del lloguer" unit="%" value={iva} onChange={setIva} />
+        <Resultat label="Lloguer despatx amb IVA" hint="lloguer × (1 + IVA)" unit="€/mes" value={fmtNum(r.lloguerAmbIva, 2)} />
+        <Resultat label="Total" hint="sou + lloguer amb IVA" unit="€/mes" value={fmtNum(r.total, 2)} />
+        <Entrada label="Dies laborables al mes" unit="dies" value={dies} onChange={setDies} />
+        <Entrada label="Hores per dia" unit="hores" value={hores} onChange={setHores} />
+        <Resultat label="Hores mínimes mes" hint="dies × hores per dia" unit="hores" value={fmtNum(r.hores, 2, 0)} />
+        <Resultat label="Mínim cost hora" hint="total / hores mínimes mes" unit="€/hora" value={fmtNum(r.costHora ?? NaN, 2)} strong />
+      </Fulla>
+      <DesarTarifa {...d} invalid={anyInvalid(any) ?? faltenValors(sou, lloguer, iva, dies, hores)} />
+    </div>
+  );
+}
+
+// Columns of a certificats line from sm up: concepte, import, (*), Eliminar.
+const LINIA_COLS_SM = "sm:grid-cols-[minmax(0,1fr)_11rem_4rem_6rem]";
+
+const GRUPS_CERTIFICAT = [
+  ["individual", "Tarifes mínimes individuals"],
+  ["composta", "Tarifes mínimes compostes"],
+] as const;
+
+interface LiniaCertificat {
+  key: string; // React key; new lines have no id until saved
+  id: number | null;
+  grup: TarifaCertificat["grup"];
+  concepte: string;
+  preu: number | null;
+  dificultat: boolean;
+}
+
+const liniaCertificat = (l: TarifaCertificat): LiniaCertificat => ({
+  key: `id-${l.id}`,
+  id: l.id,
+  grup: l.grup,
+  concepte: l.concepte,
+  preu: numOrNull(l.preu),
+  dificultat: l.dificultat,
+});
+
+function TarifesCertificatsPanel({ tarifa, linies: inicials }: { tarifa: TarifaMinima; linies: TarifaCertificat[] }) {
+  const [any, setAny] = useState<number | null>(tarifa.certificats_any);
+  const [difMin, setDifMin] = useState(numOrNull(tarifa.dificultat_min));
+  const [difMax, setDifMax] = useState(numOrNull(tarifa.dificultat_max));
+  const [linies, setLinies] = useState(() => inicials.map(liniaCertificat));
+  const [versio, setVersio] = useState(0); // remounts the rows once saved, so they show what was stored
+  const nextKey = useRef(0);
+
+  // In the order of the sheet: individuals, then compostes.
+  const ordenades = GRUPS_CERTIFICAT.flatMap(([g]) => linies.filter((l) => l.grup === g));
+  const snapshotOf = (ls: LiniaCertificat[]) => JSON.stringify([any, difMin, difMax, ls.map((l) => [l.grup, l.concepte, l.preu, l.dificultat])]);
+  const d = useDesarTarifa(snapshotOf(ordenades), async () => {
+    const stored = await saveTarifesCertificatsAction({
+      any: any ?? undefined,
+      dificultat_min: difMin ?? undefined,
+      dificultat_max: difMax ?? undefined,
+      linies: ordenades.map(({ id, grup, concepte, preu, dificultat }) => ({ id, grup, concepte, preu: preu ?? 0, dificultat })),
+    });
+    const fresh = stored.map(liniaCertificat);
+    setLinies(fresh);
+    setVersio((v) => v + 1);
+    return snapshotOf(fresh);
+  });
+
+  const canvia = (key: string, patch: Partial<LiniaCertificat>) => setLinies((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const afegeix = (grup: LiniaCertificat["grup"]) =>
+    setLinies((ls) => [...ls, { key: `nova-${++nextKey.current}`, id: null, grup, concepte: "", preu: null, dificultat: false }]);
+  const treu = (key: string) => setLinies((ls) => ls.filter((l) => l.key !== key));
+
+  const invalid =
+    anyInvalid(any) ??
+    faltenValors(difMin, difMax) ??
+    (linies.some((l) => !l.concepte.trim()) ? "Escriu el concepte de cada línia, o elimina-la." : null) ??
+    (linies.some((l) => l.preu == null) ? "Indica l'import de cada línia." : null);
+
+  return (
+    <div className="max-w-3xl space-y-5">
+      <AnyTarifa value={any} onChange={setAny} />
+      {GRUPS_CERTIFICAT.map(([grup, titol]) => {
+        const rows = ordenades.filter((l) => l.grup === grup);
+        return (
+          <section key={grup} className="space-y-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide">{titol}</h3>
+            {/* A grid rather than a table, so on a phone each line takes two
+                rows (concept, then import / (*) / Eliminar) instead of scrolling sideways. */}
+            <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white">
+              <div className={`hidden sm:grid ${LINIA_COLS_SM}`}>
+                <div className="th">Concepte</div>
+                <div className="th">Import (+ IVA)</div>
+                <div className="th text-center" title="Dificultat afegida">(*)</div>
+                <div className="th" />
+              </div>
+              <div className="divide-y divide-[var(--color-line)]">
+                {rows.map((l) => {
+                  const rang = l.dificultat && l.preu != null && difMin != null && difMax != null ? ambDificultat(l.preu, difMin, difMax) : null;
+                  return (
+                    <div key={`${versio}-${l.key}`} className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center ${LINIA_COLS_SM}`}>
+                      <div className="col-span-3 px-3 pt-2 sm:col-span-1 sm:pb-2">
+                        <input className="input" aria-label="Concepte" value={l.concepte} onChange={(e) => canvia(l.key, { concepte: e.target.value })} />
+                      </div>
+                      <div className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <DecInput label={`Import: ${l.concepte}`} value={l.preu} onChange={(n) => canvia(l.key, { preu: n })} className="w-28" />
+                          <span className="text-sm text-[var(--color-muted)]">€</span>
+                        </div>
+                        {rang && (
+                          <div className="mt-1 whitespace-nowrap text-xs tabular-nums text-[var(--color-muted)]" title="Amb la dificultat afegida (*)">
+                            (*) {formatEur(rang[0])} – {formatEur(rang[1])}
+                          </div>
+                        )}
+                      </div>
+                      <label className="flex items-center gap-1.5 px-3 py-2 sm:justify-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Dificultat afegida (*): ${l.concepte}`}
+                          checked={l.dificultat}
+                          onChange={(e) => canvia(l.key, { dificultat: e.target.checked })}
+                        />
+                        <span className="text-sm text-[var(--color-muted)] sm:hidden">(*)</span>
+                      </label>
+                      <div className="px-3 py-2 text-right">
+                        <button type="button" className="text-red-700 hover:underline text-sm" onClick={() => treu(l.key)}>Eliminar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {rows.length === 0 && <div className="px-3 py-2 text-sm text-[var(--color-muted)]">Cap línia.</div>}
+              </div>
+            </div>
+            <button type="button" className="btn-ghost" onClick={() => afegeix(grup)}>+ Afegir línia</button>
+          </section>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span>(*) Dificultat afegida, incrementar del</span>
+        <DecInput label="Increment mínim (%)" value={difMin} onChange={setDifMin} className="input-sm w-16" />
+        <span>al</span>
+        <DecInput label="Increment màxim (%)" value={difMax} onChange={setDifMax} className="input-sm w-16" />
+        <span>%</span>
+      </div>
+      <DesarTarifa {...d} invalid={invalid} />
+    </div>
+  );
+}
+
+// ============================================================================
 // Tarifa ITE (price tiers used by the ITE càlcul)
 // ============================================================================
 
 function IteTarifaPanel({ tarifa }: { tarifa: IteTarifa }) {
+  const [any, setAny] = useState<number | null>(tarifa.any_tarifa ?? 2026);
   const [p1, setP1] = useState(tarifa.preu_1);
   const [p2, setP2] = useState(tarifa.preu_2);
   const [p3, setP3] = useState(tarifa.preu_3);
   const [inc, setInc] = useState(tarifa.increment);
-  const [saved, setSaved] = useState(false);
-  const [, startTransition] = useTransition();
-
-  function save() {
-    setSaved(false);
-    startTransition(async () => {
-      await updateIteTarifaAction({
-        preu_1: parseFloat(p1) || 0,
-        preu_2: parseFloat(p2) || 0,
-        preu_3: parseFloat(p3) || 0,
-        increment: parseFloat(inc) || 0,
-      });
-      setSaved(true);
+  const snapshot = JSON.stringify([any, p1, p2, p3, inc]);
+  const d = useDesarTarifa(snapshot, async () => {
+    await updateIteTarifaAction({
+      preu_1: parseFloat(p1) || 0,
+      preu_2: parseFloat(p2) || 0,
+      preu_3: parseFloat(p3) || 0,
+      increment: parseFloat(inc) || 0,
+      any: any ?? undefined,
     });
-  }
+    return snapshot;
+  });
 
   return (
     <div className="max-w-2xl space-y-4">
+      <AnyTarifa value={any} onChange={setAny} />
       <p className="text-sm text-[var(--color-muted)]">
         Preus base del càlcul ITE segons el total d&apos;entitats equivalents (D):
         <br />si D &lt; 6 → Preu 1; si D &lt; 11 → Preu 2; si D ≥ 11 → Preu 3 + increment × (D − 10).
@@ -165,10 +524,7 @@ function IteTarifaPanel({ tarifa }: { tarifa: IteTarifa }) {
         <IteTarifaField label="Preu 3 (11 o més entitats)" hint="Base per a 11+ entitats. Per defecte 850 €" value={p3} onChange={setP3} />
         <IteTarifaField label="Increment per entitat (per sobre de 10)" hint="Per defecte 15 €" value={inc} onChange={setInc} />
       </div>
-      <div className="flex items-center gap-3">
-        <button type="button" className="btn-primary" onClick={save}>Desar tarifa</button>
-        {saved && <span className="text-sm text-green-700">Desat ✓</span>}
-      </div>
+      <DesarTarifa {...d} invalid={anyInvalid(any)} />
     </div>
   );
 }
@@ -932,10 +1288,11 @@ function TabBtn({
     <button
       type="button"
       onClick={() => onClick(value)}
-      className={`px-4 py-2 text-sm border-b-2 -mb-px ${
+      aria-pressed={active}
+      className={`whitespace-nowrap px-3 sm:px-4 py-2 text-sm ${
         active
-          ? "border-[var(--color-accent)] text-[var(--color-accent)] font-medium"
-          : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+          ? "shadow-[inset_0_-2px_0_var(--color-accent)] text-[var(--color-accent)] font-medium"
+          : "shadow-[inset_0_-1px_0_var(--color-line)] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
       }`}
     >
       {children}

@@ -26,6 +26,35 @@ export interface IteTarifa {
   preu_2: string;
   preu_3: string;
   increment: string;
+  any_tarifa?: number; // the year of the tariff; only Base de Dades loads it
+}
+
+// «Tarifa Mínima Benzina», «Tarifa Mínima Hora» and the year of «Tarifes CHB,
+// CEE i CCA»: the inputs of David's sheets (public.tarifa_minima, id = 1).
+// Results are computed by src/lib/tarifes.ts.
+export interface TarifaMinima {
+  benzina_any: number;
+  preu_litre: string; // € per litre
+  consum_100km: string; // litres cada 100 km
+  desgast_km: string; // € de desgast i manteniment per km
+  hora_any: number;
+  sou: string; // € al mes
+  lloguer: string; // lloguer del despatx al mes, sense IVA
+  lloguer_iva: string; // % d'IVA del lloguer
+  dies_mes: string;
+  hores_dia: string;
+  certificats_any: number;
+  dificultat_min: string; // (*) increment mínim, %
+  dificultat_max: string; // (*) increment màxim, %
+}
+
+// A line of «Tarifes CHB, CEE i CCA» (public.tarifa_certificat): minimum fee + IVA.
+export interface TarifaCertificat {
+  id: number;
+  grup: "individual" | "composta";
+  concepte: string;
+  preu: string;
+  dificultat: boolean; // (*) dificultat afegida
 }
 
 export interface ActaAssistent {

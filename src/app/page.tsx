@@ -35,11 +35,11 @@ export default async function HomePage() {
           </Link>
           <Link href="/ite" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">ITE</h2>
-            <p className="text-sm text-[var(--color-muted)]">Informes d'inspecció tècnica d'edificis, exportats per importar-los al portal de l'Agència de l'Habitatge.</p>
+            <p className="text-sm text-[var(--color-muted)]">Informes d'Inspecció tècnica d'edificis</p>
           </Link>
           <Link href="/calculs" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Càlculs</h2>
-            <p className="text-sm text-[var(--color-muted)]">Justificacions de càlcul (estintolaments, biguetes, inèrcies i soldadures) i taules de perfils.</p>
+            <p className="text-sm text-[var(--color-muted)]">Justificació de càlcul</p>
           </Link>
           <Link href="/honoraris" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Honoraris</h2>

@@ -16,8 +16,8 @@ export function newKey(): string {
   return randomBytes(9).toString("base64url");
 }
 
-// "actes/12", "expedients/7"
-export type FitxersFolder = `actes/${number}` | `expedients/${number}`;
+// "actes/12", "expedients/7", "ite/3"
+export type FitxersFolder = `actes/${number}` | `expedients/${number}` | `ite/${number}`;
 
 export async function newPathname(folder: FitxersFolder, name: string, fallback?: string): Promise<string> {
   return `${await fitxersArea()}/${folder}/${newKey()}/${safeFileName(name, fallback)}`;
@@ -63,6 +63,14 @@ export async function storeDataUrl(folder: FitxersFolder, dataUrl: string, name:
 // a data URI (stored now) or a ref the browser already uploaded (checked).
 export async function actaMediaRef(actaId: number, src: string, name: string): Promise<string | null> {
   const folder: FitxersFolder = `actes/${actaId}`;
+  if (src.startsWith("data:")) return storeDataUrl(folder, src, name);
+  const v = await verifyUploaded(src, folder);
+  return v ? refFor(v.pathname, v.bytes) : null;
+}
+
+// A photo or PDF of an ITE report: same rules as an acta's, in folder ite/<id>.
+export async function iteMediaRef(iteId: number, src: string, name: string): Promise<string | null> {
+  const folder: FitxersFolder = `ite/${iteId}`;
   if (src.startsWith("data:")) return storeDataUrl(folder, src, name);
   const v = await verifyUploaded(src, folder);
   return v ? refFor(v.pathname, v.bytes) : null;

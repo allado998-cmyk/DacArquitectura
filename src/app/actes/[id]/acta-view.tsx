@@ -9,39 +9,11 @@ import type { Acta, ActaAssistent, ActaDoc, ActaSignatura, ActaTema } from "@/ty
 import { actaFileName } from "@/lib/file-names";
 import { refFor } from "@/lib/fitxers-shared";
 import { uploadFitxer } from "@/lib/fitxers-client";
+import { compressImage } from "@/lib/compress-image";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-// Downscale/re-encode so a whole album of phone photos stays a few MB, not tens.
-async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<Blob> {
-  if (!file.type.startsWith("image/")) return file;
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await loadImage(url);
-    let w = img.naturalWidth, h = img.naturalHeight;
-    if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(img, 0, 0, w, h);
-    const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    return out ?? file;
-  } catch {
-    return file;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 function temaResponsables(t: ActaTema): string[] {
   if (t.responsables) return t.responsables;
   return t.responsable ? t.responsable.split(" & ").map((s) => s.trim()).filter(Boolean) : [];

@@ -148,7 +148,7 @@ await test("actions registered with unique names and valid JSON Schemas", () => 
     assert.ok(a.description.length > 10, a.name);
   }
   const menu = core.actionMenu();
-  for (const dom of ["expedients", "dedicacio", "planificacio", "clients", "facturacio", "propostes", "honoraris", "actes", "notes"]) assert.ok(menu[dom], dom);
+  for (const dom of ["expedients", "dedicacio", "planificacio", "clients", "facturacio", "propostes", "honoraris", "actes", "notes", "ite"]) assert.ok(menu[dom], dom);
 });
 await test("every change action declares plan and commit; deletes are marked destructive", () => {
   for (const a of core.listActions("change")) {

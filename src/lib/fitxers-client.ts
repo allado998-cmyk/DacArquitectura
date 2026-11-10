@@ -3,7 +3,7 @@ import { upload } from "@vercel/blob/client";
 import { newUploadPathAction } from "@/app/fitxers/actions";
 
 export async function uploadFitxer(
-  kind: "acta" | "expedient",
+  kind: "acta" | "expedient" | "ite",
   id: number,
   file: Blob,
   name: string,

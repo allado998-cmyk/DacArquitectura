@@ -1,0 +1,740 @@
+[
+ {
+  "cat": "ascensors",
+  "obj": {
+   "id": "60",
+   "codi": "UN_ASENSOR",
+   "descMultidioma": "Amb 1 ascensor",
+   "descripcio": "Amb 1 ascensor",
+   "i18n": "auxiliar.1ascensor",
+   "mestre": {
+    "id": "27",
+    "codi": "ASCENSORS_UN_NUCLI_ESCALES",
+    "i18n": "EdificiTipologia.ascensorsUnNucli"
+   },
+   "ordre": "2",
+   "valor": "UN_ASENSOR"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "62",
+   "codi": "DEF_EST_FONAMENTACIO",
+   "descMultidioma": "Fonamentació",
+   "i18n": "Deficiencia.estructures.fonamentacio",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "11"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "63",
+   "codi": "DEF_EST_VERTICAL",
+   "descMultidioma": "Estructura vertical",
+   "i18n": "Deficiencia.estructures.vertical",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "12"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "64",
+   "codi": "DEF_EST_HORITZONTAL",
+   "descMultidioma": "Estructura horitzontal",
+   "i18n": "Deficiencia.estructures.horitzontal",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "13"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "65",
+   "codi": "DEF_EST_COBERTA",
+   "descMultidioma": "Estructura de coberta",
+   "i18n": "Deficiencia.estructures.coberta",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "14"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "66",
+   "codi": "DEF_EST_ESCALES",
+   "descMultidioma": "Estructura d'escales",
+   "i18n": "Deficiencia.estructures.escales",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "15"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "116",
+   "codi": "DEF_ENV_TANVER",
+   "descMultidioma": "Tancaments verticals: Façanes, mitgeres i forats",
+   "i18n": "Deficiencia.envolupant.tancamentsVerticals",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "21"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "117",
+   "codi": "DEF_ENV_ACFAC",
+   "descMultidioma": "Acabats de façana",
+   "i18n": "Deficiencia.envolupant.acabatsFacana",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "22"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "118",
+   "codi": "DEF_ENV_FUSTEX",
+   "descMultidioma": "Fusteria exterior i envidrament",
+   "i18n": "Deficiencia.envolupant.fusteriaExt",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "23"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "119",
+   "codi": "DEF_ENV_ELEMAD",
+   "descMultidioma": "Elements adossats a façana",
+   "i18n": "Deficiencia.envolupant.elementsAdossatsFacana",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "24"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "120",
+   "codi": "DEF_ENV_ALTFAC",
+   "descMultidioma": "Altres elements de façana",
+   "i18n": "Deficiencia.envolupant.altresElementsFacana",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "25"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "121",
+   "codi": "DEF_ENV_TERR",
+   "descMultidioma": "Terrats i cobertes planes",
+   "i18n": "Deficiencia.envolupant.terrats",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "26"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "122",
+   "codi": "DEF_ENV_COBINC",
+   "descMultidioma": "Cobertes inclinades",
+   "i18n": "Deficiencia.envolupant.inclinades",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "27"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "123",
+   "codi": "DEF_INST_AIGUA",
+   "descMultidioma": "Instal·lació d'aigua",
+   "i18n": "Deficiencia.instalacions.aigua",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "31"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "124",
+   "codi": "DEF_INST_ELEC",
+   "descMultidioma": "Instal·lació d'electricitat",
+   "i18n": "Deficiencia.instalacions.electricitat",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "32"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "125",
+   "codi": "DEF_INST_SAN",
+   "descMultidioma": "Instal·lació de sanejament",
+   "i18n": "Deficiencia.instalacions.sanejament",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "33"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "126",
+   "codi": "DEF_INST_ALTRES",
+   "descMultidioma": "Altres instal·lacions",
+   "i18n": "Deficiencia.instalacions.altres",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "36"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "183",
+   "codi": "DEF_INST_GAS",
+   "descMultidioma": "Instal·lació de gas",
+   "i18n": "Deficiencia.instalacions.gas",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "34"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "184",
+   "codi": "DEF_INST_ASC",
+   "descMultidioma": "Instal·lació d'ascensor",
+   "i18n": "Deficiencia.instalacions.ascensor",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "35"
+  }
+ },
+ {
+  "cat": "categoria_deficiencia",
+  "obj": {
+   "id": "190",
+   "codi": "DEF_ALTRES_DEF",
+   "descMultidioma": "Altres deficiències en altres subsistemes constructius",
+   "i18n": "Deficiencia.altres.altresDef",
+   "mestre": {
+    "id": "32",
+    "codi": "DEF_ALTRES",
+    "i18n": "Deficiencia.altres"
+   },
+   "ordre": "41"
+  }
+ },
+ {
+  "cat": "colegi",
+  "obj": {
+   "id": "44",
+   "codi": "COAC",
+   "descMultidioma": "COAC",
+   "descripcio": "COAC",
+   "mestre": {
+    "id": "23",
+    "codi": "COLEGI_PROFESSIONAL",
+    "descripcio": "Col·legi Professional"
+   },
+   "ordre": "1",
+   "valor": "COAC"
+  }
+ },
+ {
+  "cat": "font_superficies",
+  "obj": {
+   "id": "51",
+   "codi": "CADASTRE",
+   "descMultidioma": "Cadastre",
+   "descripcio": "Cadastre",
+   "i18n": "auxiliar.cadastre",
+   "mestre": {
+    "id": "24",
+    "codi": "FONT_INFORMACIO_SUP",
+    "descripcio": "Font d'informació superfícies"
+   },
+   "ordre": "1",
+   "valor": "Cadastre"
+  }
+ },
+ {
+  "cat": "gravetat",
+  "obj": {
+   "id": "203",
+   "codi": "DEF_IMPORTANT",
+   "descMultidioma": "Important",
+   "i18n": "Deficiencia.gravetat.i",
+   "mestre": {
+    "id": "41",
+    "codi": "DEF_GRAVETAT",
+    "descripcio": "Gravetats de les deficiències",
+    "i18n": "Deficiencia.gravetat"
+   },
+   "ordre": "3",
+   "valor": "I"
+  }
+ },
+ {
+  "cat": "gravetat",
+  "obj": {
+   "id": "204",
+   "codi": "DEF_LLEU",
+   "descMultidioma": "Lleu",
+   "i18n": "Deficiencia.gravetat.ll",
+   "mestre": {
+    "id": "41",
+    "codi": "DEF_GRAVETAT",
+    "descripcio": "Gravetats de les deficiències",
+    "i18n": "Deficiencia.gravetat"
+   },
+   "ordre": "4",
+   "valor": "LL"
+  }
+ },
+ {
+  "cat": "implantacio",
+  "obj": {
+   "id": "55",
+   "codi": "IMPLANTACIO_ILLA_TANCADA",
+   "descMultidioma": "Edificació entre mitgeres/adossada/edificació en illa tancada",
+   "descripcio": "Edificació entre mitgeres/adossada/edificació en illa tancada",
+   "i18n": "auxiliar.edif.mitgeres",
+   "mestre": {
+    "id": "25",
+    "codi": "IMPLANTACIO_PARCELA",
+    "i18n": "EdificiTipologia.implantacioParcela"
+   },
+   "ordre": "2",
+   "valor": "IMPLANTACIO_ILLA_TANCADA"
+  }
+ },
+ {
+  "cat": "municipi",
+  "obj": {
+   "id": "4120",
+   "codi": "08019",
+   "codiProvincia": "08",
+   "nom": "Barcelona",
+   "provincia": {
+    "id": "8",
+    "codi": "08",
+    "descripcio": "Barcelona"
+   }
+  }
+ },
+ {
+  "cat": "nuclis",
+  "obj": {
+   "id": "56",
+   "codi": "COM_VERT_UN_NUCLI",
+   "descMultidioma": "Un sol nucli d'escales",
+   "descripcio": "Un sol nucli d'escales",
+   "i18n": "auxiliar.nucli",
+   "mestre": {
+    "id": "26",
+    "codi": "NUCLIS_COMUNICACIO_VERTICAL",
+    "i18n": "EdificiTipologia.nuclisComunicacioVertical"
+   },
+   "ordre": "1",
+   "valor": "COM_VERT_UN_NUCLI"
+  }
+ },
+ {
+  "cat": "orientacio",
+  "obj": {
+   "id": "330",
+   "codi": "ORI_SUDEST",
+   "descMultidioma": "Sud Est",
+   "i18n": "EdificiDescripcioGeneral.orientacio.sudest",
+   "mestre": {
+    "id": "63",
+    "codi": "TIPUS_ORIENTACIO",
+    "descripcio": "Tipus Orientacio Edifici",
+    "i18n": "Edifici.Orientacio"
+   },
+   "ordre": "5",
+   "valor": "5"
+  }
+ },
+ {
+  "cat": "regim_juridic",
+  "obj": {
+   "id": "41",
+   "codi": "PROP_HORITZONTAL",
+   "descMultidioma": "Propietat horitzontal",
+   "descripcio": "Propietat horitzontal",
+   "i18n": "propietat.horitzontal",
+   "mestre": {
+    "id": "22",
+    "codi": "REGIM_JURIDIC",
+    "descripcio": "Règim jurídic de la propietat",
+    "i18n": "Propietat.regimJuridic"
+   },
+   "ordre": "1",
+   "valor": "Propietat horitzontal"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "76",
+   "codi": "DEF_EST_VER_DEFINT",
+   "descMultidioma": "Deformacions, fissures i/o esquerdes en interior de l'edifici derivades de problemes de l'estructura vertical",
+   "i18n": "Deficiencia.estructures.vertical.deformacionsInterior",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "90",
+   "codi": "DEF_EST_HOR_FISFORJATS",
+   "descMultidioma": "Fissures i/o esquerdes en forjats",
+   "i18n": "Deficiencia.estructures.horitzontal.fissuresForjats",
+   "mestre": {
+    "id": "28",
+    "codi": "DEF_ESTRUCTURES",
+    "i18n": "Deficiencia.estructures"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "127",
+   "codi": "DEF_ENV_TANVER_FISFACEXT",
+   "descMultidioma": "Fissures i/o esquerdes en els tancaments de les façanes exteriors",
+   "i18n": "Deficiencia.envolupant.tancamentsVerticals.fissuresExteriors",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "146",
+   "codi": "DEF_ENV_ACFAC_BOMBMAT",
+   "descMultidioma": "Bombaments, degradació, erosió dels materials i/o risc de despreniment de l'arrebossat de façanes",
+   "i18n": "Deficiencia.envolupant.acabatsFacana.bombamentsMaterials",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "6"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "150",
+   "codi": "DEF_ENV_FUSTEX_DEFORM",
+   "descMultidioma": "Deformació i/o trencaments de fusteries exteriors",
+   "i18n": "Deficiencia.envolupant.fusteriaExt.deformacioTrencaments",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "152",
+   "codi": "DEF_ENV_FUSTEX_EROSIO",
+   "descMultidioma": "Erosió dels materials en fusteria exterior i/o corrosió d'elements metàl·lics en fusteria exterior",
+   "i18n": "Deficiencia.envolupant.fusteriaExt.erosio",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "3"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "154",
+   "codi": "DEF_ENV_ELEMAD_MALESTAT",
+   "descMultidioma": "Mal estat i/o risc de despreniment dels elements adossats a façana com: baixants, xemeneies, faroles, antenes, marquesines, estenedors de roba, tendals, cablejats, equips de climatització, etc.",
+   "i18n": "Deficiencia.envolupant.elementsAdossatsFacana.malEstat",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "160",
+   "codi": "DEF_ENV_TERR_FILTR",
+   "descMultidioma": "Manifestació de filtracions i/o goteres procedents de terrats",
+   "i18n": "Deficiencia.envolupant.terrats.filtracions",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "4"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "165",
+   "codi": "DEF_ENV_TERR_ALTRES",
+   "descMultidioma": "Altres deficiències en terrats (incloent absència d'aïllament tèrmic)",
+   "i18n": "Deficiencia.envolupant.terrats.altres",
+   "mestre": {
+    "id": "29",
+    "codi": "DEF_ENVOLUPANT",
+    "i18n": "Deficiencia.envolupant"
+   },
+   "ordre": "9"
+  }
+ },
+ {
+  "cat": "tipus_deficiencia",
+  "obj": {
+   "id": "185",
+   "codi": "DEF_INST_GAS_DEF",
+   "descMultidioma": "Deficiències en la instal·lació de gas. (En cap cas suposa la inspecció reglamentaria d'aquest tipus d'instal·lacions)",
+   "i18n": "Deficiencia.instalacions.gas.deficiencies",
+   "mestre": {
+    "id": "30",
+    "codi": "DEF_INSTALACIONS",
+    "i18n": "Deficiencia.instalacions"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_envolupant",
+  "obj": {
+   "id": "221",
+   "codi": "FAÇANES",
+   "descMultidioma": "Façanes",
+   "descripcio": "Façanes",
+   "i18n": "EdificiDescripcioGeneral.sistemaEnvolupant.facana",
+   "mestre": {
+    "id": "61",
+    "codi": "TIPUS_SISTEMA_ENVOLUPANT",
+    "descripcio": "Tipus de sistema envolupant",
+    "i18n": "Edifici.Sistemaenvolupant"
+   },
+   "ordre": "2"
+  }
+ },
+ {
+  "cat": "tipus_envolupant",
+  "obj": {
+   "id": "223",
+   "codi": "PATIS",
+   "descMultidioma": "Patis",
+   "descripcio": "Patis",
+   "i18n": "EdificiDescripcioGeneral.sistemaEnvolupant.patis",
+   "mestre": {
+    "id": "61",
+    "codi": "TIPUS_SISTEMA_ENVOLUPANT",
+    "descripcio": "Tipus de sistema envolupant",
+    "i18n": "Edifici.Sistemaenvolupant"
+   },
+   "ordre": "3"
+  }
+ },
+ {
+  "cat": "tipus_envolupant",
+  "obj": {
+   "id": "224",
+   "codi": "COBERTES",
+   "descMultidioma": "Cobertes",
+   "descripcio": "Cobertes",
+   "i18n": "EdificiDescripcioGeneral.sistemaEnvolupant.cobertes",
+   "mestre": {
+    "id": "61",
+    "codi": "TIPUS_SISTEMA_ENVOLUPANT",
+    "descripcio": "Tipus de sistema envolupant",
+    "i18n": "Edifici.Sistemaenvolupant"
+   },
+   "ordre": "5"
+  }
+ },
+ {
+  "cat": "tipus_identificacio",
+  "obj": {
+   "id": "15",
+   "codi": "NIF",
+   "descMultidioma": "NIF",
+   "descripcio": "NIF",
+   "mestre": {
+    "id": "10",
+    "codi": "TIPUS_IDENTIFICACIO",
+    "descripcio": "Tipus identificació",
+    "i18n": "Solicitant.tipusIdentificacio"
+   },
+   "ordre": "1"
+  }
+ },
+ {
+  "cat": "tipus_identificacio",
+  "obj": {
+   "id": "17",
+   "codi": "CIF",
+   "descMultidioma": "CIF",
+   "descripcio": "CIF",
+   "mestre": {
+    "id": "10",
+    "codi": "TIPUS_IDENTIFICACIO",
+    "descripcio": "Tipus identificació",
+    "i18n": "Solicitant.tipusIdentificacio"
+   },
+   "ordre": "3"
+  }
+ },
+ {
+  "cat": "tipus_via",
+  "obj": {
+   "id": "242",
+   "codi": "GRAN_VIA",
+   "descMultidioma": "Gran Via\t",
+   "descripcio": "Gran Via",
+   "i18n": "auxiliar.granvia",
+   "mestre": {
+    "id": "12",
+    "codi": "TIPUS_VIA",
+    "descripcio": "Tipus Via",
+    "i18n": "Edifici.tipusVia"
+   },
+   "ordre": "37",
+   "valor": "GV"
+  }
+ },
+ {
+  "cat": "tipus_via",
+  "obj": {
+   "id": "294",
+   "codi": "CARRER",
+   "descMultidioma": "Carrer",
+   "descripcio": "Carrer",
+   "i18n": "auxiliar.carrer",
+   "mestre": {
+    "id": "12",
+    "codi": "TIPUS_VIA",
+    "descripcio": "Tipus Via",
+    "i18n": "Edifici.tipusVia"
+   },
+   "ordre": "13",
+   "valor": "C."
+  }
+ },
+ {
+  "cat": "titulacio",
+  "obj": {
+   "id": "26",
+   "codi": "ARQUITECTE",
+   "descMultidioma": "Arquitecte/a",
+   "descripcio": "Arquitecte/a",
+   "i18n": "auxiliar.arquitecte",
+   "mestre": {
+    "id": "14",
+    "codi": "TITULACIO_TECNIC",
+    "i18n": "titulacioTecnic"
+   },
+   "ordre": "1",
+   "valor": "Arquitecte/a"
+  }
+ }
+]

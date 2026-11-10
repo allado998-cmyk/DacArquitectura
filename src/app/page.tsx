@@ -33,6 +33,10 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold mb-1">Actes</h2>
             <p className="text-sm text-[var(--color-muted)]">Actes de visites d'obra i reunions.</p>
           </Link>
+          <Link href="/ite" className="card hover:shadow-sm transition">
+            <h2 className="text-lg font-semibold mb-1">ITE</h2>
+            <p className="text-sm text-[var(--color-muted)]">Informes d'inspecció tècnica d'edificis, exportats per importar-los al portal de l'Agència de l'Habitatge.</p>
+          </Link>
           <Link href="/calculs" className="card hover:shadow-sm transition">
             <h2 className="text-lg font-semibold mb-1">Càlculs</h2>
             <p className="text-sm text-[var(--color-muted)]">Justificacions de càlcul (estintolaments, biguetes, inèrcies i soldadures) i taules de perfils.</p>

@@ -30,3 +30,6 @@ yarn-error.log*
 *.doc
 *.docx
 *.pdf
+# ITE portal exports (client reports) and the import test files made from them
+*.zip
+ite-proves/

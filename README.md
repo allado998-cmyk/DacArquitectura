@@ -235,6 +235,29 @@ un ~2 %) i el pes propi del perfil surt del catàleg si no s'escriu.
 Tests sense base de dades (comparen amb els valors dels fulls de càlcul):
 `npm run test:calculs` (els tres fitxers: `test-calculs`, `-biguetes` i `-inercies`).
 
+## ITE (informes per al portal de l'Agència de l'Habitatge)
+
+La pestanya **ITE** prepara l'informe d'inspecció tècnica d'un edifici aquí i
+n'exporta un zip amb el mateix format que «Exportar informe» del portal, per
+pujar-lo amb el botó **Importar** del portal en lloc d'omplir-lo allà.
+
+- **Nou informe**: el tècnic (David) ja hi surt; de l'expedient s'agafa
+  l'adreça i del client la propietat (també es pot omplir des de qualsevol
+  client i contacte de la Base de Dades).
+- **Obtenir dades del Cadastre**: amb la referència cadastral omple l'adreça,
+  l'any, la superfície construïda i la taula de plantes (un immoble per fila).
+- Les seccions són les del menú del portal, amb les seves etiquetes; fotos
+  per element de l'envolupant i per deficiència; l'estat de conservació i la
+  valoració final es calculen sols.
+- **Importar del portal**: porta un informe del portal (zip o XML) a l'app, amb
+  les fotos. Cada informe importat amplia les llistes desplegables.
+- També des del plugin (`create_ite`, `update_ite`, `ite_cadastre`…).
+
+**Pendent:** l'exportació del portal va signada amb el seu certificat i no
+sabem si la importació ho comprova. `node scripts/ite-proves.mjs <export.zip>`
+fa tres fitxers de prova per esbrinar-ho. Detalls del format, què es pot
+omplir i què no, i proves: [docs/ite.md](docs/ite.md). Tests: `npm run test:ite`.
+
 ## Plugin de ChatGPT i Claude
 
 L'aplicació exposa un servidor MCP a `/api/mcp` amb OAuth propi, de manera que

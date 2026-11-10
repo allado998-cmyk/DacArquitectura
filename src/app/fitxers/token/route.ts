@@ -8,7 +8,7 @@ import { FITXER_MAX_BYTES } from "@/lib/fitxers-shared";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PATHNAME = /^(dac|demo)\/(actes|expedients)\/\d+\/[A-Za-z0-9_-]{6,40}\/[^/]{1,160}$/;
+const PATHNAME = /^(dac|demo)\/(actes|expedients|ite)\/\d+\/[A-Za-z0-9_-]{6,40}\/[^/]{1,160}$/;
 
 export async function POST(request: Request): Promise<Response> {
   let body: HandleUploadBody;

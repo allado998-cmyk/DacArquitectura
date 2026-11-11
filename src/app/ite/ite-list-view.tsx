@@ -78,7 +78,7 @@ export function IteListView({ ites, expedients, clients }: { ites: IteListRow[];
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">ITE</h1>
-          <p className="mt-1 text-sm text-[var(--color-muted)]">Informes d&apos;inspecció tècnica preparats aquí i exportats per importar-los al portal de l&apos;Agència de l&apos;Habitatge.</p>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">Informes d&apos;inspecció tècnica preparats aquí per passar-los al portal de l&apos;Agència de l&apos;Habitatge: les dades amb Claude i les fotos amb el zip «Fotos per al portal».</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button className="btn-ghost" disabled={importing} onClick={() => fileRef.current?.click()} title="El zip de «Exportar informe» del portal (o només l'XML)">

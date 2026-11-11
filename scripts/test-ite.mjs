@@ -24,6 +24,7 @@ const schema = await load("schema.ts");
 const model = await load("model.ts");
 const defaults = await load("defaults.ts");
 const cadastre = await load("cadastre.ts");
+const fotos = await load("fotos.ts");
 
 let passed = 0;
 const failures = [];
@@ -289,6 +290,42 @@ await test("the report as text and the list of fields for the chat", () => {
   const camps = edit.iteCamps(cataleg, "descripcio");
   const ori = camps[0].camps.find((c) => c.camp === "edifici.edificiDescripcio.orientacio");
   assert.deepEqual(ori.valors, [{ valor: "ORI_SUDEST", text: "Sud Est" }]);
+  const asc = camps[0].camps.find((c) => c.camp === "edifici.edificiTipologia.ascensorsUnNucli");
+  assert.ok(asc.pista.includes("Nuclis de comunicació vertical"));
+});
+
+await test("the report as text is written for the portal's form (first run, 11/11/2026)", () => {
+  const dades = schema.SECTIONS.find((s) => s.key === "dades").title;
+  const sist = "Sist. Constructius";
+  const defs = schema.SECTIONS.find((s) => s.key === "deficiencies").title;
+  let doc = model.newIteDoc({ nom: "X", tecnic: defaults.tecnicDespatx(cataleg) });
+  doc = edit.applyIteEdit(doc, {
+    camps: { "propietat.codiPostalPropietat": "08028", "edifici.edificiInstalacions.caDisposa": true, "edifici.edificiInstalacions.aaSubministramentPublic": "1" },
+    deficiencies: { afegir: [{ tipus: cataleg.tipus_deficiencia[0].codi, gravetat: "I", descripcio: "Goteres" }] },
+  }, cataleg).doc;
+  const t = edit.iteAsText(doc, cataleg);
+  // the technician is the portal account: a note, not fields to type
+  const tec = t[dades]["4. Identificació del tècnic redactor"];
+  assert.ok(tec.nota && /David Lladó Porta \(35040453E\)/.test(tec.tecnic), JSON.stringify(tec));
+  // what the portal sets itself is named apart (llocFirma is "Barcelona" by default)
+  assert.deepEqual(t[dades]["No cal entrar-ho al portal"], ["Lloc de signatura"]);
+  assert.ok(!("Lloc de signatura" in (t[dades]["1. Identificació de l'informe"] ?? {})));
+  // the province the portal asks for, from the postcode
+  assert.equal(t[dades]["3. Identificació propietat"]["Província (el portal la demana)"], "Barcelona");
+  assert.equal(edit.provinciaDeCP("17001"), "Girona");
+  assert.equal(edit.provinciaDeCP("28001"), "");
+  // yes/no questions that reveal other fields are said even when "No"
+  assert.deepEqual(t[sist]["Calefacció"], ["Es disposa de sistema de calefacció", "Es disposa de sistema de calefacció col·lectiva/central: No"]);
+  assert.ok(t[sist]["Aigua calenta sanitària (ACS)"].includes("L'edifici disposa de sistema d'ACS: No"));
+  assert.ok(t[sist]["Refrigeració"].includes("L'edifici disposa de sistema col·lectiu de refrigeració: No"));
+  // a label that differs at the portal carries its hint
+  const aigua = Object.values(t[sist]).find((g) => g && typeof g === "object" && "Connexió a la xarxa" in g);
+  assert.ok(/^Directe — al portal/.test(aigua["Connexió a la xarxa"]));
+  // per-category yes/no for deficiencies, the whole list
+  const perCat = t[defs]["Té deficiències? (Sí/No per categoria, com ho demana el portal)"];
+  assert.equal(Object.keys(perCat).length, cataleg.categoria_deficiencia.length);
+  assert.equal(Object.values(perCat).filter((v) => v === "Sí").length, 1);
+  assert.equal(t[defs].deficiencies[0].codi, "D01");
 });
 
 // Real export ----------------------------------------------------------------------
@@ -347,6 +384,50 @@ if (zipPath) {
 } else {
   console.log("real export: skipped (no Inspeccio*.zip in the project folder)");
 }
+
+console.log("fotos per al portal");
+await test("photos are named by their place in the portal, with an index of captions", () => {
+  let doc = model.newIteDoc({ nom: "Inspecció Tècnica de l'Edifici del carrer Llatzeret, 27 de Barcelona", tecnic: defaults.tecnicDespatx(cataleg) });
+  doc = model.setAt(doc, "edifici.referenciaCadastral", { id: "null", tipusVia: "294", nomVia: "Llatzeret", numero: "27", municipi: "Barcelona" });
+  const tipus = cataleg.tipus_deficiencia[0];
+  const important = cataleg.gravetat.find((g) => g.valor === "I");
+  const lleu = cataleg.gravetat.find((g) => g.valor === "LL");
+  doc = model.setAt(doc, "deficiencies", [
+    { id: "null", tipusDeficiencia: tipus, gravetat: important, deficienciaDescripcio: "Esquerdes a la caixa d'escala", fotos: [
+      model.newMedia("Lateral est", "image/jpeg", "/fitxers/dac/ite/7/a/foto1.jpg?mida=10"),
+      model.newMedia("Lateral oest", "image/png", "/fitxers/dac/ite/7/b/foto2.png?mida=10"),
+    ] },
+    { id: "null", tipusDeficiencia: tipus, gravetat: lleu, deficienciaDescripcio: "Embornal brut", fotos: [] },
+    { id: "null", tipusDeficiencia: tipus, gravetat: lleu, deficienciaDescripcio: "Foto perduda", fotos: [model.newMedia("", "image/jpeg", "{IMAGEROOTDIR}/replaceFitxerId_1/DEFICIENCIES/perduda.JPG")] },
+  ]);
+  doc = model.setAt(doc, "edifici.edificiEnvolupants", [
+    { id: "null", envolupantTipus: cataleg.tipus_envolupant[0], envolupantDescripcio: "Façana principal", fotos: [model.newMedia("Vista general", "image/jpeg", "/fitxers/dac/ite/7/c/f.jpg")] },
+  ]);
+  doc = model.setAt(doc, "edifici.edificiDescripcio.croquis", model.newMedia("Croquis planta", "image/jpeg", "/fitxers/dac/ite/7/k/CROQUIS.JPG"));
+  doc = model.setAt(doc, "recomanacionsPdf", model.newMedia("RECOMANACIONS", "application/pdf", "/fitxers/dac/ite/7/r/rec.pdf"));
+
+  const p = fotos.fotoPaquet(doc, cataleg);
+  assert.deepEqual(p.fitxers.map((f) => f.zipPath), [
+    "CROQUIS/CROQUIS.jpg",
+    "ENVOLUPANTS/E01-1.jpg",
+    "DEFICIENCIES/D01-1.jpg",
+    "DEFICIENCIES/D01-2.png",
+    "RECOMANACIONS.pdf",
+  ]);
+  assert.deepEqual(p.falten, ["DEFICIENCIES/D03-1"]);
+  assert.equal(p.fitxers[2].peu, "Lateral est");
+  assert.equal(p.fitxers[0].peu, "", "the slot's default text is not a caption");
+  assert.ok(p.nom.endsWith("-fotos") && /Llatzeret-27/.test(p.nom), p.nom);
+  assert.ok(p.index.includes("D01-1.jpg (Lateral est)"), "the index lists captions");
+  assert.ok(/D02 .*Embornal brut\n\s+\(sense fotos\)/.test(p.index), "deficiencies without photos keep their number");
+  assert.ok(p.index.includes("RECOMANACIONS.pdf"));
+  assert.ok(p.index.includes("Sense fitxer a l'app (no són al zip): DEFICIENCIES/D03-1"));
+  assert.deepEqual([fotos.codiDeficiencia(0), fotos.codiDeficiencia(9), fotos.codiEnvolupant(2)], ["D01", "D10", "E03"]);
+  // the portal wants a photo per deficiency: the app warns before the portal does
+  const rev = model.validateIte(doc, cataleg);
+  assert.ok(rev.warnings.some((w) => w.startsWith("Deficiència 2: sense cap foto")), rev.warnings.join(" | "));
+  assert.ok(!rev.warnings.some((w) => w.startsWith("Deficiència 1: sense cap foto")));
+});
 
 console.log(`\n${passed} passed, ${failures.length} failed`);
 if (failures.length) process.exit(1);

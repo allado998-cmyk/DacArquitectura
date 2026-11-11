@@ -2,6 +2,7 @@
 // by path, and add / modify / remove on the lists. Pure: returns the new
 // report, a readable list of changes, and errors that block saving.
 import { catId, catLabel, matchCat, type Cataleg } from "./cataleg";
+import { codiDeficiencia, codiEnvolupant, fotoPaquet } from "./fotos";
 import { FIELD_BY_PATH, SECTIONS, type FieldDef } from "./schema";
 import {
   fieldText,
@@ -16,6 +17,7 @@ import {
   newEnvolupant,
   newMesura,
   newPlanta,
+  resumDeficiencies,
   setAt,
   syncInspeccions,
   withField,
@@ -229,54 +231,116 @@ export function removedMedia(before: IteObj, after: IteObj): string[] {
   return [...refs(before)].filter((r) => r.startsWith("/fitxers/") && !now.has(r));
 }
 
+// Province from a Catalan postcode: the portal asks for it and the report
+// only has the town and the postcode.
+export function provinciaDeCP(cp: string): string {
+  const map: Record<string, string> = { "08": "Barcelona", "17": "Girona", "25": "Lleida", "43": "Tarragona" };
+  return map[cp.trim().slice(0, 2)] ?? "";
+}
+
 // The report as text for the chat: filled fields per section, lists with
-// their index (used by modificar/treure).
+// their index (used by modificar/treure). Written for typing it into the
+// portal's form: fields the portal sets itself or lacks are set apart, yes/no
+// questions that reveal other fields are always said, and labels that differ
+// at the portal carry a hint.
 export function iteAsText(doc: IteObj, cataleg: Cataleg, seccio?: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  // Photo file names as in the «Fotos per al portal» zip, so the chat can say
+  // which file goes where at the portal.
+  const paquet = fotoPaquet(doc, cataleg);
+  const fotosDe = (carpeta: string, codi: string) =>
+    paquet.fitxers.filter((f) => f.carpeta === carpeta && f.codi === codi).map((f) => (f.peu ? { fitxer: f.fitxer, peu: f.peu } : { fitxer: f.fitxer }));
+  const unic = (slotPath: string) => paquet.fitxers.find((f) => f.slotPath === slotPath)?.zipPath ?? null;
+  const txt = (v: unknown) => (typeof v === "string" ? v : "");
   for (const s of SECTIONS) {
     if (seccio && s.key !== seccio) continue;
     const sec: Record<string, unknown> = {};
+    const noPortal: string[] = []; // filled here, but the portal sets it itself or has no such field
     for (const g of s.groups) {
+      if (g.fields.length && g.fields.every((f) => f.path.startsWith("tecnics."))) {
+        // The technician is the portal account itself: nothing to type there.
+        const t = listOf(doc, "tecnics")[0] ?? {};
+        const nom = [t.nomTecnic, t.cognom1Tecnic, t.cognom2Tecnic].map(txt).filter(Boolean).join(" ");
+        const nif = txt(t.identificacioTecnic);
+        if (nom || nif) sec[g.title] = { nota: "Ja consta al portal (és el compte amb què s'hi entra): no s'ha d'entrar.", tecnic: nif ? `${nom} (${nif})` : nom };
+        continue;
+      }
       if (g.layout === "checks") {
-        const on = g.fields.filter((f) => fieldValue(doc, f) === "true").map((f) => f.label);
+        const on: string[] = [];
+        for (const f of g.fields) {
+          const checked = fieldValue(doc, f) === "true";
+          if (f.portal === "auto" || f.portal === "no") {
+            if (checked) noPortal.push(f.label);
+            continue;
+          }
+          if (checked) on.push(f.label);
+          else if (f.portal === "gate") on.push(`${f.label}: No`);
+        }
         if (on.length) sec[g.title] = on;
         continue;
       }
       const vals: Record<string, string> = {};
       for (const f of g.fields) {
         const t = fieldText(doc, f, cataleg);
-        if (t && !(f.kind === "bool" && t === "No")) vals[f.label] = t;
+        if (!t || (f.kind === "bool" && t === "No" && f.portal !== "gate")) continue;
+        if (f.portal === "auto" || f.portal === "no") {
+          noPortal.push(f.label);
+          continue;
+        }
+        vals[f.label] = f.hint ? `${t} — ${f.hint}` : t;
+      }
+      const cpField = g.fields.find((f) => f.path === "propietat.codiPostalPropietat");
+      if (cpField) {
+        const prov = provinciaDeCP(fieldValue(doc, cpField));
+        if (prov) vals["Província (el portal la demana)"] = prov;
       }
       if (Object.keys(vals).length) sec[g.title] = vals;
     }
+    if (noPortal.length) sec["No cal entrar-ho al portal"] = noPortal;
     if (s.key === "descripcio") {
-      sec.plantes = listOf(doc, LIST_PATHS.plantes).map((p, index) => ({
+      const plantes = listOf(doc, LIST_PATHS.plantes);
+      sec.plantes = plantes.map((p, index) => ({
         index,
         descripcio: p.plantaDescripcio ?? "",
         habitatges: Number(p.numHabitatges ?? 0),
         locals: Number(p.numLocals ?? 0),
         parquing: p.teParquing === "true",
+        entitats: inspeccionsOf(p).length,
         visitades: inspeccionsOf(p).map((it, k) => (it.revisat === "true" ? k + 1 : 0)).filter(Boolean),
       }));
-      sec.croquis = isObj(getAt(doc, "edifici.edificiDescripcio.croquis"));
+      if (plantes.length) sec.nota_plantes = "visitades: números d'entitat (porta) de la fila de cada planta al portal, de l'1 fins a entitats.";
+      sec.croquis = unic("edifici.edificiDescripcio.croquis");
     }
     if (s.key === "envolupant") {
       sec.elements = listOf(doc, LIST_PATHS.envolupants).map((e, index) => ({
         index,
+        codi: codiEnvolupant(index),
         tipus: isObj(e.envolupantTipus) ? catLabel(e.envolupantTipus) : null,
         descripcio: e.envolupantDescripcio ?? "",
-        fotos: listOf(e, "fotos").map((f) => f.descripcio ?? ""),
+        fotos: fotosDe("ENVOLUPANTS", codiEnvolupant(index)),
       }));
+    }
+    if (s.key === "sistemes") {
+      const fotos = [unic("edifici.edificiInstalacions.aaFotoComptadors"), unic("edifici.edificiInstalacions.ieQcpFoto")].filter(Boolean);
+      if (fotos.length) sec.fotos = fotos;
     }
     if (s.key === "deficiencies") {
       sec.deficiencies = listOf(doc, LIST_PATHS.deficiencies).map((x, index) => ({
         index,
+        codi: codiDeficiencia(index),
         tipus: isObj(x.tipusDeficiencia) ? catLabel(x.tipusDeficiencia) : null,
         gravetat: gravetatValor(x) || null,
         descripcio: x.deficienciaDescripcio ?? "",
         observacions: x.deficienciaObservacions ?? "",
-        fotos: listOf(x, "fotos").map((f) => f.descripcio ?? ""),
+        fotos: fotosDe("DEFICIENCIES", codiDeficiencia(index)),
       }));
+      // The portal asks, per category, whether there are deficiencies.
+      const resum = resumDeficiencies(doc, cataleg);
+      if (resum.length) sec["Té deficiències? (Sí/No per categoria, com ho demana el portal)"] = Object.fromEntries(resum.map((r) => [catLabel(r.categoria), r.n > 0 ? "Sí" : "No"]));
+    }
+    if (s.key === "conservacio") {
+      const pdf = unic("recomanacionsPdf");
+      if (pdf) sec.recomanacions_pdf = pdf;
     }
     if (s.key === "sostenibilitat") {
       sec.mesures = listOf(doc, LIST_PATHS.mesures).map((m, index) => ({ index, descripcio: m.descripcioMesura ?? "" }));
@@ -298,6 +362,10 @@ export function iteCamps(cataleg: Cataleg, seccio?: string): unknown[] {
         if (f.kind === "tri") c.valors = ["si", "no", "es_desconeix"];
         if (f.kind === "radio") c.valors = f.options?.map((o) => ({ valor: o.value, text: o.label }));
         if (f.kind === "cat") c.valors = (cataleg[f.cat ?? ""] ?? []).map((o) => ({ valor: String(o.codi ?? catId(o)), text: catLabel(o) }));
+        if (f.portal === "auto") c.portal = "el portal ho posa sol: no s'hi entra";
+        if (f.portal === "no") c.portal = "el portal no té aquest camp";
+        if (f.portal === "gate") c.portal = "Sí/No que fa aparèixer altres camps al portal: cal respondre'l sempre";
+        if (f.hint) c.pista = f.hint;
         return c;
       }),
     ),

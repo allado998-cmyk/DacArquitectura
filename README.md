@@ -237,9 +237,10 @@ Tests sense base de dades (comparen amb els valors dels fulls de càlcul):
 
 ## ITE (informes per al portal de l'Agència de l'Habitatge)
 
-La pestanya **ITE** prepara l'informe d'inspecció tècnica d'un edifici aquí i
-n'exporta un zip amb el mateix format que «Exportar informe» del portal, per
-pujar-lo amb el botó **Importar** del portal en lloc d'omplir-lo allà.
+La pestanya **ITE** prepara l'informe d'inspecció tècnica d'un edifici aquí,
+per passar-lo després al portal de l'Agència («Generador d'informes ITE»):
+les dades les hi entra Claude pel formulari del portal, i les fotos surten
+d'un zip amb el nom de cada una al seu lloc.
 
 - **Nou informe**: el tècnic (David) ja hi surt; de l'expedient s'agafa
   l'adreça i del client la propietat (també es pot omplir des de qualsevol
@@ -249,14 +250,18 @@ pujar-lo amb el botó **Importar** del portal en lloc d'omplir-lo allà.
 - Les seccions són les del menú del portal, amb les seves etiquetes; fotos
   per element de l'envolupant i per deficiència; l'estat de conservació i la
   valoració final es calculen sols.
+- **Fotos per al portal**: zip amb una carpeta per apartat i noms que diuen on
+  va cada foto (`D03-2.jpg` = deficiència 3, foto 2) més un `index.txt` amb
+  els peus, per pujar-les al portal a mà o amb Claude a l'ordinador.
 - **Importar del portal**: porta un informe del portal (zip o XML) a l'app, amb
   les fotos. Cada informe importat amplia les llistes desplegables.
 - També des del plugin (`create_ite`, `update_ite`, `ite_cadastre`…).
 
-**Pendent:** l'exportació del portal va signada amb el seu certificat i no
-sabem si la importació ho comprova. `node scripts/ite-proves.mjs <export.zip>`
-fa tres fitxers de prova per esbrinar-ho. Detalls del format, què es pot
-omplir i què no, i proves: [docs/ite.md](docs/ite.md). Tests: `npm run test:ite`.
+**El portal no importa fitxers nostres**: les seves exportacions van signades
+amb el seu certificat i la importació ho comprova (provat l'11/11/2026); el
+botó «Importar» només readmet exportacions del mateix portal. Com s'omple el
+portal amb Claude, el format i les proves: [docs/ite.md](docs/ite.md).
+Tests: `npm run test:ite`.
 
 ## Plugin de ChatGPT i Claude
 

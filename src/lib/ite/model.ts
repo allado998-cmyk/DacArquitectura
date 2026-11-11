@@ -399,6 +399,8 @@ export function validateIte(doc: IteObj, cataleg: Cataleg): IteCheck {
     else if (!categoriaDeTipus(cataleg, d.tipusDeficiencia)) warnings.push(`Deficiència ${n}: el tipus no és de cap categoria coneguda.`);
     if (!isObj(d.gravetat)) errors.push(`Deficiència ${n}: falta la gravetat.`);
     if (!str(d.deficienciaDescripcio).trim()) warnings.push(`Deficiència ${n}: falta la descripció i localització.`);
+    // The portal refuses to close a report with a deficiency without a photo.
+    if (!listOf(d, "fotos").length) warnings.push(`Deficiència ${n}: sense cap foto (el portal n'exigeix una com a mínim per tancar l'informe).`);
   });
   listOf(doc, LIST_PATHS.envolupants).forEach((e, i) => {
     if (!isObj(e.envolupantTipus)) errors.push(`Envolupant ${i + 1}: falta el tipus (façana, coberta, pati…).`);

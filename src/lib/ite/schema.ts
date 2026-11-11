@@ -22,6 +22,11 @@ export interface FieldDef {
   required?: boolean;
   help?: string;
   wide?: boolean; // spans the whole row
+  // For the chat that types the report into the portal's form: "auto" the
+  // portal sets it itself, "no" the portal has no such field, "gate" a yes/no
+  // that makes other fields appear, so a "No" must be said too.
+  portal?: "auto" | "no" | "gate";
+  hint?: string; // how to find the field at the portal when its label differs
 }
 
 export interface GroupDef {
@@ -85,7 +90,7 @@ export const SECTIONS: SectionDef[] = [
         fields: [
           { path: "nom", label: "Nom", kind: "text", required: true, wide: true, max: 250 },
           { path: "dataInspeccio", label: "Data d'inspecció", kind: "date", required: true },
-          { path: "llocFirma", label: "Lloc de signatura", kind: "text", max: 100 },
+          { path: "llocFirma", label: "Lloc de signatura", kind: "text", max: 100, portal: "auto" },
         ],
       },
       {
@@ -101,8 +106,8 @@ export const SECTIONS: SectionDef[] = [
           { path: `${RC}.municipi`, label: "Municipi", kind: "text", max: 100 },
           { path: `${RC}.provincia`, label: "Província", kind: "text", max: 100 },
           { path: `${RC}.codiIne`, label: "Codi INE del municipi", kind: "text", max: 5 },
-          { path: `${RC}.adrecaCorrecta`, label: "Confirmo que l'adreça recuperada coincideix amb l'adreça de l'edifici a avaluar", kind: "bool", wide: true },
-          { path: `${RC}.adrecaIncorrecta`, label: "L'adreça proposada pel cadastre no coincideix amb la de l'edifici", kind: "bool", wide: true },
+          { path: `${RC}.adrecaCorrecta`, label: "Confirmo que l'adreça recuperada coincideix amb l'adreça de l'edifici a avaluar", kind: "bool", wide: true, portal: "auto" },
+          { path: `${RC}.adrecaIncorrecta`, label: "L'adreça proposada pel cadastre no coincideix amb la de l'edifici", kind: "bool", wide: true, portal: "auto" },
         ],
       },
       {
@@ -169,7 +174,7 @@ export const SECTIONS: SectionDef[] = [
         fields: [
           { path: `${TIP}.implantacioParcela`, label: "Implantació en parcel·la de l'edifici", kind: "cat", cat: "implantacio", wide: true },
           { path: `${TIP}.nuclisComunicacioVertical`, label: "Nuclis de comunicació vertical", kind: "cat", cat: "nuclis" },
-          { path: `${TIP}.ascensorsUnNucli`, label: "Un sol nucli d'escales", kind: "cat", cat: "ascensors" },
+          { path: `${TIP}.ascensorsUnNucli`, label: "Un sol nucli d'escales", kind: "cat", cat: "ascensors", hint: "al portal, el desplegable d'ascensors que surt sota «Nuclis de comunicació vertical» quan n'hi ha un de sol" },
           { path: `${TIP}.numMigHabitatgesPerPlanta`, label: "Núm. mig d'habitatges per planta", kind: "int" },
         ],
       },
@@ -497,7 +502,7 @@ export const SECTIONS: SectionDef[] = [
       {
         title: "Subministrament d'aigua — Connexió i muntants",
         fields: [
-          { path: `${INS}.aaSubministramentPublic`, label: "Connexió a la xarxa", kind: "radio", options: [{ value: "1", label: "Directe" }, { value: "2", label: "Per aforament" }] },
+          { path: `${INS}.aaSubministramentPublic`, label: "Connexió a la xarxa", kind: "radio", options: [{ value: "1", label: "Directe" }, { value: "2", label: "Per aforament" }], hint: "al portal l'opció pot dir-se «Directa» o «Connexió directa»; l'altra és per aforament o dipòsit" },
         ],
       },
       {
@@ -521,7 +526,7 @@ export const SECTIONS: SectionDef[] = [
           b(`${INS}.ieIcp`, "Interruptor control de potència (ICP)"),
           b(`${INS}.ieId`, "Interruptor diferencial (ID)"),
           b(`${INS}.iePia`, "Interruptor automàtic a l'inici dels circuits de serveis comuns (PIA)"),
-          b(`${INS}.ieAltres`, "Altres"),
+          { ...b(`${INS}.ieAltres`, "Altres"), portal: "no" },
           b(`${INS}.ieComptadorUnic`, "Comptador únic per a tot l'edifici"),
           b(`${INS}.ieComptadorIndividualHab`, "Comptadors individuals per habitatge/local"),
           b(`${INS}.ieComptadorIndividualCentral`, "Comptadors individuals centralitzats"),
@@ -531,8 +536,8 @@ export const SECTIONS: SectionDef[] = [
         title: "Calefacció",
         layout: "checks",
         fields: [
-          b(`${INS}.caDisposa`, "Es disposa de sistema de calefacció"),
-          b(`${INS}.caDisposaSistCentral`, "Es disposa de sistema de calefacció col·lectiva/central"),
+          { ...b(`${INS}.caDisposa`, "Es disposa de sistema de calefacció"), portal: "gate" },
+          { ...b(`${INS}.caDisposaSistCentral`, "Es disposa de sistema de calefacció col·lectiva/central"), portal: "gate" },
           b(`${INS}.caCanalitzatPropa`, "Caldera gas canalitzat: propà"),
           b(`${INS}.caCanalitzatGasNatural`, "Caldera gas canalitzat: gas natural"),
           b(`${INS}.caElectricaBombaCalor`, "Calefacció elèctrica: bomba de calor"),
@@ -553,8 +558,8 @@ export const SECTIONS: SectionDef[] = [
         title: "Aigua calenta sanitària (ACS)",
         layout: "checks",
         fields: [
-          b(`${INS}.acsDisposa`, "L'edifici disposa de sistema d'ACS"),
-          b(`${INS}.acsDisposaSistCentral`, "L'edifici disposa de sistema d'ACS central"),
+          { ...b(`${INS}.acsDisposa`, "L'edifici disposa de sistema d'ACS"), portal: "gate" },
+          { ...b(`${INS}.acsDisposaSistCentral`, "L'edifici disposa de sistema d'ACS central"), portal: "gate" },
           b(`${INS}.acsCentralCaptadorSolar`, "L'edifici disposa de captadors solars per a la producció d'ACS"),
           b(`${INS}.acsCanalitzatPropa`, "Escalfadors gas canalitzat: propà"),
           b(`${INS}.acsCanalitzatGasNatural`, "Escalfadors gas canalitzat: gas natural"),
@@ -588,8 +593,8 @@ export const SECTIONS: SectionDef[] = [
         title: "Refrigeració",
         layout: "checks",
         fields: [
-          b(`${INS}.reDisposa`, "L'edifici disposa de sistema de refrigeració"),
-          b(`${INS}.reColectiu`, "L'edifici disposa de sistema col·lectiu de refrigeració"),
+          { ...b(`${INS}.reDisposa`, "L'edifici disposa de sistema de refrigeració"), portal: "gate" },
+          { ...b(`${INS}.reColectiu`, "L'edifici disposa de sistema col·lectiu de refrigeració"), portal: "gate" },
         ],
       },
       {
@@ -701,7 +706,7 @@ export const SECTIONS: SectionDef[] = [
     ],
     pendents: ["Dades del certificat d'eficiència energètica quan n'hi ha"],
   },
-  { key: "exportar", title: "Exportar al portal", groups: [] },
+  { key: "exportar", title: "Portal", groups: [] },
 ];
 
 export const ALL_FIELDS: FieldDef[] = SECTIONS.flatMap((s) => s.groups.flatMap((g) => g.fields));

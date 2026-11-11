@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { consultaCadastreAction, createIteFromDocAction, removeIteFitxersAction, saveIteAction } from "@/app/ite/actions";
 import { applyCadastre } from "@/lib/ite/cadastre";
 import { applyIteEdit, iteAsText, iteCamps, removedMedia, type IteEdit } from "@/lib/ite/edit";
+import { fotoPaquet } from "@/lib/ite/fotos";
 import { getAt, setAt, validateIte, valoracioFavorable } from "@/lib/ite/model";
 import { SECTIONS } from "@/lib/ite/schema";
 import { loadCataleg, loadIte, newDocFor } from "@/lib/ite/server";
@@ -96,6 +97,7 @@ registerAction({
     if (!ite) return { error: `No hi ha cap informe ITE amb id ${a.id}.` };
     const cataleg = await loadCataleg();
     const check = validateIte(ite.dades, cataleg);
+    const paquet = fotoPaquet(ite.dades, cataleg);
     return {
       id: ite.id,
       nom: ite.nom,
@@ -105,6 +107,12 @@ registerAction({
       exportat: ite.exportat_at,
       valoracio_final: valoracioFavorable(ite.dades) ? "FAVORABLE" : "DESFAVORABLE",
       informe: iteAsText(ite.dades, cataleg, a.seccio),
+      fotos: {
+        total: paquet.fitxers.length,
+        sense_fitxer: paquet.falten.length,
+        zip: `${paquet.nom}.zip`,
+        com: "Els noms de fitxer de l'informe són els del zip «Descarregar fotos» (secció Portal de la web), que porta index.txt amb els peus. Les fotos es pugen al portal des d'aquest zip, no des del xat.",
+      },
       revisio: check,
     };
   },
@@ -139,7 +147,7 @@ registerAction({
   name: "create_ite",
   domain: "ite",
   description: "Crea un informe ITE amb el tècnic del despatx, la propietat des del client i l'adreça des de l'expedient; opcionalment omple camps i llistes alhora.",
-  notes: ["Accepta els mateixos camps i llistes que update_ite.", "Després, a la web: fotos, revisió i «Exportar al portal»."],
+  notes: ["Accepta els mateixos camps i llistes que update_ite.", "Després, a la web: fotos, revisió i «Descarregar fotos» per pujar-les al portal."],
   schema: z.object({ expedient_num: shortText.optional(), expedient_id: idOrNull.optional(), client_id: idOrNull.optional(), contacte_id: idOrNull.optional(), ...editShape }),
   async plan(a): Promise<Plan> {
     const errors: string[] = [];

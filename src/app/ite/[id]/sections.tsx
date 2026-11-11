@@ -22,7 +22,8 @@ import {
   validateIte,
   valoracioFavorable,
 } from "@/lib/ite/model";
-import { exportPortalXml, exportPortalZip } from "@/lib/ite/portal-client";
+import { fotoPaquet } from "@/lib/ite/fotos";
+import { exportFotosZip, exportPortalXml, exportPortalZip } from "@/lib/ite/portal-client";
 import { isObj, type IteObj } from "@/lib/ite/xml";
 import { CatSelect } from "./fields";
 import { useDraft, useIte } from "./ite-context";
@@ -471,16 +472,30 @@ export function CadastrePanel() {
 export function ExportPanel() {
   const { iteId, doc, cataleg } = useIte();
   const check = useMemo(() => validateIte(doc, cataleg), [doc, cataleg]);
+  const paquet = useMemo(() => fotoPaquet(doc, cataleg), [doc, cataleg]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgCopia, setMsgCopia] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function zip() {
+  async function fotos() {
     setBusy(true); setMsg("Preparant…");
     try {
-      const name = await exportPortalZip(iteId, doc, cataleg, setMsg);
-      setMsg(`Descarregat ${name}. Al portal: Informes Tècnics → Importar → tria aquest fitxer.`);
+      const r = await exportFotosZip(doc, cataleg, setMsg);
+      setMsg(`Descarregat ${r.name}: ${r.fotos} fitxers${r.falten ? ` (${r.falten} sense arxiu a l'app, no hi són)` : ""}. Descomprimeix-lo: cada carpeta és un apartat del portal i index.txt diu on va cada foto i el seu peu.`);
     } catch (e) {
-      setMsg(`No s'ha pogut exportar: ${e instanceof Error ? e.message : String(e)}`);
+      setMsg(`No s'ha pogut preparar: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function zip() {
+    setBusy(true); setMsgCopia("Preparant…");
+    try {
+      const name = await exportPortalZip(iteId, doc, cataleg, setMsgCopia);
+      setMsgCopia(`Descarregat ${name}.`);
+    } catch (e) {
+      setMsgCopia(`No s'ha pogut exportar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -490,19 +505,19 @@ export function ExportPanel() {
   return (
     <div className="space-y-5">
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
-        <h3 className="text-sm font-semibold">Fitxer per importar al portal</h3>
+        <h3 className="text-sm font-semibold">Fotos per al portal</h3>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Un zip amb el mateix format que el botó «Exportar informe» del portal: l&apos;informe (XML) i les fotos. Al portal: <em>Informes Tècnics → Importar</em>. Entra com a esborrany: la signatura i el tancament es fan al portal.
+          Totes les fotos i el PDF de l&apos;informe en un zip, amb una carpeta per apartat del portal i un nom que diu on va cada fitxer: <code>D03-2.jpg</code> és la deficiència 3, foto 2; <code>E01-1.jpg</code>, l&apos;element 1 de l&apos;envolupant. Hi va un <code>index.txt</code> amb els peus de foto. Les dades les entra Claude al formulari del portal; les fotos es pugen des d&apos;aquest zip, a mà o amb Claude a l&apos;ordinador.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-primary" disabled={busy} onClick={zip}>{busy ? "Exportant…" : "Exportar per al portal (.zip)"}</button>
-          <button type="button" className="btn-ghost" disabled={busy} onClick={() => setMsg(`Descarregat ${exportPortalXml(iteId, doc, cataleg)} (sense fotos).`)}>Només l&apos;XML</button>
+          <button type="button" className="btn-primary" disabled={busy || paquet.fitxers.length === 0} onClick={fotos}>{busy ? "Preparant…" : `Descarregar fotos (${paquet.fitxers.length})`}</button>
+          {paquet.falten.length > 0 && <span className="text-xs text-amber-800">{paquet.falten.length} sense arxiu a l&apos;app</span>}
         </div>
         {msg && <p className="mt-2 text-sm">{msg}</p>}
       </div>
 
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
-        <h3 className="text-sm font-semibold">Revisió abans d&apos;exportar</h3>
+        <h3 className="text-sm font-semibold">Revisió de l&apos;informe</h3>
         {check.errors.length === 0 && check.warnings.length === 0 && <p className="mt-1 text-sm text-emerald-700">Tot correcte.</p>}
         {check.errors.length > 0 && (
           <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-red-700">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
@@ -511,6 +526,18 @@ export function ExportPanel() {
           <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-amber-800">{check.warnings.map((e, i) => <li key={i}>{e}</li>)}</ul>
         )}
       </div>
+
+      <details className="rounded-lg border border-[var(--color-line)] bg-white p-4 text-sm">
+        <summary className="cursor-pointer font-semibold">Fitxer en el format del portal</summary>
+        <p className="mt-2 text-[var(--color-muted)]">
+          El mateix zip que fa «Exportar informe» al portal (XML i fotos), sense signatura. <strong>El portal no l&apos;importa</strong>: només readmet fitxers signats per ell mateix (comprovat l&apos;11/11/2026). Queda com a còpia de l&apos;informe en el seu format.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-ghost" disabled={busy} onClick={zip}>Exportar (.zip)</button>
+          <button type="button" className="btn-ghost" disabled={busy} onClick={() => setMsgCopia(`Descarregat ${exportPortalXml(iteId, doc, cataleg)} (sense fotos).`)}>Només l&apos;XML</button>
+        </div>
+        {msgCopia && <p className="mt-2">{msgCopia}</p>}
+      </details>
 
       <details className="rounded-lg border border-[var(--color-line)] bg-white p-4 text-sm">
         <summary className="cursor-pointer font-semibold">Llistes desplegables conegudes</summary>

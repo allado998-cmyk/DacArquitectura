@@ -1,10 +1,12 @@
-// Browser only: reading the portal's export into the app, and building the
-// file the portal imports. Both run on the user's machine (zip, photos), so
-// no function time and no 4.5 MB request limit.
+// Browser only: reading the portal's export into the app, the photo package
+// for uploading at the portal, and a copy of the report in the portal's own
+// format. All run on the user's machine (zip, photos), so no function time
+// and no 4.5 MB request limit.
 import { addIteFitxerAction, importIteAction, markIteExportatAction, saveIteAction } from "@/app/ite/actions";
 import { uploadFitxer } from "@/lib/fitxers-client";
 import { refFor } from "@/lib/fitxers-shared";
 import type { Cataleg } from "./cataleg";
+import { fotoPaquet } from "./fotos";
 import { buildExport, cleanImported, exportIdFor, getAt, mediaSlots } from "./model";
 import { parseIteXml, isObj, type IteObj } from "./xml";
 import { buildZip, readZip, type ZipEntry } from "./zip";
@@ -88,8 +90,10 @@ function download(bytes: Uint8Array, name: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-// The zip for the portal's «Importar»: ITE/informes/dades/<id>/<nom>.xml plus
-// the photos under ITE/informes/imatges/<id>/…
+// The report in the portal's export format: ITE/informes/dades/<id>/<nom>.xml
+// plus the photos under ITE/informes/imatges/<id>/… The portal refuses it on
+// «Importar» (it only takes files it signed itself), so it is a copy, not a
+// way in.
 export async function exportPortalZip(iteId: number, doc: IteObj, cataleg: Cataleg, onProgress: (msg: string) => void): Promise<string> {
   const plan = buildExport(doc, cataleg, { exportId: exportIdFor(iteId) });
   const files = [{ name: plan.xmlPath, data: new TextEncoder().encode(plan.xml) }];
@@ -116,4 +120,25 @@ export function exportPortalXml(iteId: number, doc: IteObj, cataleg: Cataleg): s
   const name = `${plan.fileBase}.xml`;
   download(new TextEncoder().encode(plan.xml), name, "application/xml");
   return name;
+}
+
+// All the report's photos and PDF, named by where they go in the portal
+// (D03-2.jpg = deficiency 3, photo 2) with an index.txt of captions, for
+// uploading them at the portal by hand or with Claude's computer use.
+export async function exportFotosZip(doc: IteObj, cataleg: Cataleg, onProgress: (msg: string) => void): Promise<{ name: string; fotos: number; falten: number }> {
+  const paquet = fotoPaquet(doc, cataleg);
+  const photos: { name: string; data: Uint8Array }[] = new Array(paquet.fitxers.length);
+  let done = 0;
+  await mapLimit(paquet.fitxers, 4, async (f, i) => {
+    const res = await fetch(f.src, { credentials: "same-origin" });
+    if (!res.ok) throw new Error(`No s'ha pogut llegir una foto (${res.status}). Torna-ho a provar.`);
+    photos[i] = { name: f.zipPath, data: new Uint8Array(await res.arrayBuffer()) };
+    done++;
+    onProgress(`Preparant fotos ${done}/${paquet.fitxers.length}…`);
+  });
+  onProgress("Comprimint…");
+  const zipBytes = await buildZip([{ name: "index.txt", data: new TextEncoder().encode(paquet.index) }, ...photos]);
+  const name = `${paquet.nom}.zip`;
+  download(zipBytes, name, "application/zip");
+  return { name, fotos: photos.length, falten: paquet.falten.length };
 }

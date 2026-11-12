@@ -83,6 +83,11 @@ export default async function AiPage() {
               Obre&apos;l al mòbil o a l&apos;ordinador, fes o tria les fotos i s&apos;afegeixen a l&apos;acta, reduïdes com a la web. No cal iniciar sessió:
               l&apos;enllaç només serveix per a aquella acta i caduca en 24 hores. A ChatGPT web o d&apos;escriptori també pots adjuntar-les directament al xat.
             </li>
+            <li>
+              <strong>Fotos d&apos;un informe ITE</strong>: puja-les totes de cop a l&apos;informe («Fotos per classificar», o amb l&apos;enllaç que et dona
+              l&apos;assistent) i demana-li «col·loca les fotos per classificar de l&apos;ITE…». Les mira i posa cada una al seu element o deficiència
+              amb el peu de foto, després que diguis que sí a la previsualització.
+            </li>
             <li>Tot passa pel mateix codi que fa servir la web, amb el teu usuari. El compte <strong>demo</strong> treballa sobre la base de dades de demostració.</li>
             <li>No es poden esborrar expedients, clients, factures, propostes ni actes des del xat.</li>
             <li>Si l&apos;assistent no veu les eines noves després d&apos;una actualització, torna a connectar el connector.</li>

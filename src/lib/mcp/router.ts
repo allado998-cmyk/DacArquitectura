@@ -66,7 +66,7 @@ export function registerRouter(server: McpServer): void {
     {
       title: "Accions disponibles",
       description:
-        "Sense arguments: menú d'accions per domini (expedients, dedicacio, planificacio, clients, facturacio, propostes, honoraris, actes, notes). Amb action: la seva descripció, notes i JSON Schema dels args.",
+        "Sense arguments: menú d'accions per domini (expedients, dedicacio, planificacio, clients, facturacio, propostes, honoraris, actes, notes, ite). Amb action: la seva descripció, notes i JSON Schema dels args.",
       inputSchema: z.object({ action: z.string().max(60).optional() }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

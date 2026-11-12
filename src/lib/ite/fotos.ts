@@ -3,8 +3,13 @@
 // (docs/ite.md), so photos go in through its own form; these names make that
 // mechanical, by hand or with Claude's computer use: D03-2.jpg is deficiency
 // 3, photo 2; E01-1.jpg the first photo of the first envelope element.
+//
+// Also where a photo can go (llocsFotos, with the same codes) and which of the
+// report's stored photos are still waiting for a place (pendentsDe), for the
+// plugin and the editor's «Fotos per classificar».
+import { pathnameOfRef } from "@/lib/fitxers-shared";
 import { catLabel, type Cataleg } from "./cataleg";
-import { adrecaEdifici, getAt, LIST_PATHS, listOf, SINGLE_MEDIA } from "./model";
+import { adrecaEdifici, getAt, LIST_PATHS, listOf, mediaRefs, newMedia, setAt, SINGLE_MEDIA } from "./model";
 import { isObj, type IteObj, type IteVal } from "./xml";
 
 const str = (v: IteVal | undefined): string => (typeof v === "string" ? v : "");
@@ -12,6 +17,14 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export const codiDeficiencia = (i: number) => `D${pad2(i + 1)}`;
 export const codiEnvolupant = (i: number) => `E${pad2(i + 1)}`;
+
+// What the portal is known to take: its own exports of two real reports hold
+// 127 photos, all JPEG, the largest 143 KB and 1417 px. The zip turns every
+// photo into a JPEG within these, so none is refused for its size.
+export const PORTAL_FOTO_MAX_BYTES = 140 * 1024;
+export const PORTAL_FOTO_MAX_PX = 1280;
+// The portal's photo dialog: «Descripció (Màxim 200 caràcters)».
+export const PEU_MAX = 200;
 
 const CROQUIS = "edifici.edificiDescripcio.croquis";
 const COMPTADORS = "edifici.edificiInstalacions.aaFotoComptadors";
@@ -53,13 +66,10 @@ function slug(s: string, max = 48): string {
     .replace(/-+$/g, "");
 }
 
+// Photos always go in the zip as JPEG (exportFotosZip re-encodes them).
 function extOf(m: IteObj, pdf: boolean): string {
   const mime = str(m.mimeType).toLowerCase();
-  if (pdf || mime === "application/pdf") return "pdf";
-  const byMime: Record<string, string> = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/heic": "heic" };
-  if (byMime[mime]) return byMime[mime];
-  const fromName = /\.(jpe?g|png|webp|gif|heic|pdf)(?:\?|$)/i.exec(str(m.path));
-  return fromName ? fromName[1].toLowerCase().replace("jpeg", "jpg") : "jpg";
+  return pdf || mime === "application/pdf" || /\.pdf(?:\?|$)/i.test(str(m.path)) ? "pdf" : "jpg";
 }
 
 function truncate(s: string, n: number): string {
@@ -119,6 +129,7 @@ function buildIndex(doc: IteObj, cataleg: Cataleg, fitxers: FotoFitxer[], falten
     "Una carpeta per apartat del portal; el nom del fitxer diu on va:",
     "D03-2.jpg = deficiència 3, foto 2 · E01-1.jpg = element 1 de l'envolupant, foto 1.",
     "Entre parèntesis, el peu de foto per escriure al portal.",
+    `Les fotos van en JPEG de menys de ${PORTAL_FOTO_MAX_BYTES / 1024} KB (com a molt ${PORTAL_FOTO_MAX_PX} px), com les que el portal ja accepta.`,
     "",
   );
   const of = (carpeta: string, codi: string) => fitxers.filter((f) => f.carpeta === carpeta && f.codi === codi);
@@ -168,4 +179,76 @@ function buildIndex(doc: IteObj, cataleg: Cataleg, fitxers: FotoFitxer[], falten
 
   if (falten.length) L.push(`Sense fitxer a l'app (no són al zip): ${falten.join(", ")}`, "");
   return L.join("\n");
+}
+
+// Photos waiting for a place ----------------------------------------------------
+
+// A photo in the report's folder of the file store (pendents.ts lists them).
+export interface FotoCarpeta {
+  id: string; // the file's random key: stable, so the plugin can name it
+  ref: string; // /fitxers/… as the report keeps it
+  nom: string; // file name
+  bytes: number;
+  pujada: string; // ISO time of the upload
+}
+
+// The folder's photos that the report does not use yet.
+export function pendentsDe(fotos: FotoCarpeta[], doc: IteObj): FotoCarpeta[] {
+  const used = new Set(mediaRefs(doc).map((r) => pathnameOfRef(r)));
+  return fotos.filter((f) => !used.has(pathnameOfRef(f.ref)));
+}
+
+// Where a photo can go, with the zip's codes: CROQUIS, E01…, COMPTADORS-AIGUA,
+// QUADRE-ELECTRIC, D01…, in the portal's menu order.
+export interface LlocFoto {
+  codi: string;
+  path: string; // the media slot (unica) or the photo list
+  titol: string; // what it is, for a person
+  fotos: number; // photos it has now
+  unica: boolean; // one photo, replaced; otherwise a list, appended to
+  peuDefecte?: string; // a single slot's fixed caption
+}
+
+export function llocsFotos(doc: IteObj, cataleg: Cataleg): LlocFoto[] {
+  const out: LlocFoto[] = [];
+  const single = (path: string, titol: string) => {
+    const s = SINGLE_MEDIA.find((x) => x.path === path)!;
+    out.push({ codi: SINGLE_NAMES[path], path, titol, fotos: isObj(getAt(doc, path)) ? 1 : 0, unica: true, peuDefecte: s.descripcio });
+  };
+  single(CROQUIS, "Croquis (emplaçament, plantes i seccions)");
+  listOf(doc, LIST_PATHS.envolupants).forEach((e, i) => {
+    const titol = [isObj(e.envolupantTipus) ? catLabel(e.envolupantTipus) : "", truncate(str(e.envolupantDescripcio), 90)].filter(Boolean).join(" · ");
+    out.push({ codi: codiEnvolupant(i), path: `${LIST_PATHS.envolupants}.${i}.fotos`, titol: titol || "Element de l'envolupant", fotos: listOf(e, "fotos").length, unica: false });
+  });
+  single(COMPTADORS, "Bateria de comptadors d'aigua");
+  single(QCP, "Quadre general de comandament i protecció (QCP)");
+  listOf(doc, LIST_PATHS.deficiencies).forEach((d, i) => {
+    const titol = [isObj(d.gravetat) ? catLabel(d.gravetat) : "", isObj(d.tipusDeficiencia) ? catLabel(d.tipusDeficiencia) : "", truncate(str(d.deficienciaDescripcio), 90)]
+      .filter(Boolean)
+      .join(" · ");
+    out.push({ codi: codiDeficiencia(i), path: `${LIST_PATHS.deficiencies}.${i}.fotos`, titol: titol || "Deficiència", fotos: listOf(d, "fotos").length, unica: false });
+  });
+  return out;
+}
+
+// "d3", "D03", "e1", "comptadors", "QCP"… → the code llocsFotos uses.
+export function codiLloc(s: string): string {
+  const t = s.trim().toUpperCase().replace(/[\s_]+/g, "-");
+  const m = /^([DE])-?0*(\d{1,3})$/.exec(t);
+  if (m) return `${m[1]}${pad2(Number(m[2]))}`;
+  if (/^CROQUIS/.test(t)) return "CROQUIS";
+  if (/^COMPTADOR/.test(t)) return "COMPTADORS-AIGUA";
+  if (/^(QUADRE|QCP)/.test(t)) return "QUADRE-ELECTRIC";
+  return t;
+}
+
+const MIME_BY_EXT: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", avif: "image/avif" };
+
+// Puts a stored photo in its place: a list gets it at the end; a single slot
+// is replaced (its old photo, still in the folder, becomes pending again).
+export function posarFoto(doc: IteObj, lloc: LlocFoto, foto: { ref: string; nom: string }, peu: string): IteObj {
+  const ext = /\.([a-z0-9]+)$/i.exec(foto.nom)?.[1]?.toLowerCase() ?? "jpg";
+  const text = peu.replace(/\s+/g, " ").trim().slice(0, PEU_MAX) || (lloc.unica ? (lloc.peuDefecte ?? "") : "");
+  const media = newMedia(text, MIME_BY_EXT[ext] ?? "image/jpeg", foto.ref);
+  return lloc.unica ? setAt(doc, lloc.path, media) : setAt(doc, lloc.path, [...listOf(doc, lloc.path), media]);
 }

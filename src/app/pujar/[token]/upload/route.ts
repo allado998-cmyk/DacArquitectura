@@ -1,9 +1,12 @@
 // Receives one file from the upload page. The sealed token in the URL is the
-// only credential: it names the user and the acta, and expires after 24 h.
+// only credential: it names the user and the acta (or ITE report), and
+// expires after 24 h.
 import { runAsActingUser } from "@/lib/acting-user";
-import { readActaUploadToken } from "@/lib/upload-link";
+import type { AppUser } from "@/lib/auth";
+import { readActaUploadToken, readIteUploadToken } from "@/lib/upload-link";
 import { addActaAudioAction, addActaDocAction, addActaFotoAction } from "@/app/actes/actions";
-import { compressPhoto, mb, sniff, type MediaKind } from "@/lib/mcp/media";
+import { desaFotoPendent } from "@/lib/ite/pendents";
+import { compressPhoto, mb, sniff, type MediaKind, type Sniffed } from "@/lib/mcp/media";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -17,10 +20,32 @@ function fail(error: string, status = 400): Response {
   return Response.json({ ok: false, error }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+// An ITE report's photo: it waits in the report's folder, «per classificar».
+async function iteUpload(link: { user: AppUser; iteId: number }, name: string, bytes: Buffer, s: Sniffed | null): Promise<Response> {
+  if (!s || s.kind !== "foto") return fail("Aquí només es poden pujar fotos.");
+  let jpeg = bytes;
+  if (s.mime !== "image/jpeg" || bytes.length > 1_200_000) {
+    // The page already shrinks photos; this covers browsers where it could not.
+    try {
+      jpeg = (await compressPhoto(bytes)).data;
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : "No s'ha pogut llegir la imatge.");
+    }
+  }
+  return runAsActingUser(link.user, async () => {
+    const exists = (await sql`select id from public.ite_informe where id = ${link.iteId}`) as { id: number }[];
+    if (!exists.length) return fail("Aquest informe ja no existeix.", 404);
+    const foto = await desaFotoPendent(link.iteId, jpeg, name || "foto.jpg");
+    return Response.json({ ok: true, kind: "foto", foto: { id: foto.id, nom: foto.nom } }, { headers: { "Cache-Control": "no-store" } });
+  });
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }): Promise<Response> {
   const { token } = await params;
-  const link = await readActaUploadToken(decodeURIComponent(token));
-  if (!link) return fail("L'enllaç ha caducat o no és vàlid. Demana'n un de nou al xat.", 403);
+  const raw = decodeURIComponent(token);
+  const link = await readActaUploadToken(raw);
+  const iteLink = link ? null : await readIteUploadToken(raw);
+  if (!link && !iteLink) return fail("L'enllaç ha caducat o no és vàlid. Demana'n un de nou al xat.", 403);
 
   const text = await req.text();
   if (text.length > MAX_BODY_CHARS) return fail(`El fitxer és massa gran per pujar-lo d'aquesta manera (màxim uns ${mb(MAX_BODY_CHARS * 0.75)}).`, 413);
@@ -34,6 +59,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!m) return fail("Fitxer invàlid.");
   const bytes = Buffer.from(m[2], "base64");
   const s = sniff(bytes);
+  if (iteLink) {
+    const nom = (typeof body.name === "string" ? body.name : "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").trim().slice(0, 120);
+    return iteUpload(iteLink, nom, bytes, s);
+  }
+  if (!link) return fail("L'enllaç ha caducat o no és vàlid.", 403);
   if (!s) return fail("Tipus de fitxer no admès. Puja fotos, PDF o àudio.");
   const expected = body.kind === "foto" || body.kind === "document" || body.kind === "audio" ? (body.kind as MediaKind) : s.kind;
   if (expected !== s.kind) return fail(`Aquest fitxer no és ${expected === "foto" ? "una foto" : expected === "document" ? "un PDF" : "un àudio"}.`);

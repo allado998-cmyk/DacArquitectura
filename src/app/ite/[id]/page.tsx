@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { AppNav } from "@/components/app-nav";
+import { fotosCarpeta } from "@/lib/ite/pendents";
 import { loadCataleg, loadIte } from "@/lib/ite/server";
 import { IteView } from "./ite-view";
 
@@ -13,7 +14,7 @@ export default async function IteDetailPage({ params }: { params: Promise<{ id: 
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const [ite, cataleg, expedients, clients, contactes] = await Promise.all([
+  const [ite, cataleg, expedients, clients, contactes, fotos] = await Promise.all([
     loadIte(id),
     loadCataleg(),
     sql`select id, num_expedient, projecte, client_id from public.expedients order by num_expedient desc` as unknown as Promise<
@@ -27,6 +28,8 @@ export default async function IteDetailPage({ params }: { params: Promise<{ id: 
       where coalesce(nom, '') <> '' or coalesce(telefon, '') <> '' or coalesce(mail, '') <> ''
       order by nom
     ` as unknown as Promise<{ id: number; client_id: number | null; nom: string | null; telefon: string | null; mail: string | null }[]>,
+    // The report's folder in the file store (no database): its unused photos are «per classificar».
+    fotosCarpeta(id).catch(() => []),
   ]);
   if (!ite) notFound();
 
@@ -34,7 +37,7 @@ export default async function IteDetailPage({ params }: { params: Promise<{ id: 
     <>
       <AppNav current="ite" />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-        <IteView ite={ite} cataleg={cataleg} expedients={expedients} clients={clients} contactes={contactes} />
+        <IteView ite={ite} cataleg={cataleg} expedients={expedients} clients={clients} contactes={contactes} fotos={fotos} />
       </main>
     </>
   );

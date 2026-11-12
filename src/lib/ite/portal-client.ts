@@ -4,10 +4,11 @@
 // limit.
 import { addIteFitxerAction, importIteAction, saveIteAction } from "@/app/ite/actions";
 import { rasterizePdf, srcAsDataUrl } from "@/lib/acta-doc";
+import { fitJpeg } from "@/lib/compress-image";
 import { uploadFitxer } from "@/lib/fitxers-client";
 import { refFor } from "@/lib/fitxers-shared";
 import type { Cataleg } from "./cataleg";
-import { fotoPaquet } from "./fotos";
+import { fotoPaquet, PORTAL_FOTO_MAX_BYTES, PORTAL_FOTO_MAX_PX } from "./fotos";
 import { buildInformeHtml, escHtml } from "./informe";
 import { cleanImported, getAt, mediaSlots } from "./model";
 import { parseIteXml, isObj, type IteObj } from "./xml";
@@ -124,21 +125,46 @@ export async function openItePdf(doc: IteObj, cataleg: Cataleg): Promise<void> {
 
 // All the report's photos and PDF, named by where they go in the portal
 // (D03-2.jpg = deficiency 3, photo 2) with an index.txt of captions, for
-// uploading them at the portal by hand or with Claude's computer use.
-export async function exportFotosZip(doc: IteObj, cataleg: Cataleg, onProgress: (msg: string) => void): Promise<{ name: string; fotos: number; falten: number }> {
+// uploading them at the portal by hand or with Claude's computer use. Every
+// photo goes in as a JPEG the portal is known to take (fotos.ts).
+export async function exportFotosZip(
+  doc: IteObj,
+  cataleg: Cataleg,
+  onProgress: (msg: string) => void,
+): Promise<{ name: string; fotos: number; falten: number; maxKb: number; senseComprimir: string[] }> {
   const paquet = fotoPaquet(doc, cataleg);
   const photos: { name: string; data: Uint8Array }[] = new Array(paquet.fitxers.length);
+  const senseComprimir: string[] = [];
   let done = 0;
-  await mapLimit(paquet.fitxers, 4, async (f, i) => {
+  let maxBytes = 0;
+  await mapLimit(paquet.fitxers, 3, async (f, i) => {
     const res = await fetch(f.src, { credentials: "same-origin" });
     if (!res.ok) throw new Error(`No s'ha pogut llegir una foto (${res.status}). Torna-ho a provar.`);
-    photos[i] = { name: f.zipPath, data: new Uint8Array(await res.arrayBuffer()) };
+    const blob = await res.blob();
+    let name = f.zipPath;
+    let out: Blob = blob;
+    if (!/\.pdf$/i.test(f.fitxer)) {
+      const fit = await fitJpeg(blob, PORTAL_FOTO_MAX_BYTES, PORTAL_FOTO_MAX_PX);
+      if (fit) {
+        out = fit;
+        maxBytes = Math.max(maxBytes, fit.size);
+      } else {
+        // A format this browser cannot draw (e.g. HEIC): as it is, with its own extension.
+        const ext = /\/(\w+)/.exec(blob.type)?.[1]?.replace("jpeg", "jpg") ?? "bin";
+        name = name.replace(/\.jpg$/, `.${ext}`);
+        senseComprimir.push(name);
+      }
+    }
+    photos[i] = { name, data: new Uint8Array(await out.arrayBuffer()) };
     done++;
     onProgress(`Preparant fotos ${done}/${paquet.fitxers.length}…`);
   });
-  onProgress("Comprimint…");
-  const zipBytes = await buildZip([{ name: "index.txt", data: new TextEncoder().encode(paquet.index) }, ...photos]);
+  onProgress("Fent el zip…");
+  const index = senseComprimir.length
+    ? `${paquet.index}\nNo s'han pogut convertir a JPEG (format que el navegador no llegeix; potser el portal no les accepta): ${senseComprimir.join(", ")}\n`
+    : paquet.index;
+  const zipBytes = await buildZip([{ name: "index.txt", data: new TextEncoder().encode(index) }, ...photos]);
   const name = `${paquet.nom}.zip`;
   download(zipBytes, name, "application/zip");
-  return { name, fotos: photos.length, falten: paquet.falten.length };
+  return { name, fotos: photos.length, falten: paquet.falten.length, maxKb: Math.ceil(maxBytes / 1024), senseComprimir };
 }

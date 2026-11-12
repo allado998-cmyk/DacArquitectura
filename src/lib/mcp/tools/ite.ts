@@ -1,18 +1,23 @@
 // ITE reports (Inspecció Tècnica de l'Edifici) from the chat: read them, fill
 // any field of the form, manage floors, envelope elements, deficiencies and
-// sustainability measures, and pull the building data from the Cadastre.
-// Exporting the portal's zip and adding photos are done on the web page.
+// sustainability measures, pull the building data from the Cadastre, and
+// sort the visit's photos: the user uploads them through a link (chat images
+// never reach the plugin), the assistant looks at them in small size and puts
+// each one in its place with a caption. The portal's photo zip is made on the
+// web page.
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { consultaCadastreAction, createIteFromDocAction, removeIteFitxersAction, saveIteAction } from "@/app/ite/actions";
 import { applyCadastre } from "@/lib/ite/cadastre";
 import { visibles } from "@/lib/ite/cataleg";
 import { applyIteEdit, iteAsText, iteCamps, removedMedia, type IteEdit } from "@/lib/ite/edit";
-import { fotoPaquet } from "@/lib/ite/fotos";
+import { codiLloc, fotoPaquet, llocsFotos, PEU_MAX, pendentsDe, posarFoto, type FotoCarpeta } from "@/lib/ite/fotos";
 import { getAt, setAt, validateIte, valoracioFavorable } from "@/lib/ite/model";
+import { esborrarPendents, fotosCarpeta, miniatura } from "@/lib/ite/pendents";
 import { SECTIONS } from "@/lib/ite/schema";
-import { loadCataleg, loadIte, newDocFor } from "@/lib/ite/server";
-import { id, idOrNull, longText, registerAction, shortText, type Plan } from "../core";
+import { loadCataleg, loadIte, newDocFor, type IteRow } from "@/lib/ite/server";
+import { actaUploadUrl, createIteUploadToken, UPLOAD_LINK_TTL_S } from "@/lib/upload-link";
+import { id, idOrNull, longText, registerAction, shortText, type Plan, type ToolImage } from "../core";
 import { resolveClient, resolveExpedient } from "../data";
 import { callAction } from "../shared";
 
@@ -63,6 +68,19 @@ function link(origin: string | undefined, iteId: number): string {
   return `${origin ?? ""}/ite/${iteId}`;
 }
 
+// The photos waiting for a place, or null if the file store cannot be read.
+async function pendentsOf(ite: IteRow): Promise<FotoCarpeta[] | null> {
+  try {
+    return pendentsDe(await fotosCarpeta(ite.id), ite.dades);
+  } catch (e) {
+    console.error("ite: pending photos", e);
+    return null;
+  }
+}
+
+const FOTOS_COM =
+  "Fotos: l'usuari les puja amb l'enllaç d'ite_enllac_fotos (les del xat no arriben a les eines); tu les mires amb ite_fotos_pendents i les col·loques amb ite_colocar_fotos, amb un peu per a cada una. Per al portal, el zip «Descarregar fotos» de la web (secció Portal i PDF) les dona amb aquests noms (D01-1.jpg…) i comprimides.";
+
 // Reads -------------------------------------------------------------------------
 
 registerAction({
@@ -99,6 +117,7 @@ registerAction({
     const cataleg = await loadCataleg();
     const check = validateIte(ite.dades, cataleg);
     const paquet = fotoPaquet(ite.dades, cataleg);
+    const pendents = await pendentsOf(ite);
     return {
       id: ite.id,
       nom: ite.nom,
@@ -110,8 +129,9 @@ registerAction({
       fotos: {
         total: paquet.fitxers.length,
         sense_fitxer: paquet.falten.length,
+        per_classificar: pendents?.length ?? null,
         zip: `${paquet.nom}.zip`,
-        com: "Els noms de fitxer de l'informe són els del zip «Descarregar fotos» (secció Portal de la web), que porta index.txt amb els peus. Les fotos es pugen al portal des d'aquest zip, no des del xat.",
+        com: FOTOS_COM,
       },
       revisio: check,
     };
@@ -148,7 +168,7 @@ registerAction({
   name: "create_ite",
   domain: "ite",
   description: "Crea un informe ITE amb el tècnic del despatx, la propietat des del client i l'adreça des de l'expedient; opcionalment omple camps i llistes alhora.",
-  notes: ["Accepta els mateixos camps i llistes que update_ite.", "Després, a la web: fotos, revisió i «Descarregar fotos» per pujar-les al portal."],
+  notes: ["Accepta els mateixos camps i llistes que update_ite.", FOTOS_COM],
   schema: z.object({ expedient_num: shortText.optional(), expedient_id: idOrNull.optional(), client_id: idOrNull.optional(), contacte_id: idOrNull.optional(), ...editShape }),
   async plan(a): Promise<Plan> {
     const errors: string[] = [];
@@ -189,7 +209,7 @@ registerAction({
   notes: [
     "Llegeix-lo primer amb get_ite: les llistes porten l'índex que fan servir modificar i treure. Ordre: modificar, treure, afegir.",
     "Deficiència nova: tipus i gravetat obligatoris. Gravetat: MG, G, I o LL.",
-    "Les fotos s'afegeixen a la web (botó + Fotos de cada element o deficiència).",
+    FOTOS_COM,
   ],
   schema: z.object({ id, ...editShape }),
   async plan(a): Promise<Plan> {
@@ -245,5 +265,170 @@ registerAction({
     doc = setAt(setAt(doc, "edifici.cadasFinca", finca), "edifici.cadasPlanol", full);
     await callAction(() => saveIteAction(a.id, doc));
     return { id: a.id, url: link(ctx.origin, a.id) };
+  },
+});
+
+// Photos ------------------------------------------------------------------------------
+
+registerAction({
+  kind: "read",
+  name: "ite_enllac_fotos",
+  domain: "ite",
+  description:
+    "Enllaç privat (24 h) perquè l'usuari pugi les fotos de la visita a un informe ITE des del mòbil o l'ordinador. Queden «per classificar»: després les mires amb ite_fotos_pendents i les col·loques amb ite_colocar_fotos.",
+  notes: [
+    "Les fotos adjuntes al xat no arriben a les eines: dona a l'usuari aquest enllaç tal qual. No cal que iniciï sessió; només permet afegir fotos a aquest informe.",
+    'Si tens una eina de codi amb xarxa cap a aquest domini, també pots pujar tu les fotos adjuntes al xat (/mnt/user-data/uploads): redueix cada una a 1600 px en JPEG i fes POST de JSON {"kind":"foto","name":"<nom del fitxer>","dataUrl":"data:image/jpeg;base64,…"} a l\'enllaç + "/upload". Si la xarxa ho bloqueja, dona l\'enllaç a l\'usuari.',
+  ],
+  schema: z.object({ id }),
+  async run(a, ctx) {
+    const ite = await loadIte(a.id);
+    if (!ite) return { error: `No hi ha cap informe ITE amb id ${a.id}.` };
+    const origin = ctx.origin ?? process.env.APP_URL;
+    if (!origin) return { error: "No es pot generar l'enllaç: falta l'adreça pública del lloc (APP_URL)." };
+    const token = await createIteUploadToken(ctx.user, ite.id);
+    const pendents = await pendentsOf(ite);
+    return {
+      informe: ite.nom,
+      enllac: actaUploadUrl(origin, token),
+      caduca_en_hores: UPLOAD_LINK_TTL_S / 3600,
+      per_classificar_ara: pendents?.length ?? null,
+      per_a_l_assistent: "Dona aquest enllaç a l'usuari tal qual. Quan digui que ja les ha pujades, mira-les amb ite_fotos_pendents i col·loca-les amb ite_colocar_fotos.",
+    };
+  },
+});
+
+registerAction({
+  kind: "read",
+  name: "ite_fotos_pendents",
+  domain: "ite",
+  description:
+    "Les fotos d'un informe ITE que encara no tenen lloc («per classificar»), en petit perquè les vegis, i els llocs on poden anar: CROQUIS, E01… (envolupant), COMPTADORS-AIGUA, QUADRE-ELECTRIC i D01… (deficiències).",
+  notes: [
+    "Fins a 8 fotos per crida (quantes, màxim 10); continua amb desde = seguent fins que seguent sigui null.",
+    "Decideix on va cada foto pel que s'hi veu i escriu-ne el peu (màxim 200 caràcters, com al portal): què és i on és. Després, ite_colocar_fotos amb totes alhora.",
+    "Si una foto mostra una deficiència que l'informe no té, proposa-la a l'usuari i, si hi està d'acord, crea-la amb update_ite abans de col·locar-hi la foto. Les fotos repetides o que no serveixen es poden descartar.",
+  ],
+  schema: z.object({
+    id,
+    desde: z.number().int().min(0).optional().describe("Primera foto (0 = la primera)"),
+    quantes: z.number().int().min(1).max(10).optional(),
+  }),
+  async run(a) {
+    const ite = await loadIte(a.id);
+    if (!ite) return { error: `No hi ha cap informe ITE amb id ${a.id}.` };
+    const cataleg = await loadCataleg();
+    const pendents = pendentsDe(await fotosCarpeta(ite.id), ite.dades);
+    const llocs = llocsFotos(ite.dades, cataleg).map((l) => ({ lloc: l.codi, titol: l.titol, fotos: l.fotos }));
+    if (!pendents.length) {
+      return { informe: ite.nom, total: 0, llocs, per_a_l_assistent: "No hi ha fotos per classificar. Perquè l'usuari en pugi, fes servir ite_enllac_fotos." };
+    }
+    const desde = Math.min(a.desde ?? 0, pendents.length);
+    const page = pendents.slice(desde, desde + (a.quantes ?? 8));
+    const minis = await Promise.all(page.map((f) => miniatura(f.ref)));
+    const imatges: ToolImage[] = [];
+    const fotos = page.map((f, k) => {
+      const data = minis[k];
+      if (data) imatges.push({ etiqueta: `Foto ${f.id} (${f.nom}):`, data, mimeType: "image/jpeg" });
+      return { foto: f.id, nom: f.nom, kb: Math.round(f.bytes / 1024), ...(data ? {} : { avis: "No s'ha pogut llegir la imatge." }) };
+    });
+    const fins = desde + page.length;
+    return { informe: ite.nom, total: pendents.length, desde, fins, seguent: fins < pendents.length ? fins : null, fotos, llocs, imatges };
+  },
+});
+
+const colocacio = z.object({
+  foto: z.string().min(4).max(60).describe("id de la foto (ite_fotos_pendents)"),
+  lloc: z.string().min(2).max(30).describe("CROQUIS, E01…, COMPTADORS-AIGUA, QUADRE-ELECTRIC o D01…"),
+  peu: z.string().max(PEU_MAX).optional().describe("Peu de foto per al portal (màx. 200 caràcters). Obligatori a l'envolupant i a les deficiències."),
+});
+
+const colocarSchema = z.object({
+  id,
+  fotos: z.array(colocacio).max(100).optional(),
+  descartar: z.array(z.string().min(4).max(60)).max(100).optional().describe("ids de fotos per classificar que s'esborren (repetides, mogudes, sense interès)"),
+});
+
+// Checks the placements and applies them to a copy of the report.
+async function planColocar(a: z.infer<typeof colocarSchema>) {
+  const ite = await loadIte(a.id);
+  if (!ite) return { ite: null, errors: [`No hi ha cap informe ITE amb id ${a.id}.`] } as const;
+  const cataleg = await loadCataleg();
+  const pendents = pendentsDe(await fotosCarpeta(ite.id), ite.dades);
+  const byId = new Map(pendents.map((f) => [f.id, f]));
+  const llocs = llocsFotos(ite.dades, cataleg);
+  const byCodi = new Map(llocs.map((l) => [l.codi, l]));
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const seen = new Set<string>();
+  const singles = new Set<string>();
+  const perLloc = new Map<string, number>();
+  const detall: string[] = [];
+  let doc = ite.dades;
+  for (const c of a.fotos ?? []) {
+    const f = byId.get(c.foto);
+    if (!f) { errors.push(`La foto ${c.foto} no és entre les fotos per classificar (mira ite_fotos_pendents).`); continue; }
+    if (seen.has(c.foto)) { errors.push(`La foto ${c.foto} surt dues vegades.`); continue; }
+    seen.add(c.foto);
+    const codi = codiLloc(c.lloc);
+    const lloc = byCodi.get(codi);
+    if (!lloc) { errors.push(`Lloc desconegut: «${c.lloc}». Els llocs d'aquest informe són ${llocs.map((l) => l.codi).join(", ")}.`); continue; }
+    const peu = (c.peu ?? "").replace(/\s+/g, " ").trim();
+    if (!lloc.unica && !peu) errors.push(`Falta el peu de la foto ${c.foto} (${codi}): el portal el demana.`);
+    if (lloc.unica) {
+      if (singles.has(codi)) { errors.push(`${codi} només admet una foto.`); continue; }
+      singles.add(codi);
+      if (lloc.fotos) warnings.push(`${codi} ja té una foto: la nova la substitueix i l'anterior torna a «per classificar».`);
+    }
+    doc = posarFoto(doc, lloc, f, peu);
+    perLloc.set(codi, (perLloc.get(codi) ?? 0) + 1);
+    detall.push(`${f.id} (${f.nom}) → ${codi}${peu ? `: ${peu}` : ""}`);
+  }
+  const descartar: FotoCarpeta[] = [];
+  for (const idf of a.descartar ?? []) {
+    const f = byId.get(idf);
+    if (!f) { errors.push(`La foto ${idf} no és entre les fotos per classificar.`); continue; }
+    if (seen.has(idf)) { errors.push(`La foto ${idf} no es pot col·locar i esborrar alhora.`); continue; }
+    seen.add(idf);
+    descartar.push(f);
+  }
+  if (!a.fotos?.length && !a.descartar?.length) errors.push("No hi ha res a fer: passa fotos per col·locar o per descartar.");
+  if (descartar.length) warnings.push(`S'esborraran per sempre ${descartar.length} fotos: ${descartar.map((f) => f.nom).join(", ")}.`);
+  return { ite, doc, perLloc, detall, descartar, errors, warnings, resta: pendents.length - seen.size } as const;
+}
+
+registerAction({
+  kind: "change",
+  name: "ite_colocar_fotos",
+  domain: "ite",
+  description:
+    "Posa fotos «per classificar» d'un informe ITE al seu lloc (element de l'envolupant, deficiència, croquis, comptadors o quadre elèctric) amb el peu de foto, i n'esborra les que es descartin.",
+  notes: [
+    "Fotos i llocs: els de ite_fotos_pendents. Cada foto, una sola vegada.",
+    "Envolupant i deficiències: s'afegeixen darrere de les que ja tenen. Croquis, comptadors i quadre: una sola foto; si ja n'hi havia, l'anterior torna a «per classificar».",
+    "descartar esborra fotos per classificar per sempre: només les que l'usuari no vulgui.",
+  ],
+  schema: colocarSchema,
+  async plan(a): Promise<Plan> {
+    const p = await planColocar(a);
+    if (!p.ite) return { summary: "Col·locar fotos", errors: [...p.errors] };
+    const llocs = [...p.perLloc].map(([codi, n]) => (n > 1 ? `${codi} ×${n}` : codi)).join(", ");
+    const parts = [
+      p.detall.length ? `col·locar ${p.detall.length} ${p.detall.length === 1 ? "foto" : "fotos"} (${llocs})` : "",
+      p.descartar.length ? `esborrar-ne ${p.descartar.length}` : "",
+    ].filter(Boolean);
+    return {
+      summary: `A «${p.ite.nom}»: ${parts.join(" i ") || "res"}. En quedaran ${p.resta} per classificar.`,
+      details: { colocacions: p.detall, esborrar: p.descartar.map((f) => `${f.id} (${f.nom})`) },
+      errors: [...p.errors],
+      warnings: [...p.warnings],
+    };
+  },
+  async commit(a, _plan, ctx) {
+    const p = await planColocar(a);
+    if (!p.ite || p.errors.length) throw new Error(p.errors.join(" "));
+    if (p.detall.length) await callAction(() => saveIteAction(a.id, p.doc));
+    const esborrades = p.descartar.length ? await esborrarPendents(a.id, p.doc, p.descartar.map((f) => f.id)) : 0;
+    return { id: a.id, col_locades: p.detall.length, esborrades, per_classificar: p.resta, url: link(ctx.origin, a.id) };
   },
 });

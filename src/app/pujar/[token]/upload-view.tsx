@@ -12,6 +12,15 @@ export interface UploadActa {
   counts: { fotos: number; documents: number; audios: number };
 }
 
+// An ITE report: photos only; they wait in «Fotos per classificar».
+export interface UploadIte {
+  nom: string;
+  adreca: string | null;
+  demo: boolean;
+  fotos: number; // already in their place
+  pendents: number;
+}
+
 type Kind = "foto" | "document" | "audio";
 
 interface Item {
@@ -71,9 +80,10 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise
 
 let nextId = 1;
 
-export function UploadView({ token, acta }: { token: string; acta: UploadActa }) {
+export function UploadView({ token, acta, ite }: { token: string; acta?: UploadActa; ite?: UploadIte }) {
   const [items, setItems] = useState<Item[]>([]);
-  const [counts, setCounts] = useState(acta.counts);
+  const [counts, setCounts] = useState(acta?.counts ?? { fotos: 0, documents: 0, audios: 0 });
+  const [pendents, setPendents] = useState(ite?.pendents ?? 0);
   const [busy, setBusy] = useState(false);
 
   const update = (id: number, patch: Partial<Item>) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
@@ -97,6 +107,7 @@ export function UploadView({ token, acta }: { token: string; acta: UploadActa })
         const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; counts?: UploadActa["counts"] } | null;
         if (!res.ok || !json?.ok) throw new Error(json?.error ?? `Error ${res.status}`);
         if (json.counts) setCounts(json.counts);
+        if (ite) setPendents((n) => n + 1);
         update(item.id, { status: "done" });
       } catch (e) {
         update(item.id, { status: "error", error: e instanceof Error ? e.message : String(e) });
@@ -112,31 +123,47 @@ export function UploadView({ token, acta }: { token: string; acta: UploadActa })
       <div className="mb-6 flex items-center justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.jpg" alt="DAC arquitectura" className="h-8 w-auto" />
-        {acta.demo && (
+        {(acta?.demo || ite?.demo) && (
           <span className="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Demo</span>
         )}
       </div>
 
-      <section className="card mb-5">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">Pujar a l&apos;acta</p>
-        <h1 className="text-xl font-semibold">{acta.num}</h1>
-        <p className="text-sm">
-          {acta.motiu}
-          {acta.data ? ` · ${acta.data}` : ""}
-          {acta.expedient ? ` · ${acta.expedient}` : ""}
-        </p>
-        {acta.projecte && <p className="mt-1 text-sm text-[var(--color-muted)]">{acta.projecte}</p>}
-        <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Ara té {counts.fotos} {counts.fotos === 1 ? "foto" : "fotos"}, {counts.documents} {counts.documents === 1 ? "document" : "documents"} i {counts.audios}{" "}
-          {counts.audios === 1 ? "àudio" : "àudios"}.
-        </p>
-      </section>
+      {acta && (
+        <section className="card mb-5">
+          <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">Pujar a l&apos;acta</p>
+          <h1 className="text-xl font-semibold">{acta.num}</h1>
+          <p className="text-sm">
+            {acta.motiu}
+            {acta.data ? ` · ${acta.data}` : ""}
+            {acta.expedient ? ` · ${acta.expedient}` : ""}
+          </p>
+          {acta.projecte && <p className="mt-1 text-sm text-[var(--color-muted)]">{acta.projecte}</p>}
+          <p className="mt-3 text-xs text-[var(--color-muted)]">
+            Ara té {counts.fotos} {counts.fotos === 1 ? "foto" : "fotos"}, {counts.documents} {counts.documents === 1 ? "document" : "documents"} i {counts.audios}{" "}
+            {counts.audios === 1 ? "àudio" : "àudios"}.
+          </p>
+        </section>
+      )}
+
+      {ite && (
+        <section className="card mb-5">
+          <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">Fotos de la visita · informe ITE</p>
+          <h1 className="text-xl font-semibold">{ite.nom || "Informe ITE"}</h1>
+          {ite.adreca && <p className="text-sm">{ite.adreca}</p>}
+          <p className="mt-3 text-xs text-[var(--color-muted)]">
+            Tria totes les fotos de cop. Queden «per classificar» i Claude (o tu, a DacArquitectura) les posa a cada element o deficiència amb el seu peu.
+          </p>
+          <p className="mt-2 text-xs text-[var(--color-muted)]">
+            Per classificar: {pendents} · ja col·locades: {ite.fotos}
+          </p>
+        </section>
+      )}
 
       <label className={`btn-primary mb-3 flex w-full cursor-pointer items-center justify-center py-4 text-base ${busy ? "opacity-60" : ""}`}>
         Fer o triar fotos
         <input type="file" accept="image/*" multiple className="hidden" disabled={busy} onChange={(e) => { void onFiles(e.target.files, "foto"); e.target.value = ""; }} />
       </label>
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className={`mb-6 grid grid-cols-2 gap-3 ${ite ? "hidden" : ""}`}>
         <label className={`btn flex cursor-pointer items-center justify-center ${busy ? "opacity-60" : ""}`}>
           Afegir PDF
           <input type="file" accept="application/pdf" multiple className="hidden" disabled={busy} onChange={(e) => { void onFiles(e.target.files, "document"); e.target.value = ""; }} />
@@ -166,14 +193,20 @@ export function UploadView({ token, acta }: { token: string; acta: UploadActa })
                   <div className={`text-xs ${it.status === "error" ? "text-red-700" : "text-[var(--color-muted)]"}`}>
                     {it.status === "pending" && "En cua"}
                     {it.status === "uploading" && "Pujant…"}
-                    {it.status === "done" && "Afegit a l'acta"}
+                    {it.status === "done" && (ite ? "Pujada: per classificar" : "Afegit a l'acta")}
                     {it.status === "error" && it.error}
                   </div>
                 </div>
               </li>
             ))}
           </ul>
-          {!busy && done > 0 && <p className="pt-2 text-sm text-[var(--color-muted)]">Ja pots tornar al xat. Les fotos surten al final del PDF de l&apos;acta.</p>}
+          {!busy && done > 0 && (
+            <p className="pt-2 text-sm text-[var(--color-muted)]">
+              {ite
+                ? "Ja pots tornar al xat i dir a Claude que les col·loqui. També les pots col·locar tu a DacArquitectura (informe ITE → Fotos per classificar)."
+                : "Ja pots tornar al xat. Les fotos surten al final del PDF de l'acta."}
+            </p>
+          )}
         </section>
       )}
     </main>

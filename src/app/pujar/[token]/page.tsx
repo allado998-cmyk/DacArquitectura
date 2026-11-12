@@ -1,16 +1,34 @@
 import type { Metadata } from "next";
 import { runAsActingUser } from "@/lib/acting-user";
-import { readActaUploadToken, UPLOAD_LINK_TTL_S } from "@/lib/upload-link";
+import { readActaUploadToken, readIteUploadToken, UPLOAD_LINK_TTL_S } from "@/lib/upload-link";
 import { actaReasonLabel } from "@/lib/acta-doc";
 import { sql } from "@/lib/db";
-import { UploadView, type UploadActa } from "./upload-view";
+import { mediaSlots } from "@/lib/ite/model";
+import type { AppUser } from "@/lib/auth";
+import { fotosPendents } from "@/lib/ite/pendents";
+import type { IteObj } from "@/lib/ite/xml";
+import { UploadView, type UploadActa, type UploadIte } from "./upload-view";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pujar fotos a l'acta",
+  title: "Pujar fotos",
   robots: { index: false, follow: false },
 };
+
+// The link of an ITE report: its photos go to «Fotos per classificar».
+async function itePage(raw: string, user: AppUser, iteId: number) {
+  const ite = await runAsActingUser(user, async () => {
+    const rows = (await sql`select id, nom, adreca, dades from public.ite_informe where id = ${iteId}`) as { id: number; nom: string; adreca: string | null; dades: IteObj }[];
+    const row = rows[0];
+    if (!row) return null;
+    const pendents = await fotosPendents(row.id, row.dades).then((l) => l.length).catch(() => 0);
+    return { nom: row.nom, adreca: row.adreca, fotos: mediaSlots(row.dades).filter((s) => !s.pdf).length, pendents };
+  });
+  if (!ite) return <Message title="Informe no trobat" text="Aquest informe ITE ja no existeix." />;
+  const view: UploadIte = { ...ite, demo: user === "demo" };
+  return <UploadView token={raw} ite={view} />;
+}
 
 function Message({ title, text }: { title: string; text: string }) {
   return (
@@ -28,6 +46,8 @@ export default async function UploadPage({ params }: { params: Promise<{ token: 
   const token = decodeURIComponent(raw);
   const link = await readActaUploadToken(token);
   if (!link) {
+    const ite = await readIteUploadToken(token);
+    if (ite) return itePage(raw, ite.user, ite.iteId);
     return <Message title="Enllaç caducat" text={`Els enllaços per pujar fotos duren ${UPLOAD_LINK_TTL_S / 3600} hores. Demana'n un de nou a l'assistent.`} />;
   }
 

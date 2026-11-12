@@ -16,6 +16,8 @@ export interface IteRow {
   dades: IteObj;
   exportat_at: string | null;
   updated_at: string;
+  // A hash of the report: an editor saves only over the version it loaded.
+  versio: string;
 }
 
 export async function loadCataleg(): Promise<Cataleg> {
@@ -41,7 +43,8 @@ export async function saveCatalegOf(doc: IteObj): Promise<number> {
 export async function loadIte(id: number): Promise<IteRow | null> {
   const rows = (await sql`
     select id, expedient_id, client_id, nom, adreca, to_char(data_inspeccio, 'YYYY-MM-DD') as data_inspeccio,
-           dades, to_char(exportat_at, 'YYYY-MM-DD HH24:MI') as exportat_at, to_char(updated_at, 'YYYY-MM-DD HH24:MI') as updated_at
+           dades, to_char(exportat_at, 'YYYY-MM-DD HH24:MI') as exportat_at, to_char(updated_at, 'YYYY-MM-DD HH24:MI') as updated_at,
+           md5(dades::text) as versio
     from public.ite_informe where id = ${id}
   `) as IteRow[];
   return rows[0] ?? null;

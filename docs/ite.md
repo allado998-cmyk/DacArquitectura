@@ -81,9 +81,9 @@ el punt 1 per «les dades són les que t'enganxo a sota».
 ### Cada informe
 
 1. A l'app, tingues l'informe ITE fet: dades, plantes, envolupant,
-   deficiències, mesures i fotos. A la secció **Portal**, baixa el zip
-   **«Fotos per al portal»** i descomprimeix-lo en una carpeta (vegeu «Les
-   fotos»).
+   deficiències, mesures i fotos (les col·loca Claude: vegeu «Les fotos»). A
+   la secció **Portal i PDF**, baixa el zip amb **«Descarregar fotos»** i
+   descomprimeix-lo en una carpeta.
 2. Al portal (amb el certificat), crea l'informe nou i obre'n el formulari. Per
    a la **primera prova**, fes-ne un que es digui «PROVA Claude» i esborra'l
    després: així cap informe real no es toca.
@@ -95,16 +95,57 @@ el punt 1 per «les dades són les que t'enganxo a sota».
 
 ### Les fotos
 
-L'extensió de Chrome no pot triar fitxers del disc (cap extensió pot: el
-diàleg de fitxers és del sistema). Per això el zip **«Fotos per al portal»**
-(`src/lib/ite/fotos.ts`): una carpeta per apartat del portal i el nom de cada
+**1. Pujar-les a l'app, totes de cop.** Les fotos adjuntes al xat de Claude
+no arriben al connector (a 7/11/2026 cap app de Claude ho permet: MCP encara
+no té una manera estàndard de passar fitxers del xat a un servidor). Per això
+van directes a l'app i queden a l'informe com a **«Fotos per classificar»**:
+
+- Des de l'ordinador: informe → «Fotos per classificar» → arrossegar-hi totes
+  les fotos (o «+ Afegir fotos»).
+- Des del mòbil: al mateix lloc, «Enllaç per pujar-les des del mòbil», o
+  demanar-lo a Claude («dona'm l'enllaç per pujar les fotos de l'ITE …»).
+  L'enllaç obre una pàgina sense iniciar sessió, dura 24 hores i només
+  serveix per afegir fotos a aquest informe (`/pujar/<token>`, com el de les
+  actes).
+
+En pujar-les es redueixen a 1600 px.
+
+**2. Que Claude les col·loqui.** A Claude, amb el connector: «Col·loca les
+fotos per classificar de l'informe ITE "…"». Claude les veu en petit
+(`ite_fotos_pendents`, 8 per crida, 512 px), decideix on va cada una
+(element de l'envolupant, deficiència, croquis, comptadors d'aigua, quadre
+elèctric), n'escriu el peu (com a molt 200 caràcters, com al portal) i, quan
+li dius que sí a la previsualització, les posa (`ite_colocar_fotos`). Si una
+foto mostra una deficiència que l'informe no té, la proposa; les repetides
+les pot descartar. També es poden posar a mà amb «Posar a…».
+
+Una foto és «per classificar» mentre és a la carpeta de l'informe al
+magatzem i l'informe no la fa servir (`src/lib/ite/pendents.ts`): no hi ha
+cap llista a part que es pugui desquadrar, i una foto que es treu del seu
+lloc hi torna. L'editor no desa mai per sobre del que hagi canviat Claude (o
+una altra finestra): avisa i carrega la versió desada; i en tornar a la
+finestra, la carrega sol si no hi ha res pendent de desar.
+
+**3. Al portal, des del zip.** L'extensió de Chrome no pot triar fitxers del
+disc (cap extensió pot: el diàleg de fitxers és del sistema). Per això el zip
+de «Descarregar fotos» (`src/lib/ite/fotos.ts`): una carpeta per apartat del portal i el nom de cada
 fitxer diu on va, `D03-2.jpg` = deficiència 3, foto 2; `E01-1.jpg` = element 1
 de l'envolupant, foto 1; `CROQUIS/CROQUIS.jpg`;
 `INSTALACIONS/COMPTADORS-AIGUA.jpg` i `QUADRE-ELECTRIC.jpg`;
 `RECOMANACIONS.pdf`. L'`index.txt` repeteix la llista amb el títol de cada
 deficiència i el peu de cada foto. Les deficiències sense foto hi surten
-igualment, perquè la numeració sigui la del portal. Descomprimit a, p. ex.,
-`C:\ITE\Carrer-Llatzeret-27-fotos`, dues maneres:
+igualment, perquè la numeració sigui la del portal.
+
+Les fotos del zip ja van **reduïdes per al portal**: JPEG de menys de 140 KB
+i com a molt 1280 px, sense dades EXIF. El límit exacte del portal no surt a
+l'inventari, però les seves pròpies exportacions (127 fotos de dos informes
+reals) en tenen com a molt 143 KB i 1417 px, totes JPEG: són mides que
+accepta segur. Si algun dia se sap que el límit és més alt, n'hi ha prou de
+canviar `PORTAL_FOTO_MAX_BYTES` i `PORTAL_FOTO_MAX_PX` (`fotos.ts`) per tenir
+fotos més nítides. Les de l'app no es toquen: el zip en fa una còpia
+reduïda.
+
+Descomprimit a, p. ex., `C:\ITE\Carrer-Llatzeret-27-fotos`, dues maneres:
 
 - **A mà**: a la deficiència 3 del portal, puja `D03-1.jpg`, `D03-2.jpg`… i
   escriu el peu que diu `index.txt`. Sense buscar res.
@@ -380,7 +421,9 @@ text del PDF es veu quin camp és quin:
 | Cadastre (servei públic OVC, sense clau) | `src/lib/ite/cadastre.ts` |
 | Canvis des del plugin | `src/lib/ite/edit.ts`, `src/lib/mcp/tools/ite.ts` |
 | Importar / exportar al navegador | `src/lib/ite/portal-client.ts` |
-| Fotos per al portal (noms per lloc, `index.txt`) | `src/lib/ite/fotos.ts` |
+| Fotos per al portal (noms per lloc, `index.txt`, mides), llocs d'una foto | `src/lib/ite/fotos.ts` |
+| Fotos per classificar (carpeta del magatzem, miniatures) | `src/lib/ite/pendents.ts`, `src/app/ite/[id]/pendents.tsx` |
+| Enllaç per pujar fotos sense iniciar sessió | `src/lib/upload-link.ts`, `src/app/pujar/` |
 | Informe en PDF (document; la finestra d'impressió és `openItePdf` a `portal-client.ts`) | `src/lib/ite/informe.ts` |
 | Inventari del formulari del portal (al navegador) | `scripts/portal-inventari.js`, `scripts/ite-inventari-bookmarklet.mjs` |
 | Portal contra app | `scripts/ite-inventari.mjs` → `docs/ite-inventari.md` |
@@ -394,13 +437,18 @@ text del PDF es veu quin camp és quin:
 
 - **Desar**: l'informe sencer és `ite_informe.dades` (jsonb). L'editor desa sol
   1 s després de cada canvi; les fotos que ja no hi són s'esborren del magatzem
-  després de desar.
+  després de desar. Desa només sobre la versió que té (un hash de `dades`): si
+  Claude o una altra finestra l'han canviat, no desa i ho diu. En tornar a la
+  finestra fa una consulta petita i, si ha canviat i no hi ha res per desar,
+  carrega la versió nova.
 - **Fotos**: al magatzem privat de Blob, carpeta `ite/<id>`, pujades directament
-  des del navegador (com les actes). Es redueixen a 1600 px.
+  des del navegador (com les actes) o per l'enllaç `/pujar/<token>`. Es
+  redueixen a 1600 px. Les de la carpeta que l'informe no fa servir són les
+  «per classificar» (vegeu «Les fotos»).
 - **Fotos per al portal** (secció «Portal i PDF»): el navegador llegeix les
-  fotos i fa un zip amb els noms per lloc (`D03-2.jpg`…) i l'`index.txt`;
-  vegeu «Les fotos». `get_ite` dona els mateixos noms a cada deficiència i
-  element.
+  fotos, en fa JPEG de menys de 140 KB i 1280 px, i un zip amb els noms per
+  lloc (`D03-2.jpg`…) i l'`index.txt`; vegeu «Les fotos». `get_ite` dona els
+  mateixos noms a cada deficiència i element.
 - **Informe en PDF** (secció «Portal i PDF», `informe.ts`): l'informe sencer
   amb l'ordre i la numeració del model oficial (1 a 11): identificació,
   dades i taula d'entitats, descripció i croquis, sistemes constructius amb
@@ -418,11 +466,15 @@ text del PDF es veu quin camp és quin:
 - **Cadastre**: amb la finca i el full, el servei públic del Catastro dona
   adreça, any, superfície construïda (suma dels immobles, el que fa servir el
   portal) i un immoble per fila de la taula de plantes.
-- **Plugin**: `list_ites`, `get_ite`, `ite_camps` (lectura); `create_ite`,
-  `update_ite`, `ite_cadastre` (canvi, amb previsualització). Els camps es
-  diuen per ruta (`edifici.edificiDescripcio.anyConstruccio`); les llistes
-  amb `afegir` / `modificar` / `treure` per índex. `get_ite` diu el fitxer de
-  cada foto (el nom del zip); pujar fotos i baixar el zip, a la web.
+- **Plugin**: `list_ites`, `get_ite`, `ite_camps`, `ite_enllac_fotos`,
+  `ite_fotos_pendents` (lectura); `create_ite`, `update_ite`, `ite_cadastre`,
+  `ite_colocar_fotos` (canvi, amb previsualització). Els camps es diuen per
+  ruta (`edifici.edificiDescripcio.anyConstruccio`); les llistes amb
+  `afegir` / `modificar` / `treure` per índex. `get_ite` diu el fitxer de
+  cada foto (el nom del zip) i quantes n'hi ha per classificar.
+  `ite_fotos_pendents` torna les fotos com a imatges (blocs `image` de MCP,
+  512 px) amb els llocs on poden anar (`CROQUIS`, `E01`…,
+  `COMPTADORS-AIGUA`, `QUADRE-ELECTRIC`, `D01`…). El zip es baixa a la web.
 
 ## Cost
 
@@ -431,6 +483,12 @@ navegador (cap funció mou el zip); les fotos van directes a Blob (≈5–30 MB 
 informe, menys d'un cèntim al mes). Cada consulta al Cadastre és una funció
 d'un segon. L'editor d'un informe porta les llistes senceres del portal (unes
 180 KB sense comprimir, poques desenes comprimides).
+
+Fotos per classificar: obrir l'editor llista la carpeta de l'informe a Blob
+(sense base de dades); tornar a la finestra fa una consulta petita a Neon i
+una llista a Blob, només quan l'usuari hi torna. Les miniatures per a Claude
+es fan quan les demana (8 fotos ≈ mig segon de funció). Tot plegat, cèntims
+a l'any.
 
 ## Proves
 
@@ -446,3 +504,12 @@ d'un segon. L'editor d'un informe porta les llistes senceres del portal (unes
   com a `demo`: importar Mallorca 325 (17 deficiències, 64 fotos, 29 s), canviar
   un camp i recarregar, exportar (= PROVA-3), crear un informe nou, Cadastre
   (14 files de plantes), afegir una deficiència. Després, esborrat tot.
+- `npm run test:mcp` fa el camí de Claude amb les fotos de cap a peus (amb el
+  magatzem simulat): miniatures com a imatges, errors (sense peu, lloc que no
+  existeix, foto ja col·locada), previsualització sense escriure, i desar.
+- Extrem a extrem fet el 12/11/2026 amb Chromium contra el build de
+  producció, com a `demo`: informe nou, pujar 3 fotos (una de 8 MB), posar-ne
+  dues a mà, enllaç del mòbil obert sense sessió, la foto del mòbil surt en
+  tornar a la finestra, dues finestres (la vella no desa per sobre i carrega
+  la nova), zip (JPEG de 102 i 103 KB a 1280 px), descartar, esborrar
+  l'informe. Les miniatures, contra el magatzem real.

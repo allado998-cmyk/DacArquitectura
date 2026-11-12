@@ -22,7 +22,7 @@ import {
   validateIte,
   valoracioFavorable,
 } from "@/lib/ite/model";
-import { fotoPaquet } from "@/lib/ite/fotos";
+import { fotoPaquet, PORTAL_FOTO_MAX_BYTES } from "@/lib/ite/fotos";
 import { exportFotosZip, openItePdf } from "@/lib/ite/portal-client";
 import { isObj, type IteObj } from "@/lib/ite/xml";
 import { CatSelect } from "./fields";
@@ -469,7 +469,7 @@ export function CadastrePanel() {
 
 // Export ---------------------------------------------------------------------------
 
-export function ExportPanel() {
+export function ExportPanel({ pendents = 0, onPendents }: { pendents?: number; onPendents?: () => void }) {
   const { doc, cataleg } = useIte();
   const check = useMemo(() => validateIte(doc, cataleg), [doc, cataleg]);
   const paquet = useMemo(() => fotoPaquet(doc, cataleg), [doc, cataleg]);
@@ -481,7 +481,12 @@ export function ExportPanel() {
     setBusy(true); setMsg("Preparant…");
     try {
       const r = await exportFotosZip(doc, cataleg, setMsg);
-      setMsg(`Descarregat ${r.name}: ${r.fotos} fitxers${r.falten ? ` (${r.falten} sense arxiu a l'app, no hi són)` : ""}. Descomprimeix-lo: cada carpeta és un apartat del portal i index.txt diu on va cada foto i el seu peu.`);
+      setMsg(
+        `Descarregat ${r.name}: ${r.fotos} fitxers${r.falten ? ` (${r.falten} sense arxiu a l'app, no hi són)` : ""}. ` +
+          (r.maxKb ? `Fotos en JPEG, la més gran de ${r.maxKb} KB. ` : "") +
+          (r.senseComprimir.length ? `No s'han pogut convertir: ${r.senseComprimir.join(", ")}. ` : "") +
+          "Descomprimeix-lo: cada carpeta és un apartat del portal i index.txt diu on va cada foto i el seu peu.",
+      );
     } catch (e) {
       setMsg(`No s'ha pogut preparar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -501,11 +506,16 @@ export function ExportPanel() {
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
         <h3 className="text-sm font-semibold">Fotos per al portal</h3>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Totes les fotos i el PDF de l&apos;informe en un zip, amb una carpeta per apartat del portal i un nom que diu on va cada fitxer: <code>D03-2.jpg</code> és la deficiència 3, foto 2; <code>E01-1.jpg</code>, l&apos;element 1 de l&apos;envolupant. Hi va un <code>index.txt</code> amb els peus de foto. Les dades les entra Claude al formulari del portal; les fotos es pugen des d&apos;aquest zip, a mà o amb Claude a l&apos;ordinador.
+          Totes les fotos i el PDF de l&apos;informe en un zip, amb una carpeta per apartat del portal i un nom que diu on va cada fitxer: <code>D03-2.jpg</code> és la deficiència 3, foto 2; <code>E01-1.jpg</code>, l&apos;element 1 de l&apos;envolupant. Hi va un <code>index.txt</code> amb els peus de foto. Les fotos ja van reduïdes per al portal (JPEG de menys de {PORTAL_FOTO_MAX_BYTES / 1024} KB, com les que el portal ja ha acceptat): no cal tocar-les. Les dades les entra Claude al formulari del portal; les fotos es pugen des d&apos;aquest zip, a mà o amb Claude a l&apos;ordinador.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" className="btn-primary" disabled={busy || paquet.fitxers.length === 0} onClick={fotos}>{busy ? "Preparant…" : `Descarregar fotos (${paquet.fitxers.length})`}</button>
           {paquet.falten.length > 0 && <span className="text-xs text-amber-800">{paquet.falten.length} sense arxiu a l&apos;app</span>}
+          {pendents > 0 && (
+            <button type="button" className="text-xs text-amber-800 underline" onClick={onPendents}>
+              {pendents} {pendents === 1 ? "foto" : "fotos"} per classificar (no van al zip)
+            </button>
+          )}
         </div>
         {msg && <p className="mt-2 text-sm">{msg}</p>}
       </div>

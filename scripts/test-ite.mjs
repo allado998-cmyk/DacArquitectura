@@ -573,9 +573,10 @@ await test("photos are named by their place in the portal, with an index of capt
     "CROQUIS/CROQUIS.jpg",
     "ENVOLUPANTS/E01-1.jpg",
     "DEFICIENCIES/D01-1.jpg",
-    "DEFICIENCIES/D01-2.png",
+    "DEFICIENCIES/D01-2.jpg", // a PNG: the zip turns every photo into a JPEG
     "RECOMANACIONS.pdf",
   ]);
+  assert.ok(p.index.includes("JPEG de menys de 140 KB"), "the index says the photos fit the portal");
   assert.deepEqual(p.falten, ["DEFICIENCIES/D03-1"]);
   assert.equal(p.fitxers[2].peu, "Lateral est");
   assert.equal(p.fitxers[0].peu, "", "the slot's default text is not a caption");
@@ -589,6 +590,64 @@ await test("photos are named by their place in the portal, with an index of capt
   const rev = model.validateIte(doc, cataleg);
   assert.ok(rev.warnings.some((w) => w.startsWith("Deficiència 2: sense cap foto")), rev.warnings.join(" | "));
   assert.ok(!rev.warnings.some((w) => w.startsWith("Deficiència 1: sense cap foto")));
+});
+
+console.log("fotos per classificar");
+function informeAmbLlocs() {
+  let doc = model.newIteDoc({ nom: "ITE prova fotos" });
+  const tipus = cataleg.tipus_deficiencia.find((t) => t.codi === "DEF_ENV_TERR_FILTR") ?? cataleg.tipus_deficiencia[0];
+  const greu = cataleg.gravetat[0];
+  doc = model.setAt(doc, "edifici.edificiEnvolupants", [
+    { id: "null", envolupantTipus: cataleg.tipus_envolupant[0], envolupantDescripcio: "Façana principal", fotos: [] },
+    { id: "null", envolupantDescripcio: "Coberta plana", fotos: [model.newMedia("Vista", "image/jpeg", "/fitxers/dac/ite/7/aaaaaa/v.jpg?mida=9")] },
+  ]);
+  doc = model.setAt(doc, "deficiencies", [
+    { id: "null", tipusDeficiencia: tipus, gravetat: greu, deficienciaDescripcio: "Filtracions sota la coberta", fotos: [] },
+    { id: "null", deficienciaDescripcio: "Esquerda", fotos: [] },
+  ]);
+  return model.setAt(doc, "edifici.edificiDescripcio.croquis", model.newMedia("Croquis planta", "image/jpeg", "/fitxers/dac/ite/7/bbbbbb/croquis.jpg?mida=5"));
+}
+const carpeta = (key, nom) => ({ id: key, ref: `/fitxers/dac/ite/7/${key}/${encodeURIComponent(nom)}?mida=1000`, nom, bytes: 1000, pujada: "2026-11-12T09:00:00.000Z" });
+
+await test("where a photo can go: the zip's codes, in the portal's order, with what each one is", () => {
+  const doc = informeAmbLlocs();
+  const llocs = fotos.llocsFotos(doc, cataleg);
+  assert.deepEqual(llocs.map((l) => l.codi), ["CROQUIS", "E01", "E02", "COMPTADORS-AIGUA", "QUADRE-ELECTRIC", "D01", "D02"]);
+  assert.deepEqual(llocs.map((l) => l.fotos), [1, 0, 1, 0, 0, 0, 0]);
+  assert.ok(llocs.find((l) => l.codi === "E01").titol.endsWith("Façana principal"));
+  const d01 = llocs.find((l) => l.codi === "D01").titol;
+  assert.ok(d01.startsWith(`${cat.catLabel(cataleg.gravetat[0])} · `) && d01.endsWith("Filtracions sota la coberta"), d01);
+  assert.equal(llocs.find((l) => l.codi === "CROQUIS").unica, true);
+  assert.deepEqual(["d3", "D03", "e1", "E-12", "comptadors", "Comptadors d'aigua", "qcp", "Quadre elèctric", "croquis"].map(fotos.codiLloc),
+    ["D03", "D03", "E01", "E12", "COMPTADORS-AIGUA", "COMPTADORS-AIGUA", "QUADRE-ELECTRIC", "QUADRE-ELECTRIC", "CROQUIS"]);
+});
+
+await test("photos waiting for a place: the folder's photos the report does not use", () => {
+  const doc = informeAmbLlocs();
+  const enCarpeta = [carpeta("aaaaaa", "v.jpg"), carpeta("bbbbbb", "croquis.jpg"), carpeta("cccccc", "IMG_0001.jpg"), carpeta("dddddd", "IMG 0002.jpg")];
+  assert.deepEqual(fotos.pendentsDe(enCarpeta, doc).map((f) => f.id), ["cccccc", "dddddd"], "used photos are not pending, whatever their ?mida");
+});
+
+await test("placing a photo: a list gets it at the end with its caption; a single slot is replaced", () => {
+  let doc = informeAmbLlocs();
+  const llocs = fotos.llocsFotos(doc, cataleg);
+  const e02 = llocs.find((l) => l.codi === "E02");
+  doc = fotos.posarFoto(doc, e02, carpeta("cccccc", "IMG_0001.jpg"), "  Coberta,\n vista des del terrat  ");
+  const f = model.listOf(doc, "edifici.edificiEnvolupants.1.fotos");
+  assert.equal(f.length, 2);
+  assert.equal(f[1].descripcio, "Coberta, vista des del terrat");
+  assert.equal(f[1].mimeType, "image/jpeg");
+  assert.ok(f[1].path.startsWith("/fitxers/dac/ite/7/cccccc/"));
+  const long = fotos.posarFoto(doc, llocs.find((l) => l.codi === "D01"), carpeta("dddddd", "x.png"), "x".repeat(300));
+  const d = model.listOf(long, "deficiencies.0.fotos")[0];
+  assert.equal(d.descripcio.length, fotos.PEU_MAX, "the portal takes 200 characters");
+  assert.equal(d.mimeType, "image/png");
+  const croquis = fotos.posarFoto(doc, llocs.find((l) => l.codi === "CROQUIS"), carpeta("eeeeee", "pla.jpg"), "");
+  assert.equal(model.getAt(croquis, "edifici.edificiDescripcio.croquis.descripcio"), "Croquis planta", "a single slot keeps its fixed caption");
+  assert.ok(String(model.getAt(croquis, "edifici.edificiDescripcio.croquis.path")).includes("/eeeeee/"));
+  // the replaced sketch is no longer used, so it is pending again
+  const enCarpeta = [carpeta("bbbbbb", "croquis.jpg"), carpeta("eeeeee", "pla.jpg")];
+  assert.deepEqual(fotos.pendentsDe(enCarpeta, croquis).map((x) => x.id), ["bbbbbb"]);
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

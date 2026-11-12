@@ -117,9 +117,22 @@ export const longText = z.string().max(20000);
 // A type alias (not an interface) so it is assignable to the SDK's
 // CallToolResult, which carries an index signature.
 export type ToolText = {
-  content: { type: "text"; text: string }[];
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
   isError?: boolean;
 };
+
+// A read action may return `imatges` (e.g. thumbnails of photos to sort):
+// they go to the model as image blocks after the JSON, each after its label.
+export interface ToolImage {
+  etiqueta: string;
+  data: string; // base64
+  mimeType: string;
+}
+
+export function withImages(result: ToolText, imatges: ToolImage[]): ToolText {
+  for (const im of imatges) result.content.push({ type: "text", text: im.etiqueta }, { type: "image", data: im.data, mimeType: im.mimeType });
+  return result;
+}
 
 export function textResult(summary: string, data?: unknown): ToolText {
   const text = data === undefined ? summary : `${summary}\n${JSON.stringify(data, jsonReplacer)}`;

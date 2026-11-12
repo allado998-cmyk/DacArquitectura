@@ -57,6 +57,12 @@ globalThis.__fakeSql = async (text, params) => {
     return [];
   }
   if (q.startsWith("delete from public.mcp_usage")) return [];
+  // An ITE report a test puts in globalThis.__fakeIte.
+  if (q.startsWith("update public.ite_informe set")) {
+    db.writes.push({ text: q, params });
+    return globalThis.__fakeIte ? [{ updated_at: "2026-11-12 10:01", versio: "v2" }] : [];
+  }
+  if (q.includes("from public.ite_informe where id = $1")) return globalThis.__fakeIte && params[0] === globalThis.__fakeIte.id ? [globalThis.__fakeIte] : [];
   if (/^(insert|update|delete)\b/.test(q)) {
     db.writes.push({ text: q, params });
     return [];
@@ -247,6 +253,14 @@ await test("an upload link names one user and one acta; tampered links and login
   const cookie = await sealData({ user: "adri" }, { password: sessionOptions.password });
   assert.equal(await ul.readActaUploadToken(cookie), null, "a login cookie is not an upload link");
   assert.match(ul.actaUploadUrl("https://x.example/", t), /^https:\/\/x\.example\/pujar\/Fe26/);
+});
+await test("an ITE upload link names one user and one report; acta and ITE links do not open each other", async () => {
+  const ul = await import("../src/lib/upload-link.ts");
+  const t = await ul.createIteUploadToken("adri", 9);
+  assert.deepEqual(await ul.readIteUploadToken(t), { user: "adri", iteId: 9 });
+  assert.equal(await ul.readActaUploadToken(t), null, "an ITE link does not open an acta");
+  assert.equal(await ul.readIteUploadToken(await ul.createActaUploadToken("adri", 9)), null, "an acta link does not open a report");
+  assert.equal(await ul.readIteUploadToken(t.slice(0, 40) + (t[40] === "A" ? "B" : "A") + t.slice(41)), null);
 });
 
 console.log("shared");
@@ -460,6 +474,77 @@ await test("create_expedient saves a past number through the website's own actio
   await rpc("tools/call", { name: "dac_change", arguments: { action: "create_expedient", args, confirm: true, idempotency_key: key } });
   const inserts = db.writes.filter((w) => w.text.startsWith("insert into public.expedients"));
   assert.deepEqual(inserts.map((w) => w.params), [["19-1042"]]);
+});
+
+console.log("ITE photos");
+await test("unsorted ITE photos reach the assistant as images; it places them with captions and drops the rest", async () => {
+  const model = await import("../src/lib/ite/model.ts");
+  const { buildCatalegComplet } = await import("../src/lib/ite/cataleg-portal.ts");
+  const { applyIteEdit } = await import("../src/lib/ite/edit.ts");
+  const sharp = (await import("sharp")).default;
+  const cataleg = buildCatalegComplet();
+  let doc = model.newIteDoc({ nom: "ITE fotos" });
+  const e = applyIteEdit(doc, { envolupants: { afegir: [{ tipus: "Façanes", descripcio: "Façana principal" }] }, deficiencies: { afegir: [{ tipus: "DEF_ENV_TERR_FILTR", gravetat: "G", descripcio: "Filtracions" }] } }, cataleg);
+  assert.deepEqual(e.errors, []);
+  doc = model.setAt(e.doc, "edifici.edificiDescripcio.croquis", model.newMedia("Croquis planta", "image/jpeg", "/fitxers/dac/ite/9/used0000/croquis.jpg?mida=1000"));
+  globalThis.__fakeIte = { id: 9, expedient_id: null, client_id: null, nom: "ITE fotos", adreca: null, data_inspeccio: null, dades: doc, exportat_at: null, updated_at: "2026-11-12 10:00", versio: "v1" };
+  const jpeg = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: "#7a9a5a" } }).jpeg().toBuffer();
+  const at = (m) => new Date(Date.UTC(2026, 10, 12, 9, m));
+  const blobs = [
+    { pathname: "dac/ite/9/used0000/croquis.jpg", size: 1000, uploadedAt: at(0) },
+    { pathname: "dac/ite/9/k1aaaaaa/IMG_0001.jpg", size: 210_000, uploadedAt: at(1) },
+    { pathname: "dac/ite/9/k2bbbbbb/IMG_0002.jpg", size: 220_000, uploadedAt: at(2) },
+    { pathname: "dac/ite/9/k3cccccc/IMG_0003.jpg", size: 230_000, uploadedAt: at(3) },
+    { pathname: "dac/ite/9/k4dddddd/annex.pdf", size: 5_000, uploadedAt: at(4) },
+    { pathname: "dac/ite/90/k5eeeeee/other.jpg", size: 1_000, uploadedAt: at(5) },
+  ];
+  const deleted = [];
+  globalThis.__fakeBlob = {
+    list: async ({ prefix }) => ({ blobs: blobs.filter((b) => b.pathname.startsWith(prefix)), hasMore: false }),
+    get: async () => ({ statusCode: 200, stream: new Blob([jpeg]).stream(), blob: { contentType: "image/jpeg" } }),
+    del: async (p) => { deleted.push(...[].concat(p)); },
+  };
+  try {
+    const read = await rpc("tools/call", { name: "dac_read", arguments: { action: "ite_fotos_pendents", args: { id: 9 } } });
+    assert.notEqual(read.result.isError, true, read.result.content[0].text);
+    const images = read.result.content.filter((c) => c.type === "image");
+    assert.equal(images.length, 3);
+    const meta = await sharp(Buffer.from(images[0].data, "base64")).metadata();
+    assert.ok(Math.max(meta.width, meta.height) <= 512, "thumbnails are small");
+    const json = JSON.parse(read.result.content[0].text.split("\n").slice(1).join("\n"));
+    assert.equal(json.total, 3);
+    assert.deepEqual(json.fotos.map((f) => f.foto), ["k1aaaaaa", "k2bbbbbb", "k3cccccc"]);
+    assert.deepEqual(json.llocs.map((l) => l.lloc), ["CROQUIS", "E01", "COMPTADORS-AIGUA", "QUADRE-ELECTRIC", "D01"]);
+    assert.equal(json.imatges, undefined, "the images are not repeated as text");
+    assert.match(read.result.content[1].text, /k1aaaaaa/, "each image comes after its label");
+
+    db.writes.length = 0;
+    const bad = await rpc("tools/call", { name: "dac_change", arguments: { action: "ite_colocar_fotos", args: { id: 9, fotos: [{ foto: "k1aaaaaa", lloc: "D01" }, { foto: "used0000", lloc: "E01", peu: "x" }, { foto: "k2bbbbbb", lloc: "E07", peu: "x" }] } } });
+    const btext = textOf(bad);
+    assert.match(btext, /Falta el peu de la foto k1aaaaaa/);
+    assert.match(btext, /used0000 no és entre les fotos per classificar/);
+    assert.match(btext, /Lloc desconegut: «E07»/);
+
+    const args = { id: 9, fotos: [{ foto: "k1aaaaaa", lloc: "e1", peu: "Façana principal, vista general" }, { foto: "k2bbbbbb", lloc: "d1", peu: "Taca d'humitat al sostre del 5è 1a" }], descartar: ["k3cccccc"] };
+    const preview = await rpc("tools/call", { name: "dac_change", arguments: { action: "ite_colocar_fotos", args } });
+    const ptext = textOf(preview);
+    assert.match(ptext, /^PREVISUALITZACIÓ/, ptext);
+    assert.match(ptext, /col·locar 2 fotos \(E01, D01\) i esborrar-ne 1\. En quedaran 0 per classificar/);
+    assert.equal(db.writes.length, 0, "preview must not write");
+    assert.equal(deleted.length, 0, "preview must not delete");
+    const key = /idempotency_key="([a-f0-9]+)"/.exec(ptext)?.[1];
+    const saved = await rpc("tools/call", { name: "dac_change", arguments: { action: "ite_colocar_fotos", args, confirm: true, idempotency_key: key } });
+    assert.match(textOf(saved), /^DESAT/, textOf(saved));
+    const w = db.writes.find((x) => x.text.startsWith("update public.ite_informe set"));
+    const dades = JSON.parse(w.params[0]);
+    assert.deepEqual(dades.edifici.edificiEnvolupants[0].fotos.map((f) => [f.descripcio, f.path.split("?")[0]]), [["Façana principal, vista general", "/fitxers/dac/ite/9/k1aaaaaa/IMG_0001.jpg"]]);
+    assert.equal(dades.deficiencies[0].fotos[0].descripcio, "Taca d'humitat al sostre del 5è 1a");
+    assert.equal(dades.edifici.edificiDescripcio.croquis.path, "/fitxers/dac/ite/9/used0000/croquis.jpg?mida=1000", "the rest of the report is untouched");
+    assert.deepEqual(deleted, ["dac/ite/9/k3cccccc/IMG_0003.jpg"]);
+  } finally {
+    delete globalThis.__fakeBlob;
+    delete globalThis.__fakeIte;
+  }
 });
 
 console.log("source checks");

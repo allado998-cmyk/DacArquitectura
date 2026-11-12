@@ -35,6 +35,16 @@ const STUBS = {
     }
     tag.query = (text, params) => run(text, params ?? []);
     export const sql = tag;`,
+  // The private file store: a test installs globalThis.__fakeBlob with the calls it needs.
+  "@vercel/blob": `
+    function fake(name) {
+      return (...args) => {
+        const f = globalThis.__fakeBlob?.[name];
+        if (typeof f !== "function") throw new Error("fake blob not installed: " + name);
+        return f(...args);
+      };
+    }
+    export const list = fake("list"), get = fake("get"), put = fake("put"), del = fake("del"), head = fake("head");`,
 };
 
 async function exists(p) {

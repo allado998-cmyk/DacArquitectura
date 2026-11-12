@@ -8,10 +8,12 @@ import {
   errorResult,
   suggestedIdempotencyKey,
   textResult,
+  withImages,
   type ActionCtx,
   type ChangeAction,
   type Plan,
   type ReadAction,
+  type ToolImage,
   type ToolText,
 } from "./core";
 
@@ -122,6 +124,12 @@ export async function runRead(def: ReadAction, rawArgs: unknown, a: ActionCtx): 
         return errorResult(notFound);
       }
       void logUsage(a, "dac_read", def.name, "done", { args });
+      const imatges = data && typeof data === "object" && Array.isArray((data as { imatges?: unknown }).imatges) ? (data as { imatges: ToolImage[] }).imatges : null;
+      if (imatges) {
+        const rest: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+        delete rest.imatges;
+        return withImages(textResult(`OK ${def.name}`, rest), imatges);
+      }
       return textResult(`OK ${def.name}`, data);
     } catch (e) {
       void logUsage(a, "dac_read", def.name, "failed", { args, error: String(e) });

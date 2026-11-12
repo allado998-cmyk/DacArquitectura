@@ -250,15 +250,20 @@ d'un zip amb el nom de cada una al seu lloc.
 - Les seccions són les del menú del portal, amb les seves etiquetes; fotos
   per element de l'envolupant i per deficiència; l'estat de conservació i la
   valoració final es calculen sols.
+- **Fotos per classificar**: totes les fotos de la visita de cop (arrossegant-les
+  o amb un enllaç per al mòbil, sense iniciar sessió). Claude, pel connector,
+  les mira i posa cada una al seu element o deficiència amb el peu
+  (`ite_fotos_pendents`, `ite_colocar_fotos`); també es poden posar a mà.
 - **Fotos per al portal**: zip amb una carpeta per apartat i noms que diuen on
   va cada foto (`D03-2.jpg` = deficiència 3, foto 2) més un `index.txt` amb
-  els peus, per pujar-les al portal a mà o amb Claude a l'ordinador.
+  els peus, per pujar-les al portal a mà o amb Claude a l'ordinador. Les fotos
+  hi van reduïdes a JPEG de menys de 140 KB, mides que el portal accepta.
 - **Informe en PDF**: l'informe sencer amb l'ordre del model oficial (1 a 11),
   les fotos, el resum de l'estat de conservació i la signatura del tècnic
   («PDF / Imprimir», com les actes).
 - **Importar del portal**: porta un informe del portal (zip o XML) a l'app, amb
   les fotos. Cada informe importat amplia les llistes desplegables.
-- També des del plugin (`create_ite`, `update_ite`, `ite_cadastre`…).
+- També des del plugin (`create_ite`, `update_ite`, `ite_cadastre`, les fotos…).
 
 **El portal no importa fitxers nostres**: les seves exportacions van signades
 amb el seu certificat i la importació ho comprova (provat l'11/11/2026); el

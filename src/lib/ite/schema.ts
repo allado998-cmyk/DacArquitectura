@@ -49,6 +49,7 @@ export type SectionKey =
   | "accessibilitat"
   | "conservacio"
   | "sostenibilitat"
+  | "fotos"
   | "exportar";
 
 export interface SectionDef {
@@ -809,6 +810,8 @@ export const SECTIONS: SectionDef[] = [
       },
     ],
   },
+  // Not portal sections: the app's own tools.
+  { key: "fotos", title: "Fotos per classificar", groups: [] },
   { key: "exportar", title: "Portal i PDF", groups: [] },
 ];
 

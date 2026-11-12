@@ -7,9 +7,12 @@ import { sql } from "@/lib/db";
 import { deleteFolder, deleteStored, iteMediaRef } from "@/lib/fitxers";
 import { pathnameOfRef } from "@/lib/fitxers-shared";
 import { CATASTRO_URL, parseCadastre, type CadastreDades } from "@/lib/ite/cadastre";
+import type { FotoCarpeta } from "@/lib/ite/fotos";
 import { cleanImported } from "@/lib/ite/model";
-import { loadCataleg, newDocFor, rowColumns, saveCatalegOf } from "@/lib/ite/server";
+import { esborrarPendents, fotosCarpeta } from "@/lib/ite/pendents";
+import { loadCataleg, loadIte, newDocFor, rowColumns, saveCatalegOf } from "@/lib/ite/server";
 import { isObj, type IteObj } from "@/lib/ite/xml";
+import { createIteUploadToken } from "@/lib/upload-link";
 
 const MAX_DOC_CHARS = 900_000; // under the 1 MB server-action body limit
 
@@ -60,12 +63,17 @@ export async function importIteAction(doc: IteObj): Promise<{ id: number; catale
   return { id, catalegNous: (after[0]?.n ?? 0) - (before[0]?.n ?? 0) };
 }
 
-export async function saveIteAction(id: number, doc: IteObj): Promise<{ updated_at: string }> {
+// `versio` is the version the editor loaded (IteRow.versio). If the report
+// changed since (Claude through the plugin, another window), nothing is
+// written and the editor is told, so it never overwrites those changes. The
+// plugin and the import save without it.
+export async function saveIteAction(id: number, doc: IteObj, versio?: string): Promise<{ updated_at: string; versio: string } | { conflicte: true }> {
   await requireUser();
   if (!Number.isInteger(id) || id <= 0) throw new Error("Identificador invàlid.");
   const clean = checkDoc(doc);
   const cataleg = await loadCataleg();
   const cols = rowColumns(clean, cataleg);
+  const base = versio ?? null;
   const rows = (await sql`
     update public.ite_informe set
       dades = ${JSON.stringify(clean)}::jsonb,
@@ -73,12 +81,49 @@ export async function saveIteAction(id: number, doc: IteObj): Promise<{ updated_
       adreca = ${cols.adreca},
       data_inspeccio = ${cols.data_inspeccio}::date,
       updated_at = now()
-    where id = ${id}
-    returning to_char(updated_at, 'YYYY-MM-DD HH24:MI') as updated_at
-  `) as { updated_at: string }[];
-  if (!rows[0]) throw new Error("Informe no trobat.");
+    where id = ${id} and (${base}::text is null or md5(dades::text) = ${base}::text)
+    returning to_char(updated_at, 'YYYY-MM-DD HH24:MI') as updated_at, md5(dades::text) as versio
+  `) as { updated_at: string; versio: string }[];
+  if (!rows[0]) {
+    if (base && ((await sql`select 1 from public.ite_informe where id = ${id}`) as unknown[]).length) return { conflicte: true };
+    throw new Error("Informe no trobat.");
+  }
   revalidatePath("/ite");
   return rows[0];
+}
+
+// The report as saved now, if it is not the version the editor has.
+export async function iteSiHaCanviatAction(id: number, versio: string): Promise<{ dades: IteObj; versio: string } | null> {
+  await requireUser();
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const rows = (await sql`select md5(dades::text) as versio from public.ite_informe where id = ${id}`) as { versio: string }[];
+  if (!rows[0] || rows[0].versio === versio) return null;
+  const ite = await loadIte(id);
+  return ite ? { dades: ite.dades, versio: ite.versio } : null;
+}
+
+// Photos «per classificar» --------------------------------------------------------
+
+// Every photo in the report's folder; the editor keeps the ones the report does not use.
+export async function fotosCarpetaAction(id: number): Promise<FotoCarpeta[]> {
+  await requireUser();
+  if (!Number.isInteger(id) || id <= 0) return [];
+  return fotosCarpeta(id);
+}
+
+// The private upload link's token (the page adds its own origin).
+export async function iteUploadTokenAction(id: number): Promise<string> {
+  const user = await requireUser();
+  if (!Number.isInteger(id) || id <= 0) throw new Error("Identificador invàlid.");
+  return createIteUploadToken(user, id);
+}
+
+// Deletes photos that are waiting for a place; never one the report uses.
+export async function descartarFotosAction(id: number, ids: string[]): Promise<number> {
+  await requireUser();
+  const ite = Number.isInteger(id) && id > 0 ? await loadIte(id) : null;
+  if (!ite || !ids.length) return 0;
+  return esborrarPendents(id, ite.dades, ids.slice(0, 500));
 }
 
 export async function setIteLinksAction(id: number, expedientId: number | null, clientId: number | null): Promise<void> {

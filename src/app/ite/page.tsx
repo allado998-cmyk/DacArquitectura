@@ -13,7 +13,7 @@ export default async function ItePage() {
       select i.id, i.nom, i.adreca, to_char(i.data_inspeccio, 'YYYY-MM-DD') as data_inspeccio,
              e.num_expedient as expedient_num, c.nom as client_nom,
              case when jsonb_typeof(i.dades -> 'deficiencies') = 'array' then jsonb_array_length(i.dades -> 'deficiencies') else 0 end as deficiencies,
-             to_char(i.exportat_at, 'YYYY-MM-DD') as exportat, to_char(i.updated_at, 'YYYY-MM-DD') as updated
+             to_char(i.updated_at, 'YYYY-MM-DD') as updated
       from public.ite_informe i
       left join public.expedients e on e.id = i.expedient_id
       left join public.clients c on c.id = i.client_id

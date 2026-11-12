@@ -23,7 +23,7 @@ import {
   valoracioFavorable,
 } from "@/lib/ite/model";
 import { fotoPaquet } from "@/lib/ite/fotos";
-import { exportFotosZip, exportPortalXml, exportPortalZip } from "@/lib/ite/portal-client";
+import { exportFotosZip, openItePdf } from "@/lib/ite/portal-client";
 import { isObj, type IteObj } from "@/lib/ite/xml";
 import { CatSelect } from "./fields";
 import { useDraft, useIte } from "./ite-context";
@@ -470,11 +470,11 @@ export function CadastrePanel() {
 // Export ---------------------------------------------------------------------------
 
 export function ExportPanel() {
-  const { iteId, doc, cataleg } = useIte();
+  const { doc, cataleg } = useIte();
   const check = useMemo(() => validateIte(doc, cataleg), [doc, cataleg]);
   const paquet = useMemo(() => fotoPaquet(doc, cataleg), [doc, cataleg]);
   const [msg, setMsg] = useState<string | null>(null);
-  const [msgCopia, setMsgCopia] = useState<string | null>(null);
+  const [msgPdf, setMsgPdf] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function fotos() {
@@ -489,16 +489,10 @@ export function ExportPanel() {
     }
   }
 
-  async function zip() {
-    setBusy(true); setMsgCopia("Preparant…");
-    try {
-      const name = await exportPortalZip(iteId, doc, cataleg, setMsgCopia);
-      setMsgCopia(`Descarregat ${name}.`);
-    } catch (e) {
-      setMsgCopia(`No s'ha pogut exportar: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(false);
-    }
+  // Not awaited before window.open (inside openItePdf), so the browser lets the window open.
+  function pdf() {
+    setMsgPdf(null);
+    openItePdf(doc, cataleg).catch((e) => setMsgPdf(`No s'ha pogut fer el PDF: ${e instanceof Error ? e.message : String(e)}`));
   }
 
   const lists = Object.entries(cataleg).filter(([k]) => CATALEG_LABELS[k]).map(([k, l]) => `${CATALEG_LABELS[k]}: ${l.length}`);
@@ -517,6 +511,17 @@ export function ExportPanel() {
       </div>
 
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
+        <h3 className="text-sm font-semibold">Informe en PDF</h3>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">
+          L&apos;informe sencer amb l&apos;ordre i la numeració del model oficial (de l&apos;1 a l&apos;11), les fotos de cada element i deficiència, el resum de l&apos;estat de conservació i el bloc de signatura. S&apos;obre una finestra: tria «Desa com a PDF». És un document de treball; l&apos;oficial és el que fa el portal en tancar l&apos;informe.
+        </p>
+        <div className="mt-3">
+          <button type="button" className="btn-primary" onClick={pdf}>PDF / Imprimir</button>
+        </div>
+        {msgPdf && <p className="mt-2 text-sm text-red-700">{msgPdf}</p>}
+      </div>
+
+      <div className="rounded-lg border border-[var(--color-line)] bg-white p-4">
         <h3 className="text-sm font-semibold">Revisió de l&apos;informe</h3>
         {check.errors.length === 0 && check.warnings.length === 0 && <p className="mt-1 text-sm text-emerald-700">Tot correcte.</p>}
         {check.errors.length > 0 && (
@@ -528,20 +533,8 @@ export function ExportPanel() {
       </div>
 
       <details className="rounded-lg border border-[var(--color-line)] bg-white p-4 text-sm">
-        <summary className="cursor-pointer font-semibold">Fitxer en el format del portal</summary>
-        <p className="mt-2 text-[var(--color-muted)]">
-          El mateix zip que fa «Exportar informe» al portal (XML i fotos), sense signatura. <strong>El portal no l&apos;importa</strong>: només readmet fitxers signats per ell mateix (comprovat l&apos;11/11/2026). Queda com a còpia de l&apos;informe en el seu format.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-ghost" disabled={busy} onClick={zip}>Exportar (.zip)</button>
-          <button type="button" className="btn-ghost" disabled={busy} onClick={() => setMsgCopia(`Descarregat ${exportPortalXml(iteId, doc, cataleg)} (sense fotos).`)}>Només l&apos;XML</button>
-        </div>
-        {msgCopia && <p className="mt-2">{msgCopia}</p>}
-      </details>
-
-      <details className="rounded-lg border border-[var(--color-line)] bg-white p-4 text-sm">
-        <summary className="cursor-pointer font-semibold">Llistes desplegables conegudes</summary>
-        <p className="mt-2 text-[var(--color-muted)]">Els valors de les llistes (tipus de deficiència, orientació, tipus de via, municipis…) són els del portal, amb el seu codi intern. Només es coneixen els que han aparegut en informes importats; cada informe que s&apos;importa n&apos;hi afegeix.</p>
+        <summary className="cursor-pointer font-semibold">Llistes desplegables</summary>
+        <p className="mt-2 text-[var(--color-muted)]">Les llistes (municipis, tipus de via, tipus de deficiència, gravetats, orientacions…) són les del formulari del portal, segons l&apos;inventari del 12/11/2026. Els valors que surten en informes importats del portal hi porten el seu codi intern.</p>
         <p className="mt-2 text-xs text-[var(--color-muted)]">{lists.join(" · ")}</p>
       </details>
     </div>

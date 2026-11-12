@@ -321,7 +321,7 @@ function dataUrlToUint8(dataUrl: string): Uint8Array {
 
 // Rasterise a PDF (data URI) to one JPEG data-URI per page, so the attached
 // document's pages can be embedded into the generated PDF / Word.
-async function rasterizePdf(dataUrl: string, scale = 1.6): Promise<string[]> {
+export async function rasterizePdf(dataUrl: string, scale = 1.6): Promise<string[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfjs: any = await import("pdfjs-dist");
@@ -378,7 +378,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 // Photos and PDFs kept in the file store are fetched (with the user's session)
 // and embedded, so the printed PDF and the Word file carry them inside. Older
 // actes already hold data URIs. A file that can't be fetched is left out.
-async function srcAsDataUrl(src: string): Promise<string> {
+export async function srcAsDataUrl(src: string): Promise<string> {
   if (!src || src.startsWith("data:")) return src;
   try {
     const res = await fetch(src);

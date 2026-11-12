@@ -809,7 +809,7 @@ export const SECTIONS: SectionDef[] = [
       },
     ],
   },
-  { key: "exportar", title: "Portal", groups: [] },
+  { key: "exportar", title: "Portal i PDF", groups: [] },
 ];
 
 export const ALL_FIELDS: FieldDef[] = SECTIONS.flatMap((s) => s.groups.flatMap((g) => g.fields));

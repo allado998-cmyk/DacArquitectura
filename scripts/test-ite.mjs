@@ -369,8 +369,9 @@ await test("an owner who is a person gets name and surnames; a community, its co
   assert.equal(comunitat.nomPropietat, undefined);
 });
 
-await test("«Validar informe»: a complete report has no errors, only the photos are left", () => {
-  const pick = (c, q) => cat.matchCat(complet, c, q).obj;
+const pick = (c, q) => cat.matchCat(complet, c, q).obj;
+// A report with everything the portal asks for (and no photos).
+function informeComplet() {
   const tipusTerrat = complet.tipus_deficiencia.find((t) => t.codi === "DEF_ENV_TERR_FILTR");
   let doc = model.newIteDoc({ nom: "Inspecció Tècnica de l'Edifici del carrer Exemple, 12 de Barcelona", tecnic: defaults.tecnicDespatx(complet), dataInspeccio: "2026-05-04" });
   const camps = {
@@ -401,8 +402,11 @@ await test("«Validar informe»: a complete report has no errors, only the photo
     mesures: { afegir: [{ descripcio: "Aïllar la coberta." }] },
   }, complet);
   assert.deepEqual(r.errors, []);
-  doc = r.doc;
-  doc = model.setAt(doc, "deficiencies", [{ id: "null", tipusDeficiencia: tipusTerrat, gravetat: pick("gravetat", "Lleu"), deficienciaDescripcio: "Goteres al terrat.", fotos: [] }]);
+  return model.setAt(r.doc, "deficiencies", [{ id: "null", tipusDeficiencia: tipusTerrat, gravetat: pick("gravetat", "Lleu"), deficienciaDescripcio: "Goteres al terrat.", fotos: [] }]);
+}
+
+await test("«Validar informe»: a complete report has no errors, only the photos are left", () => {
+  const doc = informeComplet();
   const ok = model.validateIte(doc, complet);
   assert.deepEqual(ok.errors, []);
   assert.ok(ok.warnings.length && ok.warnings.every((w) => /foto|croquis/.test(w)), ok.warnings.join(" | "));
@@ -441,6 +445,40 @@ await test("the report as text: the province from the municipality, how to do it
   const camps = edit.iteCamps(complet, "dades")[0].camps;
   assert.match(camps.find((c) => c.camp === "propietat.municipiPropietat").valors, /^949 opcions/);
   assert.equal(camps.find((c) => c.camp === "propietat.telefon1Propietat").obligatori, true);
+});
+
+console.log("informe en PDF");
+const informe = await load("informe.ts");
+await test("the report as a document: the official model's sections, data, photos and signature", () => {
+  let doc = informeComplet();
+  doc = model.setAt(doc, "deficiencies.0.fotos", [model.newMedia("Terrat <nord>", "image/jpeg", "/fitxers/dac/ite/7/a/terrat.jpg")]);
+  doc = model.setAt(doc, "edifici.edificiEnvolupants.0.fotos", [model.newMedia("Façana", "image/jpeg", "/fitxers/dac/ite/7/b/facana.jpg")]);
+  doc = model.setAt(doc, "edifici.edificiDescripcio.croquis", model.newMedia("Croquis planta", "image/jpeg", "{IMAGEROOTDIR}/perdut.JPG"));
+  const html = informe.buildInformeHtml(doc, complet, { data: new Date(2026, 10, 12) });
+  const seccions = [
+    "1. Identificació de l'informe", "2. Identificació de l'edifici", "3. Identificació de la propietat", "4. Identificació del tècnic redactor",
+    "5. Dades generals de l'edifici", "6. Descripció de l'edifici", "7. Sistemes constructius", "8. Relació i qualificació de les deficiències detectades",
+    "9. Avaluació de les condicions bàsiques d'accessibilitat", "10. Recomanacions per a la millora de la sostenibilitat i l'ecoeficiència", "11. Resum de l'estat de conservació",
+  ];
+  let last = -1;
+  for (const s of seccions) {
+    const at = html.indexOf(s);
+    assert.ok(at > last, `«${s}» in its place`);
+    last = at;
+  }
+  for (const t of ["1234567DF1234A", "Carrer EXEMPLE, 12", "Comunitat de Propietaris Exemple 12", "1910", "200 m²", "Principal 1a", "Aïllar la coberta.", "Goteres al terrat.", "FAVORABLE", "David Lladó Porta", "Barcelona, 12 de novembre de 2026"]) {
+    assert.ok(html.includes(t), t);
+  }
+  assert.ok(!html.includes("1.910"), "years are not grouped");
+  // photos with their name in the photo package; text escaped; a photo without a file left out
+  assert.ok(html.includes('src="/fitxers/dac/ite/7/a/terrat.jpg"'));
+  assert.ok(html.includes("D01-1 · Terrat &lt;nord&gt;") && !html.includes("<nord>"));
+  assert.ok(html.includes("E01-1 · Façana"));
+  assert.ok(!html.includes("perdut.JPG") && !html.includes("Emplaçament i croquis"));
+  // no representative block unless the owner has one
+  assert.ok(!html.includes(">Representant<"));
+  // a recommendations PDF goes at the end, page by page
+  assert.ok(informe.buildInformeHtml(doc, complet, { annex: ["data:image/jpeg;base64,AAAA"] }).includes("Annex: recomanacions"));
 });
 
 // Real export ----------------------------------------------------------------------

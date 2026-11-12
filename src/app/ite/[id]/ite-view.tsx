@@ -126,7 +126,7 @@ export function IteView({ ite, cataleg, expedients, clients, contactes }: { ite:
               {state === "desat" ? "Desat" : state === "desant" ? "Desant…" : state === "pendent" ? "Canvis per desar…" : "No s'ha pogut desar; reintentant…"}
             </span>
             <button type="button" className="btn-primary" onClick={() => go("exportar")}>
-              Portal{check.errors.length ? ` (${check.errors.length} errors)` : ""}
+              Portal i PDF{check.errors.length ? ` (${check.errors.length} errors)` : ""}
             </button>
           </div>
         </div>

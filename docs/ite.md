@@ -381,6 +381,7 @@ text del PDF es veu quin camp és quin:
 | Canvis des del plugin | `src/lib/ite/edit.ts`, `src/lib/mcp/tools/ite.ts` |
 | Importar / exportar al navegador | `src/lib/ite/portal-client.ts` |
 | Fotos per al portal (noms per lloc, `index.txt`) | `src/lib/ite/fotos.ts` |
+| Informe en PDF (document; la finestra d'impressió és `openItePdf` a `portal-client.ts`) | `src/lib/ite/informe.ts` |
 | Inventari del formulari del portal (al navegador) | `scripts/portal-inventari.js`, `scripts/ite-inventari-bookmarklet.mjs` |
 | Portal contra app | `scripts/ite-inventari.mjs` → `docs/ite-inventari.md` |
 | Pàgines i accions | `src/app/ite/` |
@@ -396,15 +397,24 @@ text del PDF es veu quin camp és quin:
   després de desar.
 - **Fotos**: al magatzem privat de Blob, carpeta `ite/<id>`, pujades directament
   des del navegador (com les actes). Es redueixen a 1600 px.
-- **Fotos per al portal** (secció Portal): el navegador llegeix les fotos i fa
-  un zip amb els noms per lloc (`D03-2.jpg`…) i l'`index.txt`; vegeu «Les
-  fotos». `get_ite` dona els mateixos noms a cada deficiència i element.
+- **Fotos per al portal** (secció «Portal i PDF»): el navegador llegeix les
+  fotos i fa un zip amb els noms per lloc (`D03-2.jpg`…) i l'`index.txt`;
+  vegeu «Les fotos». `get_ite` dona els mateixos noms a cada deficiència i
+  element.
+- **Informe en PDF** (secció «Portal i PDF», `informe.ts`): l'informe sencer
+  amb l'ordre i la numeració del model oficial (1 a 11): identificació,
+  dades i taula d'entitats, descripció i croquis, sistemes constructius amb
+  les fotos de l'envolupant, deficiències per element amb les seves fotos
+  (amb el nom del zip, `D01-2`…), accessibilitat, sostenibilitat, resum de
+  l'estat de conservació amb la gravetat màxima per element, valoració final,
+  signatura del tècnic i, al final, el PDF de recomanacions. Com les actes:
+  una finestra que el navegador desa com a PDF, sense temps de funció; espera
+  que carreguin les fotos abans d'imprimir. Porta una nota de document de
+  treball (l'oficial és el del portal en tancar l'informe).
 - **Importar del portal** (llista): el navegador obre el zip, crea l'informe,
   puja les fotos i desa. També accepta només l'XML (sense fotos).
-- **Fitxer en el format del portal** (secció Portal, plegat): el mateix zip
-  que fa el portal (XML i fotos), sense signatura. El portal no l'importa;
-  queda com a còpia de l'informe en el seu format. L'id de l'informe al
-  fitxer és 900 000 000 + l'id de l'app (els del portal van per l'1 milió).
+- El format d'exportació del portal es manté a `buildExport` (`model.ts`) i
+  als tests, però ja no hi ha cap botó: el portal no importa fitxers nostres.
 - **Cadastre**: amb la finca i el full, el servei públic del Catastro dona
   adreça, any, superfície construïda (suma dels immobles, el que fa servir el
   portal) i un immoble per fila de la taula de plantes.

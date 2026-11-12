@@ -1,13 +1,15 @@
 // Browser only: reading the portal's export into the app, the photo package
-// for uploading at the portal, and a copy of the report in the portal's own
-// format. All run on the user's machine (zip, photos), so no function time
-// and no 4.5 MB request limit.
-import { addIteFitxerAction, importIteAction, markIteExportatAction, saveIteAction } from "@/app/ite/actions";
+// for uploading at the portal, and the report as a PDF. All run on the user's
+// machine (zip, photos, printing), so no function time and no 4.5 MB request
+// limit.
+import { addIteFitxerAction, importIteAction, saveIteAction } from "@/app/ite/actions";
+import { rasterizePdf, srcAsDataUrl } from "@/lib/acta-doc";
 import { uploadFitxer } from "@/lib/fitxers-client";
 import { refFor } from "@/lib/fitxers-shared";
 import type { Cataleg } from "./cataleg";
 import { fotoPaquet } from "./fotos";
-import { buildExport, cleanImported, exportIdFor, getAt, mediaSlots } from "./model";
+import { buildInformeHtml, escHtml } from "./informe";
+import { cleanImported, getAt, mediaSlots } from "./model";
 import { parseIteXml, isObj, type IteObj } from "./xml";
 import { buildZip, readZip, type ZipEntry } from "./zip";
 
@@ -90,36 +92,34 @@ function download(bytes: Uint8Array, name: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-// The report in the portal's export format: ITE/informes/dades/<id>/<nom>.xml
-// plus the photos under ITE/informes/imatges/<id>/… The portal refuses it on
-// «Importar» (it only takes files it signed itself), so it is a copy, not a
-// way in.
-export async function exportPortalZip(iteId: number, doc: IteObj, cataleg: Cataleg, onProgress: (msg: string) => void): Promise<string> {
-  const plan = buildExport(doc, cataleg, { exportId: exportIdFor(iteId) });
-  const files = [{ name: plan.xmlPath, data: new TextEncoder().encode(plan.xml) }];
-  const photos: { name: string; data: Uint8Array }[] = new Array(plan.files.length);
-  let done = 0;
-  await mapLimit(plan.files, 4, async (f, i) => {
-    const res = await fetch(f.src, { credentials: "same-origin" });
-    if (!res.ok) throw new Error(`No s'ha pogut llegir una foto (${res.status}). Torna-ho a provar.`);
-    photos[i] = { name: f.zipPath, data: new Uint8Array(await res.arrayBuffer()) };
-    done++;
-    onProgress(`Preparant fotos ${done}/${plan.files.length}…`);
-  });
-  onProgress("Comprimint…");
-  const zipBytes = await buildZip([...files, ...photos]);
-  const name = `${plan.fileBase}.zip`;
-  download(zipBytes, name, "application/zip");
-  void markIteExportatAction(iteId);
-  return name;
-}
-
-// Only the XML (to look at it, or for a report without photos).
-export function exportPortalXml(iteId: number, doc: IteObj, cataleg: Cataleg): string {
-  const plan = buildExport(doc, cataleg, { exportId: exportIdFor(iteId) });
-  const name = `${plan.fileBase}.xml`;
-  download(new TextEncoder().encode(plan.xml), name, "application/xml");
-  return name;
+// The report as a PDF (informe.ts): a print window with the document, its
+// photos loaded from the file store, and the browser's «Desa com a PDF».
+export async function openItePdf(doc: IteObj, cataleg: Cataleg): Promise<void> {
+  // Opened within the click, so popup blockers let it through.
+  const w = window.open("", "_blank", "width=900,height=1000");
+  if (!w) throw new Error("El navegador ha bloquejat la finestra nova: permet les finestres emergents per a aquesta web.");
+  w.document.write("<!DOCTYPE html><html><body style='font-family:sans-serif;padding:24px;color:#555;'>Preparant l'informe…</body></html>");
+  const origin = window.location.origin;
+  const src = (p: string) => (p.startsWith("/fitxers/") ? origin + p : p.startsWith("data:") ? p : "");
+  const pdf = getAt(doc, "recomanacionsPdf");
+  const pdfSrc = isObj(pdf) && typeof pdf.path === "string" ? src(pdf.path) : "";
+  const annex = pdfSrc ? await rasterizePdf(await srcAsDataUrl(pdfSrc)) : [];
+  const title = typeof doc.nom === "string" && doc.nom.trim() ? doc.nom.trim() : "Informe ITE";
+  const body = buildInformeHtml(doc, cataleg, { logoUrl: `${origin}/logo.jpg`, src, annex });
+  w.document.open();
+  // The title is what the browser proposes as the file name.
+  w.document.write(`<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+    <style>@page { size: A4 portrait; margin: 1.3cm; } *{-webkit-print-color-adjust:exact;print-color-adjust:exact;} body{margin:0;}</style>
+    </head><body>${body}</body></html>`);
+  w.document.close();
+  // The photos come from the file store: print once they have loaded (or failed).
+  const pending = Array.from(w.document.images).filter((img) => !img.complete);
+  await Promise.race([
+    Promise.all(pending.map((img) => new Promise((done) => { img.addEventListener("load", done, { once: true }); img.addEventListener("error", done, { once: true }); }))),
+    new Promise((done) => setTimeout(done, 30_000)),
+  ]);
+  w.focus();
+  w.print();
 }
 
 // All the report's photos and PDF, named by where they go in the portal

@@ -14,7 +14,6 @@ export type IteListRow = {
   expedient_num: string | null;
   client_nom: string | null;
   deficiencies: number;
-  exportat: string | null;
   updated: string;
 };
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null; client_id: number | null; adreca: string | null };
@@ -107,13 +106,12 @@ export function IteListView({ ites, expedients, clients }: { ites: IteListRow[];
               <th className="th w-28">Expedient</th>
               <th className="th w-28 text-right">Inspecció</th>
               <th className="th w-24 text-right">Deficiències</th>
-              <th className="th w-28 text-right">Exportat</th>
               <th className="th w-32"></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td className="td text-[var(--color-muted)]" colSpan={7}>Cap informe. Crea&apos;n un de nou o importa&apos;n un del portal.</td></tr>
+              <tr><td className="td text-[var(--color-muted)]" colSpan={6}>Cap informe. Crea&apos;n un de nou o importa&apos;n un del portal.</td></tr>
             ) : (
               filtered.map((i) => (
                 <tr key={i.id} className="cursor-pointer hover:bg-[var(--color-paper)]" onClick={() => router.push(`/ite/${i.id}`)}>
@@ -125,7 +123,6 @@ export function IteListView({ ites, expedients, clients }: { ites: IteListRow[];
                   <td className="td font-mono text-sm">{i.expedient_num ?? "—"}</td>
                   <td className="td text-right tabular-nums">{fmtData(i.data_inspeccio)}</td>
                   <td className="td text-right tabular-nums">{i.deficiencies}</td>
-                  <td className="td text-right tabular-nums">{i.exportat ? fmtData(i.exportat) : <span className="text-[var(--color-muted)]">—</span>}</td>
                   <td className="td" onClick={(e) => e.stopPropagation()}>
                     <form action={deleteIteAction} className="flex justify-end">
                       <input type="hidden" name="id" value={i.id} />

@@ -88,13 +88,6 @@ export async function setIteLinksAction(id: number, expedientId: number | null, 
   revalidatePath("/ite");
 }
 
-export async function markIteExportatAction(id: number): Promise<void> {
-  await requireUser();
-  if (!Number.isInteger(id)) return;
-  await sql`update public.ite_informe set exportat_at = now() where id = ${id}`;
-  revalidatePath("/ite");
-}
-
 // A photo or PDF the browser uploaded to the store (or a data URI from the
 // plugin): checked to be this report's, and returned as the ref to keep.
 export async function addIteFitxerAction(id: number, src: string, name: string): Promise<string | null> {

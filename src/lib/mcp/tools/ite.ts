@@ -76,7 +76,7 @@ registerAction({
     const rows = await sql`
       select i.id, i.nom, i.adreca, to_char(i.data_inspeccio, 'YYYY-MM-DD') as data_inspeccio, e.num_expedient as expedient_num, c.nom as client,
              case when jsonb_typeof(i.dades -> 'deficiencies') = 'array' then jsonb_array_length(i.dades -> 'deficiencies') else 0 end as deficiencies,
-             to_char(i.exportat_at, 'YYYY-MM-DD') as exportat, to_char(i.updated_at, 'YYYY-MM-DD') as actualitzat
+             to_char(i.updated_at, 'YYYY-MM-DD') as actualitzat
       from public.ite_informe i
       left join public.expedients e on e.id = i.expedient_id
       left join public.clients c on c.id = i.client_id
@@ -90,7 +90,7 @@ registerAction({
   kind: "read",
   name: "get_ite",
   domain: "ite",
-  description: "Un informe ITE: els camps omplerts per seccions, les plantes, l'envolupant, les deficiències i les mesures (amb índex), i la revisió abans d'exportar.",
+  description: "Un informe ITE: els camps omplerts per seccions, les plantes, l'envolupant, les deficiències i les mesures (amb índex), i la revisió (el que el portal demana per deixar tancar l'informe).",
   notes: ["seccio limita la resposta a una secció: " + SECCIONS.join(", ")],
   schema: z.object({ id, seccio: z.enum(SECCIONS).optional() }),
   async run(a, ctx) {
@@ -105,7 +105,6 @@ registerAction({
       url: link(ctx.origin, ite.id),
       expedient_id: ite.expedient_id,
       client_id: ite.client_id,
-      exportat: ite.exportat_at,
       valoracio_final: valoracioFavorable(ite.dades) ? "FAVORABLE" : "DESFAVORABLE",
       informe: iteAsText(ite.dades, cataleg, a.seccio),
       fotos: {

@@ -1,10 +1,12 @@
 // Every field of the ITE report the app knows, with the portal's labels, in
-// the order of the portal's menu. The form renders from this list and the
-// plugin validates against it, so a field is added in one place.
+// the order of the portal's menu. The form renders from this list, the plugin
+// validates against it and the chat that types the report into the portal's
+// form reads it (`portal`, `hint`), so a field is added in one place.
 //
-// Only fields seen in a real export are here: the portal's importer may reject
-// an XML element it does not know, so we never write a guessed name. Parts of
-// the portal whose field names we have not seen yet are listed in `pendents`.
+// Fields, required ones and the yes/no questions that reveal others come from
+// the portal's form (docs/ite-portal-formulari.txt). Paths are the portal's own
+// element names where a real export shows them; a field seen only in the form
+// has a name of ours and `noExport` (the portal does not import our files).
 //
 // Paths are dot paths into the report tree (see xml.ts); "tecnics.0" is the
 // first technician.
@@ -27,6 +29,7 @@ export interface FieldDef {
   // that makes other fields appear, so a "No" must be said too.
   portal?: "auto" | "no" | "gate";
   hint?: string; // how to find the field at the portal when its label differs
+  noExport?: boolean; // seen in the portal's form, not in any export yet: the name is ours
 }
 
 export interface GroupDef {
@@ -74,10 +77,14 @@ const FON = `${E}.edificiFonamentacio`;
 const EST = `${E}.edificiEstructura`;
 const TAN = `${E}.edificiTancaments`;
 const INS = `${E}.edificiInstalacions`;
+const ACC = `${E}.edificiAccessibilitat`;
+const SOS = `${E}.edificiSostenibilitat`;
 const P = "propietat";
 const T = "tecnics.0";
 
 const b = (path: string, label: string): FieldDef => ({ path, label, kind: "bool" });
+const nb = (path: string, label: string): FieldDef => ({ path, label, kind: "bool", noExport: true });
+const gate = (path: string, label: string, hint?: string): FieldDef => ({ path, label, kind: "bool", portal: "gate", ...(hint ? { hint } : {}) });
 const pct = (path: string, label: string): FieldDef => ({ path, label, kind: "double", unit: "%" });
 
 export const SECTIONS: SectionDef[] = [
@@ -89,40 +96,67 @@ export const SECTIONS: SectionDef[] = [
         title: "1. Identificació de l'informe",
         fields: [
           { path: "nom", label: "Nom", kind: "text", required: true, wide: true, max: 250 },
-          { path: "dataInspeccio", label: "Data d'inspecció", kind: "date", required: true },
+          { path: "dataInspeccio", label: "Data d'inspecció", kind: "date", required: true, hint: "al portal és a «Desc. Bàsica Edifici» (Data Inspecció, amb el calendari)" },
           { path: "llocFirma", label: "Lloc de signatura", kind: "text", max: 100, portal: "auto" },
         ],
       },
       {
         title: "2. Identificació de l'edifici",
-        note: "Referència cadastral: 14 primers dígits de qualsevol entitat de l'edifici. Els 7 primers indiquen la finca i els 7 següents el full del plànol.",
+        note: "Referència cadastral: 14 primers dígits de qualsevol entitat de l'edifici. Els 7 primers indiquen la finca i els 7 següents el full del plànol. Al portal: escriu finca i full, prem «Obtenir dades cadastre» i marca la casella que confirma l'adreça; si no coincideix, marca l'altra casella i escriu l'adreça.",
         fields: [
           { path: `${E}.cadasFinca`, label: "Finca / Parcel·la", kind: "text", max: 7, required: true },
           { path: `${E}.cadasPlanol`, label: "Full de plànol", kind: "text", max: 7, required: true },
-          { path: `${RC}.tipusVia`, label: "Tipus via", kind: "cat", cat: "tipus_via", help: "Al portal ve del Cadastre." },
-          { path: `${RC}.nomVia`, label: "Nom de via", kind: "text", max: 200 },
-          { path: `${RC}.numero`, label: "Número", kind: "text", max: 20 },
-          { path: `${RC}.codiPostal`, label: "Codi postal", kind: "text", max: 5 },
-          { path: `${RC}.municipi`, label: "Municipi", kind: "text", max: 100 },
-          { path: `${RC}.provincia`, label: "Província", kind: "text", max: 100 },
-          { path: `${RC}.codiIne`, label: "Codi INE del municipi", kind: "text", max: 5 },
-          { path: `${RC}.adrecaCorrecta`, label: "Confirmo que l'adreça recuperada coincideix amb l'adreça de l'edifici a avaluar", kind: "bool", wide: true, portal: "auto" },
-          { path: `${RC}.adrecaIncorrecta`, label: "L'adreça proposada pel cadastre no coincideix amb la de l'edifici", kind: "bool", wide: true, portal: "auto" },
+          { path: `${RC}.tipusVia`, label: "Tipus via", kind: "cat", cat: "tipus_via", required: true, help: "Al portal ve del Cadastre." },
+          { path: `${RC}.nomVia`, label: "Nom de via", kind: "text", max: 200, required: true },
+          { path: `${RC}.numero`, label: "Número", kind: "text", max: 20, required: true },
+          { path: `${RC}.escalera`, label: "Escala", kind: "text", max: 10 },
+          { path: `${RC}.bloc`, label: "Bloc", kind: "text", max: 10, noExport: true },
+          { path: `${RC}.codiPostal`, label: "Codi postal", kind: "text", max: 5, required: true },
+          { path: `${RC}.provincia`, label: "Província", kind: "text", max: 100, required: true },
+          { path: `${RC}.municipi`, label: "Municipi", kind: "text", max: 100, required: true },
+          { path: `${RC}.codiIne`, label: "Codi INE del municipi", kind: "text", max: 5, portal: "auto" },
+          { path: `${RC}.altresRefCadastrals`, label: "Altres Ref. Cadastrals i observacions", kind: "textarea", wide: true, noExport: true },
+          { path: `${RC}.adrecaCorrecta`, label: "Confirmo que l'adreça recuperada coincideix amb l'adreça de l'edifici a avaluar", kind: "bool", wide: true, hint: "surt al portal després de prémer «Obtenir dades cadastre»" },
+          { path: `${RC}.adrecaIncorrecta`, label: "L'adreça proposada pel cadastre no coincideix amb la de l'edifici", kind: "bool", wide: true, portal: "gate", hint: "en marcar-la, el portal demana l'adreça a mà" },
         ],
       },
       {
         title: "3. Identificació propietat",
+        note: "Amb CIF, la raó social; amb NIF, NIE o passaport, nom i dos cognoms (el portal els exigeix tots tres).",
         fields: [
-          { path: `${P}.regimJuridic`, label: "Règim jurídic de la propietat", kind: "cat", cat: "regim_juridic", required: true },
-          { path: `${P}.raoSocialPropietat`, label: "Titular", kind: "text", required: true, wide: true, max: 250 },
+          { path: `${P}.regimJuridic`, label: "Règim jurídic", kind: "cat", cat: "regim_juridic", required: true },
           { path: `${P}.tipusIdentificacioPropietat`, label: "Tipus d'identificació", kind: "cat", cat: "tipus_identificacio", required: true },
-          { path: `${P}.identificacioPropietat`, label: "NIF / CIF", kind: "text", required: true, max: 20 },
-          { path: `${P}.tipusViaPropietat`, label: "Tipus de via", kind: "cat", cat: "tipus_via" },
-          { path: `${P}.nomViaPropietat`, label: "Adreça", kind: "text", max: 250 },
-          { path: `${P}.codiPostalPropietat`, label: "Codi postal", kind: "text", max: 5 },
-          { path: `${P}.municipiPropietat`, label: "Població", kind: "cat", cat: "municipi" },
-          { path: `${P}.telefon1Propietat`, label: "Telèfon", kind: "text", max: 20 },
-          { path: `${P}.emailPropietat`, label: "Adreça electrònica", kind: "text", max: 150 },
+          { path: `${P}.identificacioPropietat`, label: "Identificació", kind: "text", required: true, max: 20 },
+          { path: `${P}.raoSocialPropietat`, label: "Raó social (CIF)", kind: "text", wide: true, max: 250 },
+          { path: `${P}.nomPropietat`, label: "Nom (persona)", kind: "text", max: 100 },
+          { path: `${P}.cognom1Propietat`, label: "Primer cognom", kind: "text", max: 100 },
+          { path: `${P}.cognom2Propietat`, label: "Segon cognom", kind: "text", max: 100 },
+          { path: `${P}.tipusViaPropietat`, label: "Tipus via", kind: "cat", cat: "tipus_via", required: true },
+          { path: `${P}.nomViaPropietat`, label: "Adreça", kind: "text", max: 250, required: true },
+          { path: `${P}.codiPostalPropietat`, label: "Codi postal", kind: "text", max: 5, required: true },
+          { path: `${P}.municipiPropietat`, label: "Municipi", kind: "cat", cat: "municipi", required: true, hint: "al portal, primer la Província i després el Municipi" },
+          { path: `${P}.telefon1Propietat`, label: "Telèfon 1", kind: "text", max: 20, required: true },
+          { path: `${P}.telefon2Propietat`, label: "Telèfon 2", kind: "text", max: 20, noExport: true },
+          { path: `${P}.emailPropietat`, label: "Email", kind: "text", max: 150 },
+        ],
+      },
+      {
+        title: "3. Identificació propietat — Dades del representant",
+        note: "Només si la propietat té representant (per exemple, l'administrador de la finca). Al portal és la casella «Dades Representant»; en marcar-la, tots aquests camps són obligatoris menys el telèfon 2 i l'email.",
+        fields: [
+          { path: "mostraRepresentant", label: "La propietat té representant", kind: "bool", wide: true, portal: "gate" },
+          { path: `${P}.tipusIdentificacioRepresentant`, label: "Tipus d'identificació", kind: "cat", cat: "tipus_identificacio", noExport: true },
+          { path: `${P}.identificacioRepresentant`, label: "Identificació", kind: "text", max: 20, noExport: true },
+          { path: `${P}.nomRepresentant`, label: "Nom", kind: "text", max: 100, noExport: true },
+          { path: `${P}.cognom1Representant`, label: "Primer cognom", kind: "text", max: 100, noExport: true },
+          { path: `${P}.cognom2Representant`, label: "Segon cognom", kind: "text", max: 100, noExport: true },
+          { path: `${P}.tipusViaRepresentant`, label: "Tipus via", kind: "cat", cat: "tipus_via", noExport: true },
+          { path: `${P}.nomViaRepresentant`, label: "Adreça", kind: "text", max: 250, noExport: true },
+          { path: `${P}.codiPostalRepresentant`, label: "Codi postal", kind: "text", max: 5, noExport: true },
+          { path: `${P}.municipiRepresentant`, label: "Municipi", kind: "cat", cat: "municipi", noExport: true },
+          { path: `${P}.telefon1Representant`, label: "Telèfon 1", kind: "text", max: 20, noExport: true },
+          { path: `${P}.telefon2Representant`, label: "Telèfon 2", kind: "text", max: 20, noExport: true },
+          { path: `${P}.emailRepresentant`, label: "Email", kind: "text", max: 150, noExport: true },
         ],
       },
       {
@@ -146,11 +180,6 @@ export const SECTIONS: SectionDef[] = [
         ],
       },
     ],
-    pendents: [
-      "Escala i bloc de l'adreça de l'edifici",
-      "Adreça corregida a mà (quan la del cadastre no coincideix)",
-      "Telèfon mòbil de la propietat i dades del representant",
-    ],
   },
   {
     key: "descripcio",
@@ -159,22 +188,27 @@ export const SECTIONS: SectionDef[] = [
       {
         title: "5. Dades generals de l'edifici",
         fields: [
-          { path: `${DESC}.superficieParcela`, label: "Superfície de la parcel·la", kind: "double", unit: "m²" },
-          { path: `${DESC}.superficieConstruida`, label: "Superfície construïda de l'edifici", kind: "double", unit: "m²" },
-          { path: `${DESC}.fontInformacioSup`, label: "Font d'informació de les superfícies", kind: "cat", cat: "font_superficies" },
-          { path: `${DESC}.unifamiliar`, label: "L'edifici és", kind: "radio", options: [{ value: "false", label: "Plurifamiliar" }, { value: "true", label: "Unifamiliar" }] },
-          { path: `${DESC}.alturaSobreRasant`, label: "Altura sobre rasant", kind: "double", unit: "m" },
-          { path: `${DESC}.numPlantesSobreRasant`, label: "Núm. de plantes sobre rasant", kind: "int" },
-          { path: `${DESC}.numPlantesSotaRasant`, label: "Núm. de plantes sota rasant", kind: "int" },
-          { path: `${DESC}.anyConstruccio`, label: "Any de construcció", kind: "int" },
+          { path: `${DESC}.anyConstruccio`, label: "Any de construcció", kind: "int", required: true },
+          { path: `${DESC}.superficieParcela`, label: "Superfície de la parcel·la", kind: "double", unit: "m²", required: true },
+          { path: `${DESC}.superficieConstruida`, label: "Superfície construïda de l'edifici", kind: "double", unit: "m²", required: true },
+          { path: `${DESC}.alturaSobreRasant`, label: "Altura sobre rasant", kind: "double", unit: "m", required: true },
+          { path: `${DESC}.numPlantesSobreRasant`, label: "Núm. de plantes sobre rasant", kind: "int", required: true },
+          { path: `${DESC}.numPlantesSotaRasant`, label: "Núm. de plantes sota rasant", kind: "int", required: true },
+          { path: `${DESC}.fontInformacioSup`, label: "Font d'informació de les superfícies", kind: "cat", cat: "font_superficies", required: true },
+          { path: `${DESC}.fontInformacioSupAltres`, label: "Informació (si la font és «Altres»)", kind: "text", max: 250, noExport: true },
+          { path: `${DESC}.unifamiliar`, label: "L'edifici és", kind: "radio", required: true, options: [{ value: "false", label: "Plurifamiliar" }, { value: "true", label: "Unifamiliar" }] },
         ],
       },
       {
         title: "Tipologia edificatòria",
         fields: [
-          { path: `${TIP}.implantacioParcela`, label: "Implantació en parcel·la de l'edifici", kind: "cat", cat: "implantacio", wide: true },
-          { path: `${TIP}.nuclisComunicacioVertical`, label: "Nuclis de comunicació vertical", kind: "cat", cat: "nuclis" },
-          { path: `${TIP}.ascensorsUnNucli`, label: "Un sol nucli d'escales", kind: "cat", cat: "ascensors", hint: "al portal, el desplegable d'ascensors que surt sota «Nuclis de comunicació vertical» quan n'hi ha un de sol" },
+          { path: `${TIP}.implantacioParcela`, label: "Implantació en parcel·la de l'edifici", kind: "cat", cat: "implantacio", wide: true, required: true },
+          { path: `${TIP}.nuclisComunicacioVertical`, label: "Nuclis de comunicació vertical", kind: "cat", cat: "nuclis", required: true, hint: "«Un sol nucli d'escales» fa sortir el desplegable d'ascensors; «Dos o més nuclis», els quatre números de sota" },
+          { path: `${TIP}.ascensorsUnNucli`, label: "Un sol nucli d'escales", kind: "cat", cat: "ascensors", hint: "surt al portal quan a «Nuclis de comunicació vertical» es tria «Un sol nucli d'escales»" },
+          { path: `${TIP}.numTotalEscales`, label: "Núm. total d'escales (dos o més nuclis)", kind: "int", noExport: true },
+          { path: `${TIP}.numTotalAscensors`, label: "Núm. total d'ascensors (dos o més nuclis)", kind: "int", noExport: true },
+          { path: `${TIP}.numHabitatgesAccesMesUnNucli`, label: "Núm. total d'habitatges amb accés a través de més d'un nucli", kind: "int", noExport: true },
+          { path: `${TIP}.numHabitatgesSenseAscensor`, label: "Núm. total d'habitatges sense accés a través d'ascensor", kind: "int", noExport: true },
           { path: `${TIP}.numMigHabitatgesPerPlanta`, label: "Núm. mig d'habitatges per planta", kind: "int" },
         ],
       },
@@ -182,11 +216,10 @@ export const SECTIONS: SectionDef[] = [
         title: "6. Descripció de l'edifici",
         fields: [
           { path: `${DESC}.edificiDescripcio`, label: "Descripció general de l'edifici", kind: "textarea", wide: true },
-          { path: `${DESC}.orientacio`, label: "Orientació de la façana principal de l'edifici", kind: "cat", cat: "orientacio" },
+          { path: `${DESC}.orientacio`, label: "Orientació de la façana principal de l'edifici", kind: "cat", cat: "orientacio", required: true, hint: "al portal és a «Envolupant de l'edifici», al segon bloc de la pàgina" },
         ],
       },
     ],
-    pendents: ["Dos o més nuclis de comunicació vertical (escales, ascensors, habitatges per nucli)"],
   },
   {
     key: "envolupant",
@@ -228,7 +261,7 @@ export const SECTIONS: SectionDef[] = [
           b(`${FON}.profundaAltres`, "Es desconeix/Altres"),
         ],
       },
-      { title: "Fonamentació — observacions", fields: [{ path: `${FON}.fonamentacioObservacions`, label: "Observacions", kind: "textarea", wide: true }] },
+      { title: "Fonamentació — observacions", fields: [{ path: `${FON}.fonamentacioObservacions`, label: "Observacions", kind: "textarea", wide: true, required: true }] },
       {
         title: "Estructura vertical — Parets de càrrega",
         layout: "checks",
@@ -337,7 +370,7 @@ export const SECTIONS: SectionDef[] = [
           b(`${EST}.escalaAltres`, "Es desconeix/Altres"),
         ],
       },
-      { title: "Estructura — observacions", fields: [{ path: `${EST}.estructuraObservacions`, label: "Observacions", kind: "textarea", wide: true }] },
+      { title: "Estructura — observacions", fields: [{ path: `${EST}.estructuraObservacions`, label: "Observacions", kind: "textarea", wide: true, required: true }] },
       {
         title: "Façana principal — Acabat vist",
         layout: "checks",
@@ -456,7 +489,8 @@ export const SECTIONS: SectionDef[] = [
           b(`${TAN}.tcTeuAltres`, "Altres"),
         ],
       },
-      { title: "Tancaments i cobertes — observacions", fields: [{ path: `${TAN}.tancamentsObservacions`, label: "Observacions", kind: "textarea", wide: true }] },
+      { title: "Coberta inclinada — Aïllament", fields: [{ path: `${TAN}.tcTeuAillamentTermic`, label: "Disposa d'aïllament tèrmic", kind: "tri" }] },
+      { title: "Tancaments i cobertes — observacions", fields: [{ path: `${TAN}.tancamentsObservacions`, label: "Observacions", kind: "textarea", wide: true, required: true }] },
       {
         title: "Sanejament — Sistema d'evacuació d'aigües residuals",
         layout: "checks",
@@ -492,7 +526,7 @@ export const SECTIONS: SectionDef[] = [
         layout: "checks",
         fields: [
           b(`${INS}.aaNoDisposa`, "No disposa de sistema de subministrament d'aigua"),
-          b(`${INS}.aaDisposaPublic`, "Disposa de connexió a la xarxa de subministrament d'aigua"),
+          gate(`${INS}.aaDisposaPublic`, "Disposa de connexió a la xarxa de subministrament d'aigua pública"),
           b(`${INS}.aaDisposaPropi`, "Disposa de captació pròpia (pou, bomba, etc.)"),
           b(`${INS}.aaComptadorUnic`, "Comptador únic per a tot l'edifici"),
           b(`${INS}.aaComptadorIndividualHab`, "Comptadors individuals per habitatge/local"),
@@ -502,7 +536,7 @@ export const SECTIONS: SectionDef[] = [
       {
         title: "Subministrament d'aigua — Connexió i muntants",
         fields: [
-          { path: `${INS}.aaSubministramentPublic`, label: "Connexió a la xarxa", kind: "radio", options: [{ value: "1", label: "Directe" }, { value: "2", label: "Per aforament" }], hint: "al portal l'opció pot dir-se «Directa» o «Connexió directa»; l'altra és per aforament o dipòsit" },
+          { path: `${INS}.aaSubministramentPublic`, label: "Connexió a la xarxa", kind: "radio", options: [{ value: "1", label: "Directe" }, { value: "2", label: "Per aforament" }], hint: "surt al portal en marcar «Disposa de connexió a la Xarxa de subministrament d'Aigua pública»" },
         ],
       },
       {
@@ -522,11 +556,11 @@ export const SECTIONS: SectionDef[] = [
         fields: [
           b(`${INS}.ieCgp`, "Caixa general de protecció (CGP)"),
           b(`${INS}.ieFusible`, "Fusible a l'inici de les derivacions individuals"),
-          b(`${INS}.ieQcp`, "Quadre comandament i protecció (QCP)"),
+          gate(`${INS}.ieQcp`, "Quadre comandament i protecció (QCP)"),
           b(`${INS}.ieIcp`, "Interruptor control de potència (ICP)"),
           b(`${INS}.ieId`, "Interruptor diferencial (ID)"),
           b(`${INS}.iePia`, "Interruptor automàtic a l'inici dels circuits de serveis comuns (PIA)"),
-          { ...b(`${INS}.ieAltres`, "Altres"), portal: "no" },
+          b(`${INS}.ieAltres`, "Altres (sota el QCP)"),
           b(`${INS}.ieComptadorUnic`, "Comptador únic per a tot l'edifici"),
           b(`${INS}.ieComptadorIndividualHab`, "Comptadors individuals per habitatge/local"),
           b(`${INS}.ieComptadorIndividualCentral`, "Comptadors individuals centralitzats"),
@@ -542,6 +576,22 @@ export const SECTIONS: SectionDef[] = [
           b(`${INS}.caCanalitzatGasNatural`, "Caldera gas canalitzat: gas natural"),
           b(`${INS}.caElectricaBombaCalor`, "Calefacció elèctrica: bomba de calor"),
           b(`${INS}.caElectricaRadiadors`, "Calefacció elèctrica: radiadors"),
+        ],
+      },
+      {
+        title: "Calefacció col·lectiva/central — sistema i combustible",
+        note: "Només si hi ha calefacció col·lectiva/central.",
+        layout: "checks",
+        fields: [
+          nb(`${INS}.caCentralCaldera`, "Caldera comunitària"),
+          nb(`${INS}.caCentralBombaCalor`, "Bomba de calor"),
+          nb(`${INS}.caCentralAltres`, "Altres"),
+          nb(`${INS}.caCombGlp`, "Combustible: GLP"),
+          nb(`${INS}.caCombGasoil`, "Combustible: Gasoil"),
+          nb(`${INS}.caCombGasNatural`, "Combustible: Gas Natural"),
+          nb(`${INS}.caCombElectricitat`, "Combustible: Electricitat"),
+          nb(`${INS}.caCombBiomassa`, "Combustible: Llenya/Biomassa"),
+          nb(`${INS}.caCombAltres`, "Combustible: Altres"),
         ],
       },
       {
@@ -568,6 +618,19 @@ export const SECTIONS: SectionDef[] = [
         ],
       },
       {
+        title: "ACS central — combustible",
+        note: "Només si hi ha ACS central.",
+        layout: "checks",
+        fields: [
+          nb(`${INS}.acsCombGlp`, "GLP"),
+          nb(`${INS}.acsCombGasoil`, "Gasoil"),
+          nb(`${INS}.acsCombGasNatural`, "Gas Natural"),
+          nb(`${INS}.acsCombElectricitat`, "Electricitat"),
+          nb(`${INS}.acsCombBiomassa`, "Llenya/Biomassa"),
+          nb(`${INS}.acsCombAltres`, "Altres"),
+        ],
+      },
+      {
         title: "ACS — percentatges",
         fields: [
           pct(`${INS}.acsIndividualsPercent`, "% habitatges/locals amb sistemes individuals d'ACS"),
@@ -581,7 +644,7 @@ export const SECTIONS: SectionDef[] = [
         title: "Gas canalitzat per a instal·lacions domèstiques",
         layout: "checks",
         fields: [
-          b(`${INS}.gcDisposa`, "L'edifici disposa d'escomesa a xarxa de distribució canalitzada de gas"),
+          gate(`${INS}.gcDisposa`, "L'edifici disposa d'escomesa a xarxa de distribució canalitzada de gas"),
           b(`${INS}.gcPropa`, "Propà"),
           b(`${INS}.gcGasNatural`, "Gas natural"),
           b(`${INS}.gcComptadorIndividualHab`, "Comptadors individuals per habitatge/local"),
@@ -595,6 +658,8 @@ export const SECTIONS: SectionDef[] = [
         fields: [
           { ...b(`${INS}.reDisposa`, "L'edifici disposa de sistema de refrigeració"), portal: "gate" },
           { ...b(`${INS}.reColectiu`, "L'edifici disposa de sistema col·lectiu de refrigeració"), portal: "gate" },
+          nb(`${INS}.reTorre`, "Col·lectiu: amb torre de refredament"),
+          nb(`${INS}.reSenseTorre`, "Col·lectiu: sense torre de refredament"),
         ],
       },
       {
@@ -608,7 +673,7 @@ export const SECTIONS: SectionDef[] = [
         title: "Ventilació i renovació d'aire",
         layout: "checks",
         fields: [
-          b(`${INS}.vrDisposa`, "Disposa de sistema de ventilació per a les cambres humides dels habitatges"),
+          gate(`${INS}.vrDisposa`, "Disposa de sistema de ventilació per a les cambres humides dels habitatges"),
           b(`${INS}.vrFinestres`, "Finestres"),
           b(`${INS}.vrXemeneies`, "Pati d'instal·lacions"),
           b(`${INS}.vrShunts`, "Shunts"),
@@ -620,18 +685,36 @@ export const SECTIONS: SectionDef[] = [
         ],
       },
       {
-        title: "Protecció contra incendis i contra el llamp",
+        title: "Protecció contra incendis",
         layout: "checks",
         fields: [
-          b(`${INS}.pciDisposa`, "L'edifici disposa de sistema de protecció contra incendis"),
-          b(`${INS}.pclDisposa`, "L'edifici disposa de sistema de protecció contra el llamp"),
+          gate(`${INS}.pciDisposa`, "L'edifici disposa de sistema de protecció contra incendis"),
+          nb(`${INS}.pciDeteccio`, "Un sistema de detecció d'incendis"),
+          nb(`${INS}.pciAlarma`, "Un sistema d'alarma"),
+          nb(`${INS}.pciExtintors`, "Extintors mòbils"),
+          nb(`${INS}.pciHidrants`, "Hidrants exteriors"),
+          nb(`${INS}.pciColumnaSeca`, "Columna seca"),
+          nb(`${INS}.pciBie`, "Boca d'incendis equipada"),
+        ],
+      },
+      {
+        title: "Protecció contra el llamp",
+        layout: "checks",
+        fields: [
+          gate(`${INS}.pclDisposa`, "L'edifici disposa de sistema de protecció contra el llamp"),
+          nb(`${INS}.pclPuntes`, "Parallamps de puntes"),
+          nb(`${INS}.pclFaraday`, "Parallamps Faraday"),
+          nb(`${INS}.pclActius`, "Parallamps amb sistemes actius (ionitzants)"),
+          nb(`${INS}.pclAltre`, "Altre tipus de parallamps"),
+          nb(`${INS}.pclSobretensions`, "Un dispositiu de protecció contra sobretensions transitòries"),
+          nb(`${INS}.pclXarxaTerra`, "Xarxa de terra"),
         ],
       },
       {
         title: "Instal·lacions de comunicacions (ICT)",
         layout: "checks",
         fields: [
-          b(`${INS}.ictDisposa`, "L'edifici disposa d'instal·lacions de comunicacions ICT"),
+          gate(`${INS}.ictDisposa`, "L'edifici disposa d'instal·lacions de comunicacions ICT"),
           b(`${INS}.ictAntenaTdt`, "Antena per a recepció de TDT"),
           b(`${INS}.ictAntenaTvSatelite`, "Antena per a recepció de TV satèl·lit"),
           b(`${INS}.ictParesCoure`, "Accés de parells de coure"),
@@ -644,21 +727,15 @@ export const SECTIONS: SectionDef[] = [
       {
         title: "Instal·lació d'ascensor",
         fields: [
-          { path: `${INS}.iaDisposa`, label: "L'edifici disposa d'ascensor comunitari", kind: "radio", options: SI_NO },
+          { path: `${INS}.iaDisposa`, label: "L'edifici disposa d'ascensor comunitari", kind: "radio", options: SI_NO, portal: "gate", hint: "amb «Sí», el portal demana la profunditat i l'amplada de la cabina" },
           { path: `${INS}.iaProfunditat`, label: "Cabina: profunditat", kind: "double", unit: "m" },
           { path: `${INS}.iaAmplada`, label: "Cabina: amplada", kind: "double", unit: "m" },
           { path: `${INS}.iaUbicacio`, label: "Ubicació", kind: "text", wide: true, max: 500 },
         ],
       },
-      { title: "Instal·lacions — observacions", fields: [{ path: `${INS}.instalacionsObservacions`, label: "Observacions", kind: "textarea", wide: true }] },
+      { title: "Instal·lacions — observacions", fields: [{ path: `${INS}.instalacionsObservacions`, label: "Observacions", kind: "textarea", wide: true, required: true }] },
     ],
-    pendents: [
-      "Calefacció i ACS col·lectives: tipus de generador i combustible",
-      "Refrigeració col·lectiva: amb o sense torre de refredament",
-      "Detall de la protecció contra incendis (detecció, alarma, extintors, hidrants, columna seca, BIE)",
-      "Detall de la protecció contra el llamp (tipus de parallamps, sobretensions, xarxa de terra)",
-      "Aïllament de la coberta inclinada",
-    ],
+    pendents: ["La descripció que el portal demana en marcar «Altres» o «Es desconeix/Altres» (un camp de text sense nom al costat de la casella)"],
   },
   { key: "deficiencies", title: "Deficiències", groups: [] },
   {
@@ -669,19 +746,39 @@ export const SECTIONS: SectionDef[] = [
         title: "9. Avaluació de les condicions bàsiques d'accessibilitat",
         fields: [
           {
-            path: `${E}.edificiAccessibilitat.satisfa`,
-            label: "El tècnic/a competent a sota signant valora que",
+            path: `${ACC}.satisfa`,
+            label: "L'edifici satisfà completament les condicions bàsiques d'accessibilitat que prescriu la normativa vigent?",
             kind: "radio",
             wide: true,
+            required: true,
+            portal: "gate",
+            hint: "amb «No», el portal demana les caselles i els textos de sota",
             options: [
-              { value: "true", label: "L'edifici satisfà completament les condicions bàsiques d'accessibilitat" },
-              { value: "false", label: "L'edifici NO satisfà completament les condicions bàsiques d'accessibilitat" },
+              { value: "true", label: "Sí" },
+              { value: "false", label: "No" },
             ],
           },
         ],
       },
+      {
+        title: "Si no les satisfà — 1. Deficiències segons condicions funcionals de l'edifici",
+        layout: "checks",
+        fields: [
+          b(`${ACC}.exterior`, "Accessibilitat exterior"),
+          b(`${ACC}.entrePlantes`, "Accessibilitat entre plantes de l'edifici"),
+          b(`${ACC}.enPlantes`, "Accessibilitat en les plantes de l'edifici"),
+          b(`${ACC}.placesAparcament`, "Accessibilitat en places d'aparcament"),
+          b(`${ACC}.espaisComunitaris`, "Accessibilitat en altres espais d'ús comunitari"),
+        ],
+      },
+      {
+        title: "Si no les satisfà — descripció i ajustos",
+        fields: [
+          { path: `${ACC}.accessibilitatDescripcio`, label: "2. Breu descripció de la problemàtica d'accessibilitat existent", kind: "textarea", wide: true },
+          { path: `${ACC}.accessibilitatAjustos`, label: "3. Ajustos raonables per assolir l'accessibilitat (descripció de mesures i costos estimats)", kind: "textarea", wide: true },
+        ],
+      },
     ],
-    pendents: ["Quan no les satisfà: deficiències per condicions funcionals, descripció de la problemàtica i ajustos raonables"],
   },
   {
     key: "conservacio",
@@ -691,8 +788,12 @@ export const SECTIONS: SectionDef[] = [
         title: "11.3 Recomanacions necessàries per a un correcte manteniment i conservació",
         fields: [{ path: "recomanacions", label: "Recomanacions", kind: "textarea", wide: true }],
       },
+      {
+        title: "11.4 Valoració",
+        note: "Favorable o desfavorable surt de les deficiències (cap, o totes lleus: favorable).",
+        fields: [{ path: "observacionsValoracio", label: "Observacions de la valoració", kind: "textarea", wide: true }],
+      },
     ],
-    pendents: ["Mesures cautelars executades per categoria", "Observacions de la valoració final"],
   },
   {
     key: "sostenibilitat",
@@ -700,11 +801,13 @@ export const SECTIONS: SectionDef[] = [
     groups: [
       {
         title: "10. Recomanacions per a la millora de la sostenibilitat i l'ecoeficiència",
-        layout: "checks",
-        fields: [b(`${E}.edificiSostenibilitat.existenciaCertificat`, "Existència del certificat d'eficiència energètica de l'edifici")],
+        fields: [
+          { path: `${SOS}.existenciaCertificat`, label: "Existència del certificat d'eficiència energètica de l'edifici", kind: "bool", wide: true, portal: "gate" },
+          { path: `${SOS}.idCertificat`, label: "ID del certificat (si n'hi ha)", kind: "text", max: 50, noExport: true },
+          { path: `${SOS}.dataValidesaCertificat`, label: "Data de validesa del certificat", kind: "date", noExport: true },
+        ],
       },
     ],
-    pendents: ["Dades del certificat d'eficiència energètica quan n'hi ha"],
   },
   { key: "exportar", title: "Portal", groups: [] },
 ];

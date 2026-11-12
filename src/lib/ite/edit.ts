@@ -1,7 +1,7 @@
 // Changes to an ITE report described as data (what the plugin sends): fields
 // by path, and add / modify / remove on the lists. Pure: returns the new
 // report, a readable list of changes, and errors that block saving.
-import { catId, catLabel, matchCat, type Cataleg } from "./cataleg";
+import { catId, catLabel, categoriaDeTipus, matchCat, visibles, type Cataleg } from "./cataleg";
 import { codiDeficiencia, codiEnvolupant, fotoPaquet } from "./fotos";
 import { FIELD_BY_PATH, SECTIONS, type FieldDef } from "./schema";
 import {
@@ -289,12 +289,17 @@ export function iteAsText(doc: IteObj, cataleg: Cataleg, seccio?: string): Recor
         }
         vals[f.label] = f.hint ? `${t} — ${f.hint}` : t;
       }
-      const cpField = g.fields.find((f) => f.path === "propietat.codiPostalPropietat");
-      if (cpField) {
-        const prov = provinciaDeCP(fieldValue(doc, cpField));
-        if (prov) vals["Província (el portal la demana)"] = prov;
+      // The portal asks for the province before the municipality: the one of
+      // the municipality chosen here, or else the postcode's.
+      for (const [who, key] of [["Propietat", "Província (el portal la demana)"], ["Representant", "Província del representant (el portal la demana)"]] as const) {
+        const mPath = `propietat.municipi${who}`;
+        if (!g.fields.some((f) => f.path === mPath)) continue;
+        const m = getAt(doc, mPath);
+        const prov = (isObj(m) && isObj(m.provincia) ? txt(m.provincia.descripcio) : "") || provinciaDeCP(txt(getAt(doc, `propietat.codiPostal${who}`)));
+        if (prov) vals[key] = prov;
       }
-      if (Object.keys(vals).length) sec[g.title] = vals;
+      // How to do it at the portal (the cadastre button, the representative's box…).
+      if (Object.keys(vals).length) sec[g.title] = g.note ? { nota: g.note, ...vals } : vals;
     }
     if (noPortal.length) sec["No cal entrar-ho al portal"] = noPortal;
     if (s.key === "descripcio") {
@@ -325,18 +330,24 @@ export function iteAsText(doc: IteObj, cataleg: Cataleg, seccio?: string): Recor
       if (fotos.length) sec.fotos = fotos;
     }
     if (s.key === "deficiencies") {
-      sec.deficiencies = listOf(doc, LIST_PATHS.deficiencies).map((x, index) => ({
-        index,
-        codi: codiDeficiencia(index),
-        tipus: isObj(x.tipusDeficiencia) ? catLabel(x.tipusDeficiencia) : null,
-        gravetat: gravetatValor(x) || null,
-        descripcio: x.deficienciaDescripcio ?? "",
-        observacions: x.deficienciaObservacions ?? "",
-        fotos: fotosDe("DEFICIENCIES", codiDeficiencia(index)),
-      }));
-      // The portal asks, per category, whether there are deficiencies.
+      sec.deficiencies = listOf(doc, LIST_PATHS.deficiencies).map((x, index) => {
+        // The portal files each deficiency under an element (its type's category).
+        const categoria = isObj(x.tipusDeficiencia) ? categoriaDeTipus(cataleg, x.tipusDeficiencia) : undefined;
+        return {
+          index,
+          codi: codiDeficiencia(index),
+          element: categoria ? catLabel(categoria) : null,
+          tipus: isObj(x.tipusDeficiencia) ? catLabel(x.tipusDeficiencia) : null,
+          // As the portal shows it («Important»); update_ite takes this or MG/G/I/LL.
+          gravetat: isObj(x.gravetat) ? catLabel(x.gravetat) : gravetatValor(x) || null,
+          descripcio: x.deficienciaDescripcio ?? "",
+          observacions: x.deficienciaObservacions ?? "",
+          fotos: fotosDe("DEFICIENCIES", codiDeficiencia(index)),
+        };
+      });
+      // The portal asks, element by element, «S'observen deficiències?».
       const resum = resumDeficiencies(doc, cataleg);
-      if (resum.length) sec["Té deficiències? (Sí/No per categoria, com ho demana el portal)"] = Object.fromEntries(resum.map((r) => [catLabel(r.categoria), r.n > 0 ? "Sí" : "No"]));
+      if (resum.length) sec["S'observen deficiències? (Sí/No per element, com al portal)"] = Object.fromEntries(resum.map((r) => [catLabel(r.categoria), r.n > 0 ? "Sí" : "No"]));
     }
     if (s.key === "conservacio") {
       const pdf = unic("recomanacionsPdf");
@@ -358,10 +369,16 @@ export function iteCamps(cataleg: Cataleg, seccio?: string): unknown[] {
     camps: s.groups.flatMap((g) =>
       g.fields.map((f) => {
         const c: Record<string, unknown> = { camp: f.path, etiqueta: f.label, grup: g.title, tipus: f.kind };
+        if (f.required) c.obligatori = true;
         if (f.unit) c.unitat = f.unit;
         if (f.kind === "tri") c.valors = ["si", "no", "es_desconeix"];
         if (f.kind === "radio") c.valors = f.options?.map((o) => ({ valor: o.value, text: o.label }));
-        if (f.kind === "cat") c.valors = (cataleg[f.cat ?? ""] ?? []).map((o) => ({ valor: String(o.codi ?? catId(o)), text: catLabel(o) }));
+        if (f.kind === "cat") {
+          const list = visibles(cataleg[f.cat ?? ""]);
+          // 949 municipalities do not fit in a chat: the value is looked up by its text.
+          if (list.length > 150) c.valors = `${list.length} opcions: escriu el text (p. ex. el nom del municipi) i es busca a la llista`;
+          else c.valors = list.map((o) => ({ valor: String(o.codi ?? catId(o)), text: catLabel(o) }));
+        }
         if (f.portal === "auto") c.portal = "el portal ho posa sol: no s'hi entra";
         if (f.portal === "no") c.portal = "el portal no té aquest camp";
         if (f.portal === "gate") c.portal = "Sí/No que fa aparèixer altres camps al portal: cal respondre'l sempre";

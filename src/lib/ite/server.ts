@@ -1,6 +1,7 @@
 // Server side of the ITE module: reads that the web actions and the plugin share.
 import { sql } from "@/lib/db";
-import { buildCataleg, harvestCataleg, type CatEntry, type Cataleg } from "./cataleg";
+import { harvestCataleg, type CatEntry, type Cataleg } from "./cataleg";
+import { buildCatalegComplet } from "./cataleg-portal";
 import { adrecaEdificiFrom, nomInforme, parseAdreca, propietatFromClient, tecnicDespatx, type ClientDades, type ContacteDades } from "./defaults";
 import { iteResum, newIteDoc } from "./model";
 import type { IteObj } from "./xml";
@@ -19,7 +20,7 @@ export interface IteRow {
 
 export async function loadCataleg(): Promise<Cataleg> {
   const rows = (await sql`select cat, entrada from public.ite_cataleg`) as { cat: string; entrada: IteObj }[];
-  return buildCataleg(rows.map((r) => ({ cat: r.cat, obj: r.entrada })));
+  return buildCatalegComplet(rows.map((r) => ({ cat: r.cat, obj: r.entrada })));
 }
 
 // Learns the code-list values of an imported report.

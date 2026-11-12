@@ -1,11 +1,13 @@
 // The portal's code lists ("mestres"): orientations, envelope types, deficiency
 // types and severities, street types, municipalities… Each value is an object
 // with the portal's own `id` (what its database links by), a `codi` and texts,
-// and the XML carries the whole object wherever it is used. We cannot invent
-// those ids, so the lists are learnt from real exports:
-//   - cataleg-base.json: everything found in the first export we had;
-//   - table ite_cataleg: everything found in any report imported into the app.
-// A select in the form only offers values from these lists.
+// and the XML carries the whole object wherever it is used. Three sources:
+//   - cataleg-base.json: values found in real exports, with the portal's ids;
+//   - table ite_cataleg: values found in any report imported into the app;
+//   - cataleg-portal.json (server only, cataleg-portal.ts): every value the
+//     portal's form offers (docs/ite-portal-formulari.txt), with ids of ours
+//     ("f…"). When a value also comes with its real id, the real one is offered
+//     and ours is kept only to show reports that already use it.
 import { isObj, type IteObj, type IteVal } from "./xml";
 import BASE from "./cataleg-base.json";
 
@@ -29,6 +31,10 @@ export const CATALEG_BY_FIELD: Record<string, string> = {
   municipiTecnic: "municipi",
   colegiProfessionalTecnic: "colegi",
   titulacioTecnic: "titulacio",
+  titulacioTecnicDeficiencia: "titulacio",
+  tipusIdentificacioRepresentant: "tipus_identificacio",
+  tipusViaRepresentant: "tipus_via",
+  municipiRepresentant: "municipi",
 };
 
 export const CATALEG_LABELS: Record<string, string> = {
@@ -105,7 +111,22 @@ function sortEntries(list: IteObj[]): IteObj[] {
   });
 }
 
-// Base lists plus the ones learnt from imports (later entries win by id).
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// A value taken from the portal's form, with an id of ours (cataleg-portal.json).
+export const esDelFormulari = (obj: IteObj): boolean => str(obj.id).startsWith("f");
+
+// The same value in two sources: same text (municipalities: same name and province).
+const sameValue = (cat: string, o: IteObj) => (cat === "municipi" ? `${str(o.codiProvincia)}|${fold(str(o.nom))}` : fold(catLabel(o)));
+
+// The values a select offers: not the form's copy of a value that also came
+// with the portal's real id.
+export function visibles(list: IteObj[] | undefined): IteObj[] {
+  return (list ?? []).filter((o) => o.ocult !== "true");
+}
+
+// Base lists plus the ones from the portal's form and from imports (later
+// entries win by id; a real id wins over ours for the same value).
 export function buildCataleg(extra: CatEntry[] = []): Cataleg {
   const map = new Map<string, Map<string, IteObj>>();
   for (const e of [...(BASE as unknown as CatEntry[]), ...extra]) {
@@ -114,20 +135,22 @@ export function buildCataleg(extra: CatEntry[] = []): Cataleg {
     m.set(catId(e.obj), e.obj);
   }
   const out: Cataleg = {};
-  for (const [cat, m] of map) out[cat] = sortEntries([...m.values()]);
+  for (const [cat, m] of map) {
+    const all = [...m.values()];
+    const real = new Set(all.filter((o) => !esDelFormulari(o)).map((o) => sameValue(cat, o)));
+    out[cat] = sortEntries(all.map((o) => (esDelFormulari(o) && real.has(sameValue(cat, o)) ? { ...o, ocult: "true" } : o)));
+  }
   return out;
 }
 
 export function findCat(cataleg: Cataleg, cat: string, idOrCodi: string): IteObj | undefined {
   const list = cataleg[cat] ?? [];
-  return list.find((o) => catId(o) === idOrCodi) ?? list.find((o) => str(o.codi) === idOrCodi);
+  return list.find((o) => catId(o) === idOrCodi) ?? visibles(list).find((o) => str(o.codi) === idOrCodi) ?? list.find((o) => str(o.codi) === idOrCodi);
 }
-
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 // For the plugin: a value given as id, codi or (part of) its label.
 export function matchCat(cataleg: Cataleg, cat: string, q: string): { obj?: IteObj; ambiguous?: IteObj[] } {
-  const list = cataleg[cat] ?? [];
+  const list = visibles(cataleg[cat]);
   const exact = findCat(cataleg, cat, q);
   if (exact) return { obj: exact };
   const fq = fold(q);

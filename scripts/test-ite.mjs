@@ -246,7 +246,7 @@ await test("fields by path with chat values; unknown paths and values are errors
       "edifici.edificiTancaments.tcAillamentTermic": "es_desconeix",
       "edifici.edificiEstructura.verticalCarregaPedra": true,
       "edifici.edificiDescripcio.orientacio": "sud est",
-      "edifici.edificiAccessibilitat.satisfa": "satisfà completament",
+      "edifici.edificiAccessibilitat.satisfa": "Sí",
       "dataInspeccio": "2026-03-01",
     },
   }, cataleg);
@@ -318,14 +318,129 @@ await test("the report as text is written for the portal's form (first run, 11/1
   assert.deepEqual(t[sist]["Calefacció"], ["Es disposa de sistema de calefacció", "Es disposa de sistema de calefacció col·lectiva/central: No"]);
   assert.ok(t[sist]["Aigua calenta sanitària (ACS)"].includes("L'edifici disposa de sistema d'ACS: No"));
   assert.ok(t[sist]["Refrigeració"].includes("L'edifici disposa de sistema col·lectiu de refrigeració: No"));
-  // a label that differs at the portal carries its hint
+  // a field that only shows up after ticking another one says which
   const aigua = Object.values(t[sist]).find((g) => g && typeof g === "object" && "Connexió a la xarxa" in g);
-  assert.ok(/^Directe — al portal/.test(aigua["Connexió a la xarxa"]));
-  // per-category yes/no for deficiencies, the whole list
-  const perCat = t[defs]["Té deficiències? (Sí/No per categoria, com ho demana el portal)"];
+  assert.ok(/^Directe — surt al portal en marcar «Disposa de connexió a la Xarxa/.test(aigua["Connexió a la xarxa"]), aigua["Connexió a la xarxa"]);
+  // per-element yes/no for deficiencies, the whole list
+  const perCat = t[defs]["S'observen deficiències? (Sí/No per element, com al portal)"];
   assert.equal(Object.keys(perCat).length, cataleg.categoria_deficiencia.length);
   assert.equal(Object.values(perCat).filter((v) => v === "Sí").length, 1);
   assert.equal(t[defs].deficiencies[0].codi, "D01");
+  // each deficiency says under which portal element it goes, and its severity as the portal shows it
+  assert.equal(t[defs].deficiencies[0].element, cat.catLabel(cat.categoriaDeTipus(cataleg, cataleg.tipus_deficiencia[0])));
+  assert.equal(t[defs].deficiencies[0].gravetat, "Important");
+});
+
+// The portal's form (docs/ite-portal-formulari.txt) ---------------------------------
+const catPortal = await load("cataleg-portal.ts");
+const complet = catPortal.buildCatalegComplet();
+
+console.log("formulari del portal");
+await test("every dropdown value of the portal's form, real ids first", () => {
+  assert.equal(cat.visibles(complet.municipi).length, 949);
+  assert.equal(cat.visibles(complet.tipus_via).length, 123, "124 at the portal, «Polígon» twice");
+  assert.equal(cat.visibles(complet.tipus_deficiencia).length, 103);
+  assert.deepEqual(cat.visibles(complet.gravetat).map((g) => g.valor), ["MG", "G", "I", "LL"]);
+  assert.equal(cat.visibles(complet.orientacio).length, 8);
+  // the real values keep their portal ids; ours start with "f"
+  assert.equal(complet.municipi.find((m) => m.nom === "Barcelona").id, "4120");
+  assert.equal(cat.matchCat(complet, "tipus_via", "carrer").obj.id, "294");
+  // every new deficiency type sits in one of the 19 categories
+  assert.ok(complet.tipus_deficiencia.every((t) => cat.categoriaDeTipus(complet, t)));
+  // a value that later comes with its real id: ours is hidden, still found by id
+  const ours = complet.tipus_via.find((o) => o.descMultidioma === "Avinguda");
+  const withReal = catPortal.buildCatalegComplet([{ cat: "tipus_via", obj: { ...ours, id: "201", mestre: ours.mestre } }]);
+  assert.deepEqual(cat.visibles(withReal.tipus_via).filter((o) => o.descMultidioma === "Avinguda").map((o) => o.id), ["201"]);
+  assert.equal(cat.findCat(withReal, "tipus_via", ours.id).descMultidioma, "Avinguda");
+  // what the office's defaults look up
+  assert.equal(defaults.municipiFor(complet, "L'Hospitalet de Llobregat").nom, "Hospitalet de Llobregat, l'");
+  assert.equal(defaults.municipiFor(complet, "Girona").provincia.descripcio, "Girona");
+  assert.equal(defaults.tipusIdentificacioFor(complet, "X1234567L").codi, "NIE");
+  assert.equal(defaults.tipusViaFor(complet, "avinguda").descMultidioma, "Avinguda");
+});
+
+await test("an owner who is a person gets name and surnames; a community, its company name", () => {
+  const persona = defaults.propietatFromClient({ nom: "Marta Fabrias Domingo", nif: "12345678Z", carrer: "Av. Diagonal 1", ciutat: "Girona", codi_postal: "17001" }, null, complet);
+  assert.deepEqual([persona.nomPropietat, persona.cognom1Propietat, persona.cognom2Propietat, persona.raoSocialPropietat], ["Marta", "Fabrias", "Domingo", undefined]);
+  assert.equal(persona.municipiPropietat.nom, "Girona");
+  assert.deepEqual(defaults.nomICognoms("Puig i Vila, Maria Rosa"), { nom: "Maria Rosa", cognom1: "Puig", cognom2: "i Vila" });
+  const comunitat = defaults.propietatFromClient({ nom: "Comunitat de Propietaris Mallorca 325", nif: "H65761249" }, null, complet);
+  assert.equal(comunitat.raoSocialPropietat, "Comunitat de Propietaris Mallorca 325");
+  assert.equal(comunitat.nomPropietat, undefined);
+});
+
+await test("«Validar informe»: a complete report has no errors, only the photos are left", () => {
+  const pick = (c, q) => cat.matchCat(complet, c, q).obj;
+  const tipusTerrat = complet.tipus_deficiencia.find((t) => t.codi === "DEF_ENV_TERR_FILTR");
+  let doc = model.newIteDoc({ nom: "Inspecció Tècnica de l'Edifici del carrer Exemple, 12 de Barcelona", tecnic: defaults.tecnicDespatx(complet), dataInspeccio: "2026-05-04" });
+  const camps = {
+    "edifici.cadasFinca": "1234567", "edifici.cadasPlanol": "DF1234A",
+    "edifici.referenciaCadastral.tipusVia": "carrer", "edifici.referenciaCadastral.nomVia": "EXEMPLE", "edifici.referenciaCadastral.numero": "12",
+    "edifici.referenciaCadastral.codiPostal": "08001", "edifici.referenciaCadastral.provincia": "BARCELONA", "edifici.referenciaCadastral.municipi": "BARCELONA",
+    "edifici.referenciaCadastral.adrecaCorrecta": true,
+    "propietat.regimJuridic": "horitzontal", "propietat.tipusIdentificacioPropietat": "CIF", "propietat.identificacioPropietat": "H65761249",
+    "propietat.raoSocialPropietat": "Comunitat de Propietaris Exemple 12", "propietat.tipusViaPropietat": "carrer", "propietat.nomViaPropietat": "Exemple 12",
+    "propietat.codiPostalPropietat": "08001", "propietat.municipiPropietat": "Barcelona", "propietat.telefon1Propietat": "934000000",
+    "edifici.edificiDescripcio.anyConstruccio": 1910, "edifici.edificiDescripcio.superficieParcela": 200, "edifici.edificiDescripcio.superficieConstruida": 900,
+    "edifici.edificiDescripcio.alturaSobreRasant": 18, "edifici.edificiDescripcio.numPlantesSobreRasant": 6, "edifici.edificiDescripcio.numPlantesSotaRasant": 0,
+    "edifici.edificiDescripcio.fontInformacioSup": "Cadastre", "edifici.edificiDescripcio.orientacio": "Sud Est",
+    "edifici.edificiTipologia.implantacioParcela": "entre mitgeres", "edifici.edificiTipologia.nuclisComunicacioVertical": "Un sol nucli d'escales",
+    "edifici.edificiTipologia.ascensorsUnNucli": "Amb 1 ascensor",
+    "edifici.edificiFonamentacio.fonamentacioObservacions": "Sense lesions visibles.", "edifici.edificiEstructura.estructuraObservacions": "Correcta.",
+    "edifici.edificiEstructura.escalaEstructuraVoltaCeramica": true, "edifici.edificiTancaments.tancamentsObservacions": "Façana arrebossada.",
+    "edifici.edificiInstalacions.instalacionsObservacions": "Instal·lacions comunes renovades.", "edifici.edificiInstalacions.seaDisposaPublic": true,
+    "edifici.edificiInstalacions.aaDisposaPublic": true, "edifici.edificiInstalacions.acsDisposa": true,
+    "edifici.edificiInstalacions.acsIndividualsPercent": 100, "edifici.edificiInstalacions.acsCanalitzatPercent": 80, "edifici.edificiInstalacions.acsEmbassatPercent": 0,
+    "edifici.edificiInstalacions.acsEscalfadorElectricPercent": 20, "edifici.edificiInstalacions.acsAltresPercent": 0,
+    "edifici.edificiAccessibilitat.satisfa": "No",
+  };
+  let r = edit.applyIteEdit(doc, {
+    camps,
+    plantes: { afegir: [{ descripcio: "Principal 1a", habitatges: 1 }] },
+    envolupants: { afegir: [{ tipus: "Façanes", descripcio: "Façana principal de maó arrebossat." }] },
+    mesures: { afegir: [{ descripcio: "Aïllar la coberta." }] },
+  }, complet);
+  assert.deepEqual(r.errors, []);
+  doc = r.doc;
+  doc = model.setAt(doc, "deficiencies", [{ id: "null", tipusDeficiencia: tipusTerrat, gravetat: pick("gravetat", "Lleu"), deficienciaDescripcio: "Goteres al terrat.", fotos: [] }]);
+  const ok = model.validateIte(doc, complet);
+  assert.deepEqual(ok.errors, []);
+  assert.ok(ok.warnings.length && ok.warnings.every((w) => /foto|croquis/.test(w)), ok.warnings.join(" | "));
+
+  // each rule of the portal, one at a time
+  const errs = (changes, list = {}) => {
+    const x = edit.applyIteEdit(doc, { camps: changes, ...list }, complet);
+    assert.deepEqual(x.errors, []);
+    return model.validateIte(x.doc, complet).errors;
+  };
+  assert.deepEqual(errs({ "propietat.raoSocialPropietat": null }), ["Dades Generals · 3. Identificació propietat: falta «Raó social (CIF)»."]);
+  assert.equal(errs({ "propietat.tipusIdentificacioPropietat": "NIF" }).length, 3, "a person: name and both surnames");
+  assert.equal(errs({ mostraRepresentant: true }).length, 10);
+  assert.equal(errs({ "edifici.edificiTipologia.nuclisComunicacioVertical": "Dos o més nuclis" }).length, 4);
+  assert.deepEqual(errs({ "edifici.edificiInstalacions.acsAltresPercent": null }), ["Sist. Constructius · ACS — percentatges: falta «% amb altres»."]);
+  assert.equal(errs({ "edifici.edificiInstalacions.iaDisposa": "Sí" }).length, 2, "lift: depth and width");
+  assert.equal(errs({ "edifici.edificiSostenibilitat.existenciaCertificat": true }).length, 1);
+  assert.equal(errs({ "edifici.edificiEstructura.escalaEstructuraVoltaCeramica": false }).length, 1);
+  assert.equal(errs({ "edifici.edificiInstalacions.seaDisposaPublic": false, "edifici.edificiInstalacions.aaDisposaPublic": false }).length, 2);
+  assert.equal(errs({ "edifici.edificiEstructura.estructuraObservacions": null }).length, 1);
+  assert.equal(errs({}, { mesures: { treure: [0] } })[0], "Sostenibilitat: cal almenys una mesura recomanada.");
+  assert.match(errs({}, { plantes: { modificar: [{ index: 0, habitatges: 0, locals: 1 }] } })[0], /1 habitatge com a mínim/);
+  assert.equal(errs({}, { envolupants: { treure: [0] } })[0], "Envolupant de l'edifici: cal almenys un element (tipus, descripció i foto).");
+  // a serious deficiency asks for the deadline in its observations (art. 9.2)
+  const greu = model.setAt(doc, "deficiencies.0.gravetat", pick("gravetat", "Greu"));
+  assert.ok(model.validateIte(greu, complet).warnings.some((w) => /art\. 9\.2/.test(w)));
+});
+
+await test("the report as text: the province from the municipality, how to do it at the portal", () => {
+  const d = edit.applyIteEdit(model.newIteDoc({}), { camps: { "propietat.municipiPropietat": "Girona", "edifici.cadasFinca": "1234567" } }, complet).doc;
+  const t = edit.iteAsText(d, complet, "dades");
+  const prop = t["Dades Generals"]["3. Identificació propietat"];
+  assert.equal(prop["Província (el portal la demana)"], "Girona");
+  assert.match(t["Dades Generals"]["2. Identificació de l'edifici"].nota, /Obtenir dades cadastre/);
+  // the field list gives long lists by text, not 949 options
+  const camps = edit.iteCamps(complet, "dades")[0].camps;
+  assert.match(camps.find((c) => c.camp === "propietat.municipiPropietat").valors, /^949 opcions/);
+  assert.equal(camps.find((c) => c.camp === "propietat.telefon1Propietat").obligatori, true);
 });
 
 // Real export ----------------------------------------------------------------------
@@ -334,8 +449,16 @@ if (!zipPath) {
   const zips = (await readdir(ROOT)).filter((f) => /^Inspeccio.*\.zip$/i.test(f));
   if (zips[0]) zipPath = join(ROOT, zips[0]);
 }
+// Other exports kept for reference (ite-proves/, git-ignored): the owner as a
+// person and the accessibility details only show up in the Llatzeret 27 one.
+const altres = [];
+for (const f of await readdir(join(ROOT, "ite-proves")).catch(() => [])) {
+  if (!/^Inspeccio.*\.zip$/i.test(f)) continue;
+  const e = zip.readZip(new Uint8Array(await readFile(join(ROOT, "ite-proves", f)))).find((x) => /\/dades\/\d+\/[^/]+\.xml$/.test(x.name));
+  if (e) altres.push(xml.parseIteXml(new TextDecoder().decode(await e.read())).doc);
+}
 if (zipPath) {
-  console.log(`real export (${zipPath.split(/[\\/]/).pop()})`);
+  console.log(`real export (${zipPath.split(/[\\/]/).pop()}${altres.length ? ` i ${altres.length} més a ite-proves/` : ""})`);
   const entries = zip.readZip(new Uint8Array(await readFile(zipPath)));
   const xmlEntry = entries.find((e) => /\/dades\/\d+\/[^/]+\.xml$/.test(e.name));
   const src = new TextDecoder().decode(await xmlEntry.read());
@@ -345,8 +468,9 @@ if (zipPath) {
     const unsigned = i >= 0 ? src.slice(0, i) + src.slice(j) : src;
     assert.equal(xml.serializeIteXml(parsed.doc, parsed.rootTag), unsigned.replace(/\n$/, ""));
   });
-  await test("every field of the form exists in the real file", () => {
-    const missing = schema.ALL_FIELDS.map((f) => f.path).filter((p) => model.getAt(parsed.doc, p) === undefined);
+  await test("every field of the form exists in a real export, unless marked noExport", () => {
+    const docs = [parsed.doc, ...altres];
+    const missing = schema.ALL_FIELDS.filter((f) => !f.noExport).map((f) => f.path).filter((p) => docs.every((d) => model.getAt(d, p) === undefined));
     assert.deepEqual(missing, []);
   });
   await test("its code lists are all in cataleg-base.json", () => {

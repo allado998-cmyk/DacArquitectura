@@ -1,0 +1,543 @@
+# Formulari del Portal generador d'informes ITE: inventari
+# Fet per Claude in Chrome el 12/11/2026 sobre un informe en blanc («PROVA INVENTARI»), desat a la nota de DacArquitectura «Inventari portal ITE» i copiat aquí tal qual. Sense dades de cap informe: etiquetes, opcions, obligatoris, camps que apareixen en marcar-ne d'altres (APAREIX AMB), avisos en desar (AVÍS) i el que demana «Validar informe» (VALIDAR).
+# D'aquí surten les llistes de src/lib/ite/cataleg-portal.json (scripts/ite-cataleg-portal.mjs) i els obligatoris de src/lib/ite/schema.ts.
+
+Inventari del formulari del Portal generador d'informes ITE (ite.agenciahabitatge.cat), informe de prova «PROVA INVENTARI». Format: SECCIÓ | GRUP | ETIQUETA | TIPUS | OBLIGATORI | OPCIONS
+=== DADES GENERALS ===
+Dades Generals | 1. IDENTIFICACIÓ DE L'INFORME | * Nom | text | sí |
+Dades Generals | 1. IDENTIFICACIÓ DE L'INFORME | Data d'emissió | text | no | (no editable; mostra «Pendent de tancament»)
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Finca / Parcel·la | text | sí | (dins «Referència Cadastral de l'edifici (14 primers dígits de qualsevol entitat de...) següents el full del plànol»; botó «Obtenir dades cadastre»; sense consulta mostra «No hi ha dades per la Referència Cadastral informada»)
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Full de plànol | text | sí |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Tipus via: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Nom de via: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Número: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Escala: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Bloc: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Codi postal: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Municipi: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Província: | text | no | (no editable, dada del cadastre) | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Marqui aquesta casella per confirmar que l’adreça recuperada coincideix amb l’adreça de l’edifici a avaluar | casella | no | | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | En cas que l'adreça proposada pel cadastre no coincideixi amb la de l'edifici a avaluar, marqui aquesta casella per afegir les dades correctes | casella | no | | APAREIX AMB: botó «Obtenir dades cadastre» amb referència vàlida
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Tipus via | desplegable | sí | Accés ; Antic ; Antiga Carretera ; Autopista ; Autovia ; Avinguda ; Barranc ; Barri ; Bloc ; Calçada ; Camí ; Cantonada ; Carrer ; Carrerada ; Carreró ; Carretera ; Cases ; Cinturó ; Circumval·lacio ; Colònia ; Complex ; Conjunt ; Corraló ; Corredor ; Corriol ; Costa ; Disseminat ; Drecera ; Edifici ; Eix ; Enllaç ; Escala ; Esplanada ; Finca ; Fons ; Glorieta ; Gran Via ; Grup ; Illa ; Jardins ; Lloc ; Masia ; Mercat ; Mirador ; Moll ; Muralla ; Paratge ; Parc ; Partida ; Pas ; Passadís ; Passatge ; Passeig ; Passera ; Pista ; Pla ; Plaça ; Placeta ; Plana ; Platja ; Poblat ; Polígon ; Polígon ; Pont ; Port ; Porta ; Portal ; Portals ; Prolongació ; Pujada ; Racó ; Rail ; Ramal ; Rambla ; Rambleta ; Rasa ; Raval ; Rial ; Riera ; Ronda ; Rotonda ; Sector ; Sender ; Sense via ; Sèquia ; Torrent ; Travessera ; Travessia ; Tunel ; Urbanització ; Veïnat ; Via ; Viaducte ; Vial ; Xalet ; Zona ; Afegit ; Baixada ; Barraqueta ; Bulevard ; Col·legi ; Consell ; Camp ; Darrera ; Diputació ; Fora murs ; Extraradi ; Escalinata ; Esquena ; Ferrocarril ; Hort ; Llac ; Costera ; Munt ; Particular ; Vedat ; Parròquia ; Rampa ; Rua ; Sortida ; Solar ; Terrenys ; Vall ; Eixample
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Nom de via | text | sí |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Número | text | sí |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Escala | text | no |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Bloc | text | no |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Codi postal | text | sí |
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Província | desplegable | sí | Barcelona ; Girona ; Lleida ; Tarragona
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi | desplegable | sí | (desactivat fins que es tria Província; la llista depèn de la província: vegeu MUNICIPIS més avall)
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | Altres Ref. Cadastrals i observacions | text llarg | no |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT | * Règim jurídic | opció única | sí | Propietat horitzontal ; Propietat vertical
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Tipus d'identificació | desplegable | sí | NIF ; NIE ; CIF ; PASSAPORT
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Identificació | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Nom | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Primer cognom | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Segon cognom | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Tipus via | desplegable | sí | (mateixa llista que «Tipus via» de 2. IDENTIFICACIÓ DE L'EDIFICI, idèntica opció per opció)
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Adreça | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Codi postal | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Província | desplegable | sí | Álava ; Albacete ; Alicante ; Almería ; Ávila ; Badajoz ; Baleares ; Barcelona ; Burgos ; Cáceres ; Cádiz ; Castellón ; Ciudad Real ; Córdoba ; La Coruña ; Cuenca ; Girona ; Granada ; Guadalajara ; Guipúzcoa ; Huelva ; Huesca ; Jaén ; León ; Lleida ; La Rioja ; Lugo ; Madrid ; Málaga ; Murcia ; Navarra ; Orense ; Asturias ; Palencia ; Las Palmas ; Pontevedra ; Salamanca ; Santa Cruz de Tenerife ; Cantabria ; Segovia ; Sevilla ; Soria ; Tarragona ; Teruel ; Toledo ; Valencia ; Valladolid ; Vizcaya ; Zamora ; Zaragoza ; Ceuta ; Melilla ; Altres
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Municipi | desplegable | sí | (desactivat fins que es tria Província; depèn de la província. Barcelona/Girona/Lleida/Tarragona: mateixes llistes que a MUNICIPIS (comprovat Barcelona, idèntica). Altres: ANDORRA - ENCAMP ; ANDORRA - SANT JULIA DE LORIA ; Arudy ; Frouzins ; Maoubourguet ; Ordino ; Prats de Molló ; Venècia. Resta de províncies: no inventariades, p. ex. Madrid en té 180)
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | * Telèfon 1 | text | sí |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | Telèfon 2 | text | no |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades del propietari | Email | text | no |
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | Dades Representant | casella | no | (casella al títol del grup)
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Tipus d'identificació | desplegable | sí | NIF ; NIE ; CIF | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Identificació | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Nom | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Primer cognom | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Segon cognom | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Tipus via | desplegable | sí | (mateixa llista que «Tipus via» de 2. IDENTIFICACIÓ DE L'EDIFICI) | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Adreça | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Codi postal | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Província | desplegable | sí | (mateixa llista de 53 opcions que la Província del propietari, Álava … Altres) | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Municipi | desplegable | sí | (depèn de la Província, com al propietari) | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | * Telèfon 1 | text | sí | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | Telèfon 2 | text | no | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 3. IDENTIFICACIÓ PROPIETAT / Dades Representant | Email | text | no | | APAREIX AMB: casella «Dades Representant»
+Dades Generals | 4. IDENTIFICACIÓ DEL TÈCNIC REDACTOR | (taula de tècnics: columnes Identificació ; Titulació ; Nom / Raó social; botons «Alta» i «Eliminar») | taula | — |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» (botó Alta) | * Tipus d'identificació | desplegable | sí | NIF ; NIE ; CIF ; PASSAPORT
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Identificació | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Nom | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Primer cognom | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | Segon cognom | text | no |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Titulació | desplegable | sí | Arquitecte/a ; Aparellador/a ; Arquitecte/a Tècnic/a ; Enginyer/a d'Edificació ; Graduat/da en Ciències i Tecnologies de l'Edificació
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Col·legi Professional | desplegable | sí | CATEB ; CATT ; CATL ; CATG ; CATTE ; Altres
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | Nom Col·legi Professional | text | no | | APAREIX AMB: Col·legi Professional = Altres
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Núm. col·legiat | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Tipus via | desplegable | sí | (mateixa llista que «Tipus via» de 2. IDENTIFICACIÓ DE L'EDIFICI)
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Adreça | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Codi postal | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Província | desplegable | sí | (mateixa llista de 53 opcions que la Província del propietari)
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Municipi | desplegable | sí | (depèn de la Província)
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Telèfon 1 | text | sí |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | Telèfon 2 | text | no |
+Dades Generals | 4. TÈCNIC REDACTOR / finestra «Tècnic» | * Email | text | sí |
+AVÍS | Dades Generals | Hi ha errors de validació al formulari. identificacioRepresentant, El número d'identificació o el tipus no és correcte
+MUNICIPIS (Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi | desplegable | sí) — opcions segons la Província triada:
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi [Província = Barcelona, 312] | desplegable | sí | Abrera ; Aguilar de Segarra ; Aiguafreda ; Alella ; Alpens ; Ametlla del Vallès, l' ; Arenys de Mar ; Arenys de Munt ; Argençola ; Argentona ; Artés ; Avià ; Avinyó ; Avinyonet del Penedès ; Badalona ; Badia del Vallès ; Bagà ; Balonyà ; Balsareny ; Barberà del Vallès ; Barcelona ; Begues ; Bellprat ; Berga ; Bigues i Riells ; Borredà ; Bruc, el ; Brull, el ; Cabanyes, les ; Cabrera d'Anoia ; Cabrera de Mar ; Cabrils ; Calaf ; Calders ; Caldes de Montbui ; Caldes d'Estrac ; Calella ; Calldetenes ; Callús ; Calonge de Segarra ; Campins ; Canet de Mar ; Canovelles ; Cànoves i Samalús ; Canyelles ; Capellades ; Capolat ; Cardedeu ; Cardona ; Carme ; Casserres ; Castell de l'Areny ; Castellar de N'Hug ; Castellar del Riu ; Castellar del Vallès ; Castellbell i el Vilar ; Castellbisbal ; Castellcir ; Castelldefels ; Castellet i la Gornal ; Castellfollit de Riubregós ; Castellfollit del Boix ; Castellgalí ; Castellnou de Bages ; Castellolí ; Castellterçol ; Castellví de la Marca ; Castellví de Rosanes ; Centelles ; Cercs ; Cerdanyola del Vallès ; Cervelló ; Collbató ; Collsuspina ; Copons ; Corbera de Llobregat ; Cornellà de Llobregat ; Cubelles ; Dosrius ; Esparreguera ; Esplugues de Llobregat ; Espunyola, l' ; Esquirol, L' ; Estany, l' ; Figaró-Montmany ; Fígols ; Fogars de la Selva ; Fogars de Montclús ; Folgueroles ; Fonollosa ; Font-rubí ; Franqueses del Vallès, les ; Gaià ; Gallifa ; Garriga, la ; Gavà ; Gelida ; Gironella ; Gisclareny ; Granada, la ; Granera ; Granollers ; Gualba ; Guardiola de Berguedà ; Gurb ; Hospitalet de Llobregat, l' ; Hostalets de Pierola, els ; Igualada ; Jorba ; Llacuna, la ; Llagosta, la ; Lliçà d'Amunt ; Lliçà de Vall ; Llinars del Vallès ; Lluçà ; Malgrat de Mar ; Malla ; Manlleu ; Manresa ; Marganell ; Martorell ; Martorelles ; Masies de Roda, les ; Masies de Voltregà, les ; Masnou, el ; Masquefa ; Matadepera ; Mataró ; Mediona ; Moià ; Molins de Rei ; Mollet del Vallès ; Monistrol de Calders ; Monistrol de Montserrat ; Montcada i Reixac ; Montclar ; Montesquiu ; Montgat ; Montmajor ; Montmaneu ; Montmeló ; Montornès del Vallès ; Montseny ; Muntanyola ; Mura ; Navarcles ; Navàs ; Nou de Berguedà, la ; Òdena ; Olèrdola ; Olesa de Bonesvalls ; Olesa de Montserrat ; Olivella ; Olost ; Olvan ; Orís ; Oristà ; Orpí ; Òrrius ; Pacs del Penedès ; Palafolls ; Palau Solità i Plegamans ; Pallejà ; Palma de Cervelló, la ; Papiol, el ; Parets del Vallès ; Perafita ; Piera ; Pineda de Mar ; Pla del Penedès, el ; Pobla de Claramunt, la ; Pobla de Lillet, la ; Polinyà ; Pont de Vilomara i Rocafort, el ; Pontons ; Prat de Llobregat, el ; Prats de Lluçanès ; Prats de Rei, els ; Premià de Dalt ; Premià de Mar ; Puigdàlber ; Puig-reig ; Pujalt ; Quar, la ; Rajadell ; Rellinars ; Ripollet ; Roca del Vallès, la ; Roda de Ter ; Rubí ; Rubió ; Rupit i Pruit ; Sabadell ; Sagàs ; Saldes ; Sallent ; Sant Adrià de Besòs ; Sant Agustí de Lluçanès ; Sant Andreu de la Barca ; Sant Andreu de Llavaneres ; Sant Antoni de Vilamajor ; Sant Bartomeu del Grau ; Sant Boi de Llobregat ; Sant Boi de Lluçanès ; Sant Cebrià de Vallalta ; Sant Celoni ; Sant Climent de Llobregat ; Sant Cugat del Vallès ; Sant Cugat Sesgarrigues ; Sant Esteve de Palautordera ; Sant Esteve Sesrovires ; Sant Feliu de Codines ; Sant Feliu de Llobregat ; Sant Feliu Sasserra ; Sant Fost de Campsentelles ; Sant Fruitós de Bages ; Sant Hipòlit de Voltregà ; Sant Iscle de Vallalta ; Sant Jaume de Frontanyà ; Sant Joan de Vilatorrada ; Sant Joan Despí ; Sant Julià de Cerdanyola ; Sant Julià de Vilatorta ; Sant Just Desvern ; Sant Llorenç d'Hortons ; Sant Llorenç Savall ; Sant Martí d'Albars ; Sant Martí de Centelles ; Sant Martí de Tous ; Sant Martí Sarroca ; Sant Martí Sesgueioles ; Sant Mateu de Bages ; Sant Pere de Ribes ; Sant Pere de Riudebitlles ; Sant Pere de Torelló ; Sant Pere de Vilamajor ; Sant Pere Sallavinera ; Sant Pol de Mar ; Sant Quintí de Mediona ; Sant Quirze de Besora ; Sant Quirze del Vallès ; Sant Quirze Safaja ; Sant Sadurní d'Anoia ; Sant Sadurní d'Osormort ; Sant Salvador de Guardiola ; Sant Vicenç de Castellet ; Sant Vicenç de Montalt ; Sant Vicenç de Torelló ; Sant Vicenç dels Horts ; Santa Cecília de Voltregà ; Santa Coloma de Cervelló ; Santa Coloma de Gramenet ; Santa Eugènia de Berga ; Santa Eulàlia de Riuprimer ; Santa Eulàlia de Ronçana ; Santa Fe del Penedès ; Santa Margarida de Montbui ; Santa Margarida i els Monjos ; Santa Maria de Besora ; Santa Maria de Corcó ; Santa Maria de Martorelles ; Santa Maria de Merlès ; Santa Maria de Miralles ; Santa Maria de Palautordera ; Santa Maria d'Oló ; Santa Perpètua de Mogoda ; Santa Susanna ; Santpedor ; Sentmenat ; Seva ; Sitges ; Sobremunt ; Sora ; Subirats ; Súria ; Tagamanent ; Talamanca ; Taradell ; Tavèrnoles ; Tavertet ; Teià ; Terrassa ; Tiana ; Tona ; Tordera ; Torelló ; Torre de Claramunt, la ; Torrelavit ; Torrelles de Foix ; Torrelles de Llobregat ; Ullastrell ; Vacarisses ; Vallbona d'Anoia ; Vallcebre ; Vallgorguina ; Vallirana ; Vallromanes ; Veciana ; Vic ; Vilada ; Viladecans ; Viladecavalls ; Vilafranca del Penedès ; Vilalba Sasserra ; Vilanova de Sau ; Vilanova del Camí ; Vilanova del Vallès ; Vilanova i la Geltrú ; Vilassar de Dalt ; Vilassar de Mar ; Vilobí del Penedès ; Viver i Serrateix
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi [Província = Girona, 222] | desplegable | sí | Agullana ; Aiguaviva ; Albanyà ; Albons ; Alp ; Amer ; Anglès ; Arbúcies ; Argelaguer ; Armentera, l' ; Avinyonet de Puigventós ; Banyoles ; Bàscara ; Begur ; Bellcaire d'Empordà ; Besalú ; Bescanó ; Beuda ; Bisbal d'Empordà, la ; Biure ; Blanes ; Boadella i les Escaules ; Bolvir ; Bordils ; Borrassà ; Breda ; Brunyola ; Cabanelles ; Cabanes ; Cadaqués ; Caldes de Malavella ; Calonge ; Camós ; Campdevànol ; Campelles ; Campllong ; Camprodon ; Canet d'Adri ; Cantallops ; Capmany ; Cassà de la Selva ; Castellfollit de la Roca ; Castelló d'Empúries ; Castell-Platja d'Aro i s'Agaro ; Cellera de Ter, la ; Celrà ; Cervià de Ter ; Cistella ; Colera ; Colomers ; Corçà ; Cornellà del Terri ; Crespià ; Cruïlles, Monells i Sant Sadurní de l'Heure ; Darnius ; Das ; Escala, l' ; Espinelves ; Espolla ; Esponellà ; Far d'Empordà, el ; Figueres ; Flaçà ; Foixà ; Fontanals de Cerdanya ; Fontanilles ; Fontcoberta ; Forallac ; Fornells de la Selva ; Fortià ; Garrigàs ; Garrigoles ; Garriguella ; Ger ; Girona ; Gombrèn ; Gualta ; Guils de Cerdanya ; Hostalric ; Isòvol ; Jafre ; Jonquera, la ; Juïà ; Lladó ; Llagostera ; Llambilles ; Llanars ; Llançà ; Llers ; Llívia ; Lloret de Mar ; Llosses, les ; Maçanet de Cabrenys ; Maçanet de la Selva ; Madremanya ; Maià de Montcal ; Masarac ; Massanes ; Medinyà ; Meranges ; Mieres ; Mollet de Peralada ; Molló ; Montagut i Oix ; Mont-ras ; Navata ; Ogassa ; Olot ; Ordis ; Osor ; Palafrugell ; Palamós ; Palau de Santa Eulàlia ; Palau-sator ; Palau-saverdera ; Palol de Revardit ; Pals ; Pardines ; Parlavà ; Pau ; Pedret i Marzà ; Pera, la ; Peralada ; Planes d'Hostoles, les ; Planoles ; Pont de Molins ; Pontós ; Porqueres ; Port de la Selva, el ; Portbou ; Preses, les ; Puigcerdà ; Quart ; Queralbs ; Rabós ; Regencós ; Ribes de Freser ; Riells i Viabrea ; Ripoll ; Riudarenes ; Riudaura ; Riudellots de la Selva ; Riumors ; Roses ; Rupià ; Sales de Llierca ; Salt ; Sant Andreu Salou ; Sant Aniol de Finestres ; Sant Climent Sescebes ; Sant Feliu de Buixalleu ; Sant Feliu de Guíxols ; Sant Feliu de Pallerols ; Sant Ferriol ; Sant Gregori ; Sant Hilari Sacalm ; Sant Jaume de Llierca ; Sant Joan de les Abadesses ; Sant Joan de Mollet ; Sant Joan les Fonts ; Sant Jordi Desvalls ; Sant Julià de Ramis ; Sant Julià del Llor i Bonmatí ; Sant Llorenç de la Muga ; Sant Martí de Llémena ; Sant Martí Vell ; Sant Miquel de Campmajor ; Sant Miquel de Fluvià ; Sant Mori ; Sant Pau de Segúries ; Sant Pere Pescador ; Santa Coloma de Farners ; Santa Cristina d'Aro ; Santa Llogaia d'Àlguema ; Santa Pau ; Sarrià de Ter ; Saus ; Selva de Mar, la ; Serinyà ; Serra de Daró ; Setcases ; Sils ; Siurana ; Susqueda ; Tallada d'Empordà, la ; Terrades ; Torrent ; Torroella de Fluvià ; Torroella de Montgrí ; Tortellà ; Toses ; Tossa de Mar ; Ullà ; Ullastret ; Ultramort ; Urús ; Vajol, la ; Vall de Bianya, la ; Vall d'en Bas, la ; Vallfogona de Ripollès ; Vall-llobrega ; Ventalló ; Verges ; Vidrà ; Vidreres ; Vilabertran ; Vilablareix ; Viladamat ; Viladasens ; Vilademuls ; Viladrau ; Vilafant ; Vilajuïga ; Vilallonga de Ter ; Vilamacolum ; Vilamalla ; Vilamaniscle ; Vilanant ; Vila-sacra ; Vilaür ; Vilobí d'Onyar ; Vilopriu
+CORRECCIÓ llista Barcelona: on diu «Balonyà» ha de dir «Balenyà».
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi [Província = Lleida, 231] | desplegable | sí | Abella de la Conca ; Àger ; Agramunt ; Aitona ; Alamús, els ; Alàs i Cerc ; Albagés, l' ; Albatàrrec ; Albesa ; Albi, l' ; Alcanó ; Alcarràs ; Alcoletge ; Alfarràs ; Alfés ; Algerri ; Alguaire ; Alins ; Almacelles ; Almatret ; Almenar ; Alòs de Balaguer ; Alpicat ; Alt Àneu ; Anglesola ; Arbeca ; Arres ; Arsèguel ; Artesa de Lleida ; Artesa de Segre ; Aspa ; Avellanes i Santa Linya, les ; Baix Pallars ; Balaguer ; Barbens ; Baronia de Rialb, la ; Bassella ; Bausen ; Belianes ; Bellaguarda ; Bellcaire d'Urgell ; Bell-lloc d'Urgell ; Bellmunt d'Urgell ; Bellpuig ; Bellver de Cerdanya ; Bellvís ; Benavent de Segrià ; Biosca ; Bòrdes, es ; Borges Blanques, les ; Bossòst ; Bovera ; Cabanabona ; Cabó ; Camarasa ; Canejan ; Castell de Mur ; Castellar de la Ribera ; Castelldans ; Castellnou de Seana ; Castelló de Farfanya ; Castellserà ; Cava ; Cervera ; Cervià de les Garrigues ; Ciutadilla ; Clariana de Cardener ; Cogul, el ; Coll de Nargó ; Coma i la Pedra, la ; Conca de Dalt ; Corbins ; Cubells ; Espluga Calba, l' ; Espot ; Estamariu ; Estaràs ; Esterri d'Àneu ; Esterri de Cardós ; Farrera ; Fígols i Alinyà ; Floresta, la ; Fondarella ; Foradada ; Fuliola, la ; Fulleda ; Gavet de la Conca ; Gimenells i Pla de la Font ; Golmés ; Gósol ; Granadella, la ; Granja d'Escarp, la ; Granyanella ; Granyena de les Garrigues ; Granyena de Segarra ; Guimerà ; Guingueta d'Aneu, la ; Guissona ; Guixers ; Isona i Conca Dellà ; Ivars de Noguera ; Ivars d'Urgell ; Ivorra ; Josa i Tuixén ; Juncosa ; Juneda ; Les ; Linyola ; Lladorre ; Lladurs ; Llardecans ; Llavorsí ; Lleida ; Lles de Cerdanya ; Llimiana ; Llobera ; Maials ; Maldà ; Massalcoreig ; Massoteres ; Menàrguens ; Miralcamp ; Mollerussa ; Molsosa, la ; Montellà i Martinet ; Montferrer i Castellbò ; Montgai ; Montoliu de Lleida ; Montoliu de Segarra ; Montornès de Segarra ; Nalec ; Naut Aran ; Navès ; Odèn ; Oliana ; Oliola ; Olius ; Oluges, les ; Omellons, els ; Omells de Na Gaia, els ; Organyà ; Os de Balaguer ; Ossó de Sió ; Palau d'Anglesola, el ; Penelles ; Peramola ; Pinell de Solsonès ; Pinós ; Plans de Sió, els ; Poal, el ; Pobla de Cérvoles, la ; Pobla de Segur, la ; Pont de Bar, el ; Pont de Suert, el ; Ponts ; Portella, la ; Prats i Sansor ; Preixana ; Preixens ; Prullans ; Puiggròs ; Puigverd d'Agramunt ; Puigverd de Lleida ; Rialp ; Ribera d'Ondara ; Ribera d'Urgellet ; Riner ; Riu de Cerdanya ; Rosselló ; Salàs de Pallars ; Sanaüja ; Sant Esteve de la Sarga ; Sant Guim de Freixenet ; Sant Guim de la Plana ; Sant Llorenç de Morunys ; Sant Martí de Riucorb ; Sant Ramon ; Sarroca de Bellera ; Sarroca de Lleida ; Senterada ; Sentiu de Sió, la ; Seròs ; Seu d'Urgell, la ; Sidamon ; Soleràs, el ; Solsona ; Soriguera ; Sort ; Soses ; Sudanell ; Sunyer ; Talarn ; Talavera ; Tàrrega ; Tarrés ; Tarroja de Segarra ; Térmens ; Tírvia ; Tiurana ; Torà ; Torms, els ; Tornabous ; Torre de Cabdella, la ; Torrebesses ; Torrefarrera ; Torrefeta i Florejacs ; Torregrossa ; Torrelameu ; Torres de Segre ; Torre-serona ; Tremp ; Vall de Boí, la ; Vall de Cardós ; Vallbona de les Monges ; Vallfogona de Balaguer ; Valls d'Aguilar, les ; Valls del Valira, les ; Vansa i Fórnols, la ; Verdú ; Vielha e Mijaran ; Vilagrassa ; Vilaller ; Vilamòs ; Vilanova de Bellpuig ; Vilanova de la Barca ; Vilanova de l'Aguda ; Vilanova de Meià ; Vilanova de Segrià ; Vila-sana ; Vilosell, el ; Vinaixa
+Dades Generals | 2. IDENTIFICACIÓ DE L'EDIFICI | * Municipi [Província = Tarragona, 184] | desplegable | sí | Aiguamúrcia ; Albinyana ; Albiol, l' ; Alcanar ; Alcover ; Aldea, l' ; Aldover ; Aleixar, l' ; Alfara de Carles ; Alforja ; Alió ; Almoster ; Altafulla ; Ametlla de Mar, l' ; Ampolla, l' ; Amposta ; Arboç, l' ; Arbolí ; Argentera, l' ; Arnes ; Ascó ; Banyeres del Penedès ; Barberà de la Conca ; Batea ; Bellmunt del Priorat ; Bellvei ; Benifallet ; Benissanet ; Bisbal de Falset, la ; Bisbal del Penedès, la ; Blancafort ; Bonastre ; Borges del Camp, les ; Bot ; Botarell ; Bràfim ; Cabacés ; Cabra del Camp ; Calafell ; Camarles ; Cambrils ; Canonja, la ; Capafonts ; Capçanes ; Caseres ; Castellvell del Camp ; Catllar, el ; Colldejou ; Conesa ; Constantí ; Corbera d'Ebre ; Cornudella de Montsant ; Creixell ; Cunit ; Deltebre ; Duesaigües ; Espluga de Francolí, l' ; Falset ; Fatarella, la ; Febró, la ; Figuera, la ; Figuerola del Camp ; Flix ; Forès ; Freginals ; Galera, la ; Gandesa ; Garcia ; Garidells, els ; Ginestar ; Godall ; Gratallops ; Guiamets, els ; Horta de Sant Joan ; Lloar, el ; Llorac ; Llorenç del Penedès ; Marçà ; Margalef ; Mas de Barberans ; Masdenverge ; Maslllorenç ; Masó, la ; Maspujols ; Masroig, el ; Milà, el ; Miravet ; Molar, el ; Montblanc ; Montbrió del Camp ; Montferri ; Montmell,el ; Mont-ral ; Mont-roig del Camp ; Móra d'Ebre ; Móra la Nova ; Morell, el ; Morera de Montsant, la ; Nou de Gaià, la ; Nulles ; Pallaresos, els ; Palma d'Ebre, la ; Passanant ; Paüls ; Perafort ; Perelló, el ; Piles, les ; Pinell de Brai, el ; Pira ; Pla de Santa Maria, el ; Pobla de Mafumet, la ; Pobla de Massaluca, la ; Pobla de Montornès, la ; Poboleda ; Pont d'Armentera, el ; Pontils ; Porrera ; Pradell de la Teixeta ; Prades ; Prat de Comte ; Pratdip ; Puigpelat ; Querol ; Rasquera ; Renau ; Reus ; Riba, la ; Riba-roja d'Ebre ; Riera de Gaià, la ; Riudecanyes ; Riudecols ; Riudoms ; Rocafort de Queralt ; Roda de Barà ; Rodonyà ; Roquetes ; Rourell, el ; Salomó ; Salou ; Sant Carles de la Ràpita ; Sant Jaume dels Domenys ; Sant Jaume d'Enveja ; Santa Bàrbara ; Santa Coloma de Queralt ; Santa Oliva ; Sarral ; Savallà del Comtat ; Secuita, la ; Selva del Camp, la ; Senan ; Sénia, la ; Solivella ; Tarragona ; Tivenys ; Tivissa ; Torre de Fontaubella, la ; Torre de l'Espanyol, la ; Torredembarra ; Torroja del Priorat ; Tortosa ; Ulldecona ; Ulldemolins ; Vallclara ; Vallfogona de Riucorb ; Vallmoll ; Valls ; Vandellòs i l'Hospitalet de l'Infant ; Vendrell, el ; Vespella de Gaià ; Vilabella ; Vilalba dels Arcs ; Vilallonga del Camp ; Vilanova de Prades ; Vilanova d'Escornalbou ; Vilaplana ; Vila-rodona ; Vila-seca ; Vilaverd ; Vilella Alta, la ; Vilella Baixa, la ; Vimbodí ; Vinebre ; Vinyols i els Arcs ; Xerta
+CORRECCIÓ llista Tarragona: on diu «Maslllorenç» ha de dir «Maslllorenç» amb dues ele: «Masllo…» → «Masllo» no; el text exacte és «Mas·lllorenç» NO: és «Masllo-renç» sense guió → escrit: M-a-s-l-l-o-r-e-n-ç.
+Aclariment Dades Generals: el text complet del grup de la referència cadastral és «Referència Cadastral de l'edifici (14 primers dígits de qualsevol entitat de l'edifici. Els 7 primers indiquen la finca i els 7 següents el full del plànol)».
+AVÍS | Dades Generals | (finestra «Confirmació» en canviar de secció) Si no heu desat abans es perdran els canvis. Vol continuar? [Acceptar / Cancel·lar]
+=== DESC. BÀSICA EDIFICI ===
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Any construcció | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Sup. de la parcel·la (m2) | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Sup. construïda (m2) | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Altura sobre rasant (m) | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Núm. plantes sobre rasant | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Núm. plantes sota rasant | text | sí |
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * Font d'informació superfícies | opció única | sí | Cadastre ; Escriptura ; Altres
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | Informació | text | no | | APAREIX AMB: Font d'informació superfícies = Altres
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | * L'edifici és: | opció única | sí | Unifamiliar ; Plurifamiliar
+Desc. Bàsica Edifici | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) | Data Inspecció: | data | no | (calendari; camp només de lectura, es tria amb el calendari)
+Desc. Bàsica Edifici | 5. DADES EDIFICI / Relació de nombre d'entitats | (taula: Descripció ; Habitatges ; Locals ; Té pàrquing ; Total d'entitats; paginació « Pàgina anterior / Pàgina següent »; botons «Alta» i «Eliminar») | taula | — |
+Desc. Bàsica Edifici | Relació de nombre d'entitats / finestra «Alta» | * Descripció: | text | sí |
+Desc. Bàsica Edifici | Relació de nombre d'entitats / finestra «Alta» | Núm. d'habitatges: | número | no | (selector numèric amb fletxes)
+Desc. Bàsica Edifici | Relació de nombre d'entitats / finestra «Alta» | Núm. de locals: | número | no | (selector numèric amb fletxes)
+Desc. Bàsica Edifici | Relació de nombre d'entitats / finestra «Alta» | Ordre: | número | no | (selector numèric amb fletxes)
+Desc. Bàsica Edifici | Relació de nombre d'entitats / finestra «Alta» | Té pàrquing: | casella | no |
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Implantació en parcel·la de l'edifici | opció única | sí | Edificació exempta/aïllada o aparellada en parcel·la/bloc obert ; Edificació entre mitgeres/adossada/edificació en illa tancada
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Nuclis de comunicació vertical en edificis residencials | opció única | sí | Sense nucli de comunicació ; Un sol nucli d'escales ; Dos o més nuclis
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Un sol nucli d'escales | opció única | sí | Sense ascensor ; Amb 1 ascensor ; Amb 2 o més ascensors | APAREIX AMB: Nuclis de comunicació vertical = Un sol nucli d'escales
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Núm. total d'escales: | text | sí | | APAREIX AMB: Nuclis de comunicació vertical = Dos o més nuclis
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Núm. total d'ascensors: | text | sí | | APAREIX AMB: Nuclis de comunicació vertical = Dos o més nuclis
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Núm. total d'habitatges amb accés a través de més de 1 nucli: | text | sí | | APAREIX AMB: Nuclis de comunicació vertical = Dos o més nuclis
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | * Núm. total d'habitatges sense accés a través d'ascensor: | text | sí | | APAREIX AMB: Nuclis de comunicació vertical = Dos o més nuclis
+Desc. Bàsica Edifici | TIPOLOGIA EDIFICATÒRIA | Núm. mig d'habitatges per planta: | text | no |
+Desc. Bàsica Edifici | DESCRIPCIÓ I CROQUIS | Descripció general de l'edifici | text llarg | no |
+Desc. Bàsica Edifici | DESCRIPCIÓ I CROQUIS | (taula de croquis: Descripció ; Operacions; botons «Afegir» i «Eliminar») | taula | — |
+Desc. Bàsica Edifici | DESCRIPCIÓ I CROQUIS / finestra «Fitxer» (botó Afegir) | * Descripció (Màxim 200 caràcters): | text | sí | (màxim 200 caràcters)
+Desc. Bàsica Edifici | DESCRIPCIÓ I CROQUIS / finestra «Fitxer» | * Fitxer | fitxer | sí | (botó «Tria un fitxer»)
+AVÍS | Desc. Bàsica Edifici | Hi ha errors de validació al formulari. path, no puede estar vacío
+ERRATA DEFINITIVA (substitueix les dues correccions anteriors sobre Tarragona): el municipi es diu Masllorenc amb c trencada final, lletra a lletra: M a s l l o r e n ç (dues ele).
+=== ENVOLUPANT DE L'EDIFICI ===
+Envolupant de l'edifici | Sistema Envolupant (llista) | (taula d'elements: Tipus ; Descripció; paginació « Pàgina anterior / Pàgina següent »; casella de seleccionar-ho tot; botons «Afegir» i «Eliminar») | taula | — |
+Envolupant de l'edifici | Dades Sistema Envolupant (pàgina d'element, botó Afegir) | * Descripció: | text llarg | sí |
+Envolupant de l'edifici | Dades Sistema Envolupant | * Tipus | opció única | sí | Forjat Sanitari/Solera ; Façanes ; Patis ; Mitgeres ; Cobertes
+Envolupant de l'edifici | Dades Sistema Envolupant | * Fotografies: | taula de fitxers | sí | (columnes Descripció ; Operacions; botons «Afegir» i «Eliminar»; text en vermell: «Abans de pujar un fitxer, has d'omplir els camps obligatoris. Caldrà descriure mínimament els gruixos, les tipologies constructives i acabats amb coherència amb les imatges carregades»)
+Envolupant de l'edifici | Dades Sistema Envolupant / finestra de foto (Afegir) | * Descripció (Màxim 200 caràcters): | text | sí | (màxim 200 caràcters)
+Envolupant de l'edifici | Dades Sistema Envolupant / finestra de foto | * Fitxer | fitxer | sí |
+Envolupant de l'edifici | Dades Sistema Envolupant | (botons de la pàgina: «Desar» i «Tornar») | — | — |
+AVÍS | Envolupant de l'edifici | Hi ha errors de validació al formulari. envolupantDescripcio, no puede estar vacío
+=== SIST. CONSTRUCTIUS === (4 pestanyes: FONAMENTACIÓ ; ESTRUCTURA ; TANCAMENTS VERTICALS i COBERTES ; INSTAL·LACIONS DE L'EDIFICI; dins de cada pestanya, apartats plegables)
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Mur de pedra | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Mur de fàbrica de maó | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Mur de fàbrica bloc | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Mur de formigó armat | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Mur pantalla | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | Es desconeix/Altres | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Sistemes de contenció: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | FONAMENTACIÓ / Fonamentació superficial: | Sabates, rases i pous de paredat | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació superficial: | Llosa | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació superficial: | Sabata o Rases formigó | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació superficial: | Es desconeix/Altres | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació superficial: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | FONAMENTACIÓ / Fonamentació profunda: | Pilons | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació profunda: | Pantalles | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació profunda: | Es desconeix/Altres | casella | no |
+Sist. Constructius | FONAMENTACIÓ / Fonamentació profunda: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | FONAMENTACIÓ | * Observacions | text llarg | sí |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De pedra | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De formigó armat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De tova | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De tàpia | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De fàbrica de maó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De bloc ceràmic | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | De bloc formigó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Parets de Càrrega: | Amb entramat de fusta | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | Maó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | Ferro colat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | Acer | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | Formigó armat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Pilars: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Pilars: Altres
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Altres: | Es desconeix | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Altres: | Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura vertical / Altres: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Estructura principal (bigues): | De fusta | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Estructura principal (bigues): | Metàl·liques | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Estructura principal (bigues): | De formigó armat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | De fusta | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | Metàl·lica | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | De formigó armat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | De ceràmica armada | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Elements secundaris, biguetes): | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | Taulell | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | Revoltó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | Revoltó ceràmic | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | Revoltó de formigó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Forjat (Entrebigat): | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Altres: | Forjat reticular | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Altres: | Llosa formigó | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Altres: | Es desconeix/Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Planta Tipus / Altres: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Forjat: | Idèntic al de Planta Tipus | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Forjat: | Diferent al de Planta Tipus | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Forjat Sanitari: | Idèntic al de Planta Tipus | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Forjat Sanitari: | Diferent al de Planta Tipus | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Altres: | Solera | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Altres: | Es desconeix/Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura horitzontal: Terra. Planta en contacte amb terreny / Altres: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Forjat horitzontal: | Capa formació pendent | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Forjat horitzontal: | Envanets + taulell | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Forjat inclinat: | Formigó armat | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Forjat inclinat: | Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Forjat inclinat: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Encavallades, pòrtics: | Bigues formigó armat + taulell | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Encavallades, pòrtics: | Bigues metàl·liques + taulell | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Encavallades, pòrtics: | Bigues fusta + taulell | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Altres: | Taulell ceràmic | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Altres: | Taulell fusta | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Altres: | Xapa/Sandwich | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Altres: | Es desconeix/Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Estructura de coberta / Altres: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Es desconeix/Altres
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Fusta | casella | no |
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Metàl·lica | casella | no |
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Volta ceràmica | casella | no |
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Llosa armada | casella | no |
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Es desconeix/Altres | casella | no |
+Sist. Constructius | ESTRUCTURA / Escala / Estructura | Sense escala | casella | no |
+Sist. Constructius | ESTRUCTURA | * Observacions | text llarg | sí |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Paredat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Carreus | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Fàbrica maó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Fàbrica bloc ceràmic | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Fàbrica bloc formigó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Panell prefabricat formigó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Panell metàl·lic/Sandwich | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Vist en Façana Principal: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Arrebossat i pintat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Estucat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Morter monocapa | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Aplacat ceràmic | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Aplacat pedra | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Xapa metàl·lica | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal / Acabat Revestit en Façana Principal: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal | Disposa de Cambra d'aire: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Façana principal | Disposa d'Aïllament tèrmic: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Paredat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Carreus | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Fàbrica maó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Fàbrica bloc ceràmic | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Fàbrica bloc formigó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Panell prefabricat formigó | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Panell metàl·lic/Sandwich | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Vist en Altres Façanes: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Arrebossat i pintat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Estucat | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Morter monocapa | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Aplacat ceràmic | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Aplacat pedra | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Xapa metàl·lica | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres / Acabat Revestit en Altres Façanes: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres | Disposa de Cambra d'aire: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Altres façanes, façanes a patis, i mitgeres | Disposa d'Aïllament tèrmic: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | Fusta | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | Acer | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | Alumini | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | PVC | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de fusteria predominant: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Simple | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Doble vidre | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Triple vidre | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Amb capa baix emissiu | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Amb capa de control solar | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Fusteria i vidre en buits d'obra / Tipus de vidre predominant: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Terrat / Coberta plana / Transitable: | Transitable | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Terrat / Coberta plana / Transitable: | No transitable | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Terrat / Coberta plana | Disposa d'Aïllament tèrmic: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Terrat / Coberta plana | Disposa de làmina impermeabilitzant: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Teula àrab | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Teula plana o altra | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Teula ciment | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Xapa coure/zinc | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Fibrociment | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Asfàltica | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Xapa d'acer | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Pissarra | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | Altres | casella | no |
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada / Cobertura: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES / Coberta inclinada | Disposa d'Aïllament tèrmic: | opció única | no | Si ; No ; Es desconeix
+Sist. Constructius | TANCAMENTS VERTICALS i COBERTES | * Observacions | text llarg | sí |
+(Nota: els camps de «Coberta inclinada» són sempre a la pàgina, dins el seu apartat plegable; no depenen de cap casella.)
+Sist. Constructius | INSTAL·LACIONS DE L'EDIFICI / Sanejament. Sistema d'evacuació d'aigües residuals | No disposa de Sistema d'evacuació d'aigües residuals | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament. Sistema d'evacuació d'aigües residuals | Disposa de Sistema d'evacuació a la xarxa de clavegueram públic | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament. Sistema d'evacuació d'aigües residuals | Disposa de Sistema d'evacuació propi (fosa sèptica, etc.) | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants: | Baixants vistos | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants: | Baixants encastats | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants: | Altres | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Baixants: Altres
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants (material): | Ceràmic | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants (material): | Fibrociment | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants (material): | PVC | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Baixants (material): | Es desconeix/Altres | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors: | Col·lectors vistos | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors: | Col·lectors soterrats | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors: | Altres | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Col·lectors: Altres
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors (material): | Formigó | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors (material): | Ceràmic | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors (material): | Fibrociment | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors (material): | PVC | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Sanejament / Col·lectors (material): | Es desconeix/Altres | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua | No disposa de Sistema de subministrament d'Aigua | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua | Disposa de connexió a la Xarxa de subministrament d'Aigua pública | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua | (sense etiqueta, tipus de connexió) | opció única | no | Directe ; Per aforament | APAREIX AMB: Disposa de connexió a la Xarxa de subministrament d'Aigua pública
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua | Disposa de Captació pròpia (pou, bomba, etc) | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / Comptadors: | Comptador únic per a tot l'edifici | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / Comptadors: | Comptadors individuals per habitatge/local | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / Comptadors: | Comptadors individuals centralitzats | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material dels muntants, mateix bloc que Comptadors:) | Plom | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material) | Ferro | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material) | Coure | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material) | Plàstic | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material) | Altres | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua / (material) | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres
+Sist. Constructius | INSTAL·LACIONS / Subministrament d'Aigua | * Fotografia comptadors: | fitxer | sí |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Caixa General de Protecció (CGP) | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Quadre Comandament i Protecció (QCP) | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Interruptor Control de Potència (ICP) | casella | no | | APAREIX AMB: Quadre Comandament i Protecció (QCP)
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Interruptor Diferencial (ID) | casella | no | | APAREIX AMB: Quadre Comandament i Protecció (QCP)
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Interruptor Automàtic a l'inici dels circuits de serveis comuns (PIA) | casella | no | | APAREIX AMB: Quadre Comandament i Protecció (QCP)
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Altres | casella | no | | APAREIX AMB: Quadre Comandament i Protecció (QCP)
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Quadre Comandament i Protecció (QCP) (i Altres)
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / L'edifici disposa (instal·lació elèctrica elements comuns): | Fusible a l'inici de les derivacions individuals a habitatges o locals | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / Comptadors: | Comptador únic per a tot l'edifici | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / Comptadors: | Comptadors individuals per habitatge/local | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica / Comptadors: | Comptadors individuals centralitzats | casella | no |
+Sist. Constructius | INSTAL·LACIONS / Instal·lació elèctrica | * Foto quadre commandament protecció: | fitxer | sí |
+Sist. Constructius | INSTAL·LACIONS / Calefacció | L'edifici disposa de Sistema de Calefacció: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | Es disposa de sistema de Calefacció Col·lectiva/Central: | opció única | no | Si ; No | APAREIX AMB: L'edifici disposa de Sistema de Calefacció = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció: | Caldera comunitària | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció: | Bomba de calor | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció: | Altres | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Sistema de Calefacció: Altres
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | GLP | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | Gasoil | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | Gas Natural | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | Electricitat | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | Llenya/Biomassa | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | Altres | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció / Sistema de Calefacció (combustible): | (sense etiqueta, descripció) | text | no | | APAREIX AMB: (combustible) Altres
+Sist. Constructius | INSTAL·LACIONS / Aigua Calenta Sanitària (ACS) | L'edifici disposa de sistema d'ACS: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Aigua Calenta Sanitària (ACS) | L'edifici disposa de captadors solars per a la producció d'ACS | casella | no | | APAREIX AMB: sistema d'ACS = Si
+Sist. Constructius | INSTAL·LACIONS / Aigua Calenta Sanitària (ACS) | L'edifici disposa de sistema d'ACS Central: | opció única | no | Si ; No | APAREIX AMB: sistema d'ACS = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | GLP | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | Gasoil | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | Gas Natural | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | Electricitat | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | Llenya/Biomassa | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | Altres | casella | no | | APAREIX AMB: ACS Central = Si
+Sist. Constructius | INSTAL·LACIONS / ACS / Combustible per a producció ACS: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Combustible ACS: Altres
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat per a instal·lacions domèstiques | L'edifici disposa d'escomesa a xarxa de distribució canalitzada de gas per a ús domèstic: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat | % d'habitatges/locals que disposen d'escomesa a xarxa de distribució canalitzada de gas per a ús domèstic | text | no | | APAREIX AMB: escomesa de gas = Si
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat / Combustible | Propà | casella | no | | APAREIX AMB: escomesa de gas = Si
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat / Combustible | Gas Natural | casella | no | | APAREIX AMB: escomesa de gas = Si
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat / Comptadors | Comptadors individuals per habitatge/local | casella | no | | APAREIX AMB: escomesa de gas = Si
+Sist. Constructius | INSTAL·LACIONS / Gas canalitzat / Comptadors | Comptadors individuals centralitzats | casella | no | | APAREIX AMB: escomesa de gas = Si
+Sist. Constructius | INSTAL·LACIONS / Calefacció | % d'habitatges/locals que disposen de sistemes individuals de Calefacció | text | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | % d'habitatges amb Caldera (Gas canalitzat): | text | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | Propà | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | Gas Natural | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | % habitatges amb Caldera Gasoil | text | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | % habitatges amb Calefacció elèctrica: | text | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | Bomba de Calor | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | Radiadors | casella | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / Calefacció | % amb Altres | text | no | | APAREIX AMB: Calefacció Col·lectiva/Central = No
+Sist. Constructius | INSTAL·LACIONS / ACS | % d'habitatges/locals que disposen de sistemes individuals de producció d'ACS | text | no | | APAREIX AMB: ACS Central = No
+Sist. Constructius | INSTAL·LACIONS / ACS | % d'habitatges amb Escalfadors (Gas canalitzat) indicant: | text | no | | APAREIX AMB: ACS Central = No i escriure un valor a «% ... sistemes individuals de producció d'ACS»
+Sist. Constructius | INSTAL·LACIONS / ACS / Escalfadors (Gas canalitzat) | Propà | casella | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS / Escalfadors (Gas canalitzat) | Gas Natural | casella | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS | % d'habitatges amb Escalfadors (Gas embotellat) indicant: | text | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS / Escalfadors (Gas embotellat) | Propà | casella | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS / Escalfadors (Gas embotellat) | Butà | casella | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS | % habitatges amb Escalfadors elèctrics | text | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / ACS | % amb Altres | text | no | | APAREIX AMB: ídem
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | L'edifici disposa de sistema de Refrigeració: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | L'edifici disposa de sistema col·lectiu de Refrigeració: | opció única | no | Si ; No | APAREIX AMB: sistema de Refrigeració = Si
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | Amb torre de refredament | casella | no | | APAREIX AMB: Refrigeració col·lectiva = Si
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | Sense torre de refredament | casella | no | | APAREIX AMB: Refrigeració col·lectiva = Si
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | % d'habitatges/locals disposen de sistemes individuals de refrigeració (aire condicionat) | text | no | | APAREIX AMB: Refrigeració col·lectiva = No
+Sist. Constructius | INSTAL·LACIONS / Refrigeració | Núm. aparells d'aire condicionat vistos en façanes | text | no | | APAREIX AMB: Refrigeració col·lectiva = No
+Sist. Constructius | INSTAL·LACIONS / Ventilació i renovació d'aire | L'edifici disposa de sistema de ventilació per a les cambres humides (banys i cuines) dels habitatges: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Finestres | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Shunts | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Pati d'instal·lacions | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Altres | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Tipus de sistemes: Altres
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Existeixen locals o habitatges on les cambres humides no tinguin cap dels sistemes anteriors de ventilació | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Mecànica | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Natural | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Ventilació / Tipus de sistemes | Híbrida | casella | no | | APAREIX AMB: ventilació = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis | L'edifici disposa de sistema de protecció contra incendis: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis / L'edifici disposa de: | Un sistema de detecció d'incendis | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis / L'edifici disposa de: | Un sistema d'alarma | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis / L'edifici disposa de: | Extintors Mòbils | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis | Hidrants exteriors | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis | Columna seca | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra Incendis | Boca d'incendis equipada | casella | no | | APAREIX AMB: protecció contra incendis = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp | L'edifici disposa de sistema de protecció contra el llamp: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp / L'edifici disposa de: | Parallamps de puntes | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp / L'edifici disposa de: | Parallamps Faraday | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp / L'edifici disposa de: | Parallamps amb sistemes actius (ionitzants) | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp / L'edifici disposa de: | Altre tipus de parallamps | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp / L'edifici disposa de: | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altre tipus de parallamps
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp | Un dispositiu de protecció contra sobretensions transitòries | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Protecció Contra el Llamp | Xarxa de terra | casella | no | | APAREIX AMB: protecció contra el llamp = Si
+Sist. Constructius | INSTAL·LACIONS / Instal·lacions de Comunicacions ICT | L'edifici disposa d'Instal·lacions de comunicacions ICT: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / ICT / L'edifici disposa de: | Antena per a recepció de TDT | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT / L'edifici disposa de: | Antena per a recepció de TV satèl·lit | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT / L'edifici disposa de: | Accés de parells de coure | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT / L'edifici disposa de: | Accés de telecomunicacions per cable | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT | Accés de fibra òptica | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT | Accés sense fils | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT | Altres instal·lacions d'ICT | casella | no | | APAREIX AMB: ICT = Si
+Sist. Constructius | INSTAL·LACIONS / ICT | (sense etiqueta, descripció) | text | no | | APAREIX AMB: Altres instal·lacions d'ICT
+Sist. Constructius | INSTAL·LACIONS / Instal·lació d'ascensor | L'edifici disposa d'ascensor comunitari: | opció única | no | Si ; No
+Sist. Constructius | INSTAL·LACIONS / Instal·lació d'ascensor / Dimensions de la cabina: | Profunditat: | text | no | | APAREIX AMB: ascensor comunitari = Si
+Sist. Constructius | INSTAL·LACIONS / Instal·lació d'ascensor / Dimensions de la cabina: | Amplada: | text | no | | APAREIX AMB: ascensor comunitari = Si
+Sist. Constructius | INSTAL·LACIONS / Instal·lació d'ascensor / Dimensions de la cabina: | Ubicació: | text llarg | no | | APAREIX AMB: ascensor comunitari = Si
+Sist. Constructius | INSTAL·LACIONS | * Observacions | text llarg | sí |
+AVÍS | Sist. Constructius | Sistemes constructius desat amb èxit
+=== DEFICIÈNCIES === (8. RELACIÓ I QUALIFICACIÓ DE LES DEFICIÈNCIES DETECTADES; pestanyes Estructures ; Envolupant ; Instal·lacions ; Altres; un apartat plegable per element)
+Deficiències | Estructures / Fonamentació | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Estructures / Estructura vertical | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Estructures / Estructura horitzontal | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Estructures / Estructura de coberta | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Estructures / Estructura d'escales | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Tancaments verticals: Façanes, mitgeres i forats | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Acabats de façana | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Fusteria exterior i envidrament | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Elements adossats a façana | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Altres elements de façana | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Terrats i cobertes planes | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Envolupant / Cobertes inclinades | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Instal·lació d'aigua | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Instal·lació d'electricitat | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Instal·lació de sanejament | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Instal·lació de gas | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Instal·lació d'ascensor | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Instal·lacions / Altres instal·lacions | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | Altres / Altres deficiències en altres subsistemes constructius | S'observen deficiències? | opció única | no | Si ; No
+Deficiències | (cada element) | (taula de deficiències: casella seleccionar ; Descripció ; Gravetat ; Fotografies; paginació « »; botons «Eliminar» i «Alta») | taula | — | | APAREIX AMB: S'observen deficiències? = Si i Desar
+Deficiències | Deficiència -  (pàgina d'Alta) | * Descripció de la deficiència i localització: | text llarg | sí | (entre 1 i 3000 caràcters segons l'error de validació)
+Deficiències | Deficiència -  | * Gravetat | opció única | sí | Molt greu ; Greu ; Important ; Lleu
+Deficiències | Deficiència -  | * Tipus de deficiència | desplegable | sí | (la llista depèn de l'element; vegeu TIPUS DE DEFICIÈNCIA més avall)
+Deficiències | Deficiència -  | Observacions: (Art. 9.2. en els casos de deficiències greus o molt greus s'haurà d'indicar el termini orientatiu per esmenar les deficiències): | text llarg | no |
+Deficiències | Deficiència -  | * Fotografies: | taula de fitxers | sí | (Descripció ; Operacions; botons «Afegir» i «Eliminar»; text en vermell «Abans de pujar un fitxer, has d'omplir els camps obligatoris»)
+Deficiències | Deficiència -  / finestra de foto | * Descripció (Màxim 200 caràcters): | text | sí | (màx 200)
+Deficiències | Deficiència -  / finestra de foto | * Fitxer | fitxer | sí |
+Deficiències | Deficiència -  | (botons «Desar» i «Tornar») | — | — |
+AVÍS | Deficiències | Informe Tècnic desat amb èxit
+AVÍS | Deficiències (Alta buida) | Hi ha errors de validació al formulari. deficienciaDescripcio, longitud incorrecta: entre 1 y 3000
+TIPUS DE DEFICIÈNCIA segons l'element (Deficiències | Deficiència -  | * Tipus de deficiència | desplegable | sí | ...):
+[Fonamentació] Fissures i/o esquerdes en els tancaments derivades de problemes en fonaments ; Fissures i/o esquerdes en elements estructurals derivades de problemes en fonaments ; Fissures i/o esquerdes en envans derivades de problemes en fonaments ; Assentaments de pilars derivats de problemes en fonaments ; Assentament de soleres derivats de problemes en fonaments ; Deformació i/o trencament de trencaaigües derivat/derivades de problemes en fonaments ; Bombament de murs de contenció ; Altres deficiències en fonaments
+[Estructura vertical] Deformacions, fissures i/o esquerdes en interior de l'edifici derivades de problemes de l'estructura vertical ; Deformacions, fissures i/o esquerdes en els tancaments de l'edifici derivades de problemes en l'estructura vertical ; Bombaments, desplomes i/o desnivells de paret de càrrega de l'estructura vertical ; Presencia de xilòfags en elements de fusta de l'estructura vertical ; Corrosió d'elements metàl·lics de l'estructura vertical ; Patologies i degradació de formigó en elements de l'estructura vertical ; Fissures en pilars de l'estructura vertical ; Presencia d'humitats i/o filtracions en elements de l'estructura vertical ; Altres deficiències en l'estructura vertical
+[Estructura horitzontal] Fissures i/o esquerdes en forjats ; Fissures i/o esquerdes en bigues ; Deformacions anormals del forjat ; Deformació i/o trencaments de trencaaigües derivats de problemes de l'estructura horitzontal ; Presencia de xilòfags en elements de fusta de l'estructura horitzontal ; Corrosió d'elements metàl·lics de l'estructura horitzontal ; Patologies i degradació de formigó en elements de l'estructura horitzontal ; Trencaments i/o despreniments d'elements del forjat ; Presencia d'humitats i/o filtracions en elements de l'estructura horitzontal ; Altres deficiències en l'estructura horitzontal
+[Estructura de coberta] Deformació d'aiguavés de l'estructura de coberta ; Fissures i/o esquerdes en l'estructura de coberta ; Presencia de xilòfags en elements de fusta de l'estructura de coberta ; Corrossió en elements metàl·lics de l'estructura de coberta ; Patologies i degradació de formigó en l'estructura de coberta ; Trencaments i/o despreniments d'elements de l'estructura de coberta ; Presencia d'humitats i/o filtracions en l'estructura de coberta ; Altres deficiències en l'estructura de coberta
+[Estructura d'escales] Fissures i/o esquerdes en estructura d'escales ; Bombament de murs d'escala ; Desnivell i/o deformació dels mutant d'escala en estructura d'escales ; Presencia de xilòfags en elements de fusta de l'estructura d'escala ; Trencaments i/o despreniments d'elements d'escales ; Altres deficiències en l'estructura d'escales
+[Tancaments verticals: Façanes, mitgeres i forats] Fissures i/o esquerdes en els tancaments de les façanes exteriors ; Fissures i/o esquerdes en els tancaments de les façanes de patis ; Fissures i/o esquerdes en mitgeres ; Bombaments de murs de tancament ; Deformació o trencaments de fusteries de forats ; Degradació, erosió i/o risc de despreniment dels materials de la fàbrica de tancament ; Humitats per capitalitat en els murs de tancament ; Humitats per filtracions en els murs de tancament, fusteries i troballes ; Humitats per condensació o altres causes en els murs de tancament, fusteries i troballes ; Presencia de vegetació i/o microorganismes (floridura, molsa, bactèries...) en murs de tancament ; Degradació o absència de juntes entre edificis en façanes ; Risc de despreniment d'elements adossats a les façanes ; Degradació o absència d'aïllament tèrmic en façanes i mitgeres ; Altres deficiències en els murs de tancament
+[Acabats de façana] Fissures i/o esquerdes en arrebossat de les façanes exteriors ; Fissures i/o esquerdes en arrebossat de façanes de patis ; Bombaments de l'arrebossat en murs de tancament ; Humitats en arrebossat de murs de tancament ; Presencia de vegetació i de microorganismes (floridura, moisa, bactèries...) en arrebossat de murs de tancament ; Bombaments, degradació, erosió dels materials i/o risc de despreniment de l'arrebossat de façanes ; Degradació dels panels, plaques i elements prefabricats de tancament en Façanes ; Degradació dels ancoratges de subjecció d'aplacats, panels i plaques de tancament ; Altres deficiències en els acabats de façana
+[Fusteria exterior i envidrament] Deformació i/o trencaments de fusteries exteriors ; Presencia de microorganismes en fusteria exterior(floridura, molsa, bactèries...) o xilòfags en fusteria exterior de fusta ; Erosió dels materials en fusteria exterior i/o corrosió d'elements metàl·lics en fusteria exterior ; Absència d'envidrament o vidres trencats i/o despreniments
+[Elements adossats a façana] Mal estat i/o risc de despreniment dels elements adossats a façana com: baixants, xemeneies, faroles, antenes, marquesines, estenedors de roba, tendals, cablejats, equips de climatització, etc.
+[Altres elements de façana] Mal estat i/o risc de despreniment d'elements de façana com: ràfecs, cornises, volades, miradors, etc ; Mal estat i/o risc de despreniment de defenses com: baranes, ampit, petos, balustrades, tanques, reixes, tanques de seguretat, etc.
+[Terrats i cobertes planes] Absència, deformació i/o trencaments de les membranes impermeabilitzants en terrats ; Absència, deformació i/o trencaments del paviment en terrats ; Absència, deformació i/o trencaments de juntes de dilatació en terrats ; Manifestació de filtracions i/o goteres procedents de terrats ; Manifestació de condensacions en l'interior derivades dels terrats ; Presencia de vegetació i/o de microorganismes (floridura, molsa, bactèries...) en terrats ; Nius d'aus en terrat ; Trencaments, obstruccions o altres deficiències en boneres, cassoletes i elements de desaigües en terrats ; Altres deficiències en terrats (incloent absència d'aïllament tèrmic) ; Mal estat i/o risc de despreniment d'altres elements de coberta, com: lluernes, claraboies i finestres, xemeneies i shunts, antenes, baladot de l'ascensor, etc.
+[Cobertes inclinades] Deformació i/o trencaments dels aiguavés de coberta ; Despreniment i/o trencaments de les peces de cobertura: teules, plaques, etc. ; Deformació i/o trencament de juntes de dilatació en cobertes ; Manifestació de filtracions i/o goteres derivades de la coberta ; Manifestació de condensacions en el interior de la coberta ; Presencia de vegetació i/o de microorganismes (floridura, molsa, bactèries...) en la coberta ; Nius d'aus en coberta ; Trencaments, obstruccions o altres deficiències dels canalons en coberta ; Altres deficiències en cobertes inclinades (incloent absència d'aïllament tèrmic) ; Mal estat i/o risc de despreniment d'altres elements de coberta, com: lluernes, claraboies i finestres, xemeneies i shunts, antenes, badalot de l'ascensor, etc.
+[Instal·lació d'aigua] Humitats i/o filtracions derivades de fuites en les conduccions i canonades d'abastiment i distribució d'aigua ; Altres deficiències en la instal·lació d'abastiment d'aigua
+[Instal·lació d'electricitat] Deficiències en la instal·lació d'electricitat
+[Instal·lació de sanejament] Humitats i/o filtracions derivades de fuites en les conduccions i canonades de sanejament ; Problemes de pous i embossaments en les conduccions de sanejament ; Altres deficiències en la instal·lació de sanejament
+[Instal·lació de gas] Deficiències en la instal·lació de gas. (En cap cas suposa la inspecció reglamentaria d'aquest tipus d'instal·lacions)
+[Instal·lació d'ascensor] Deficiències en la instal·lació d'ascensors. (En cap cas suposa la inspecció reglamentaria d'aquest tipus d'instal·lacions)
+[Altres instal·lacions] Deficiències en la instal·lació ICT. (En cap cas suposa la inspecció reglamentaria d'aquest tipus d'instal·lacions) ; Deficiències en la instal·lació de seguretat contra incendis. (En cap cas suposa la inspecció reglamentaria d'aquest tipus d'instal·lacions) ; Deficiències en altres instal·lacions
+[Altres deficiències en altres subsistemes constructius] Altres subsistemes constructius
+(Els textos s'han copiat tal com surten al portal, amb les seves faltes: Presencia, Corrossió, mutant, capitalitat, troballes, moisa, baladot.)
+=== ACCESSIBILITAT === (9. AVALUACIÓ DE LES CONDICIONS BÀSIQUES D'ACCESSIBILITAT)
+Accessibilitat | Condicions Bàsiques d'Accessibilitat | * L'EDIFICI SATISFÀ COMPLETAMENT LES CONDICIONS BÀSIQUES D'ACCESSIBILITAT QUE PRESCRIU LA NORMATIVA VIGENT? | opció única | sí | Si ; No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat / 1. DEFICIÈNCIES SEGONS CONDICIONS FUNCIONALS DE L'EDIFICI: | ACCESSIBILITAT EXTERIOR | casella | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat / 1. DEFICIÈNCIES SEGONS CONDICIONS FUNCIONALS DE L'EDIFICI: | ACCESSIBILITAT ENTRE PLANTES DE L'EDIFICI | casella | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat / 1. DEFICIÈNCIES SEGONS CONDICIONS FUNCIONALS DE L'EDIFICI: | ACCESSIBILITAT EN LES PLANTES DE L'EDIFICI | casella | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat / 1. DEFICIÈNCIES SEGONS CONDICIONS FUNCIONALS DE L'EDIFICI: | ACCESSIBILITAT EN PLACES D'APARCAMENT | casella | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat / 1. DEFICIÈNCIES SEGONS CONDICIONS FUNCIONALS DE L'EDIFICI: | ACCESSIBILITAT EN ALTRES ESPAIS D'ÚS COMUNITARI | casella | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat | 2. BREU DESCRIPCIÓ DE LA PROBLEMÀTICA D'ACCESSIBILITAT EXISTENT | text llarg | no | | APAREIX AMB: SATISFÀ ... = No
+Accessibilitat | Condicions Bàsiques d'Accessibilitat | 3. AJUSTOS RAONABLES PER ASSOLIR L'ACCESSIBILITAT (descripció mesures i costos estimats) | text llarg | no | | APAREIX AMB: SATISFÀ ... = No
+AVÍS | Accessibilitat | Condicions Bàsiques d'Accessibilitat desat amb èxit
+(Marcar les 5 caselles no fa aparèixer cap camp més.)
+=== ESTAT DE CONSERVACIÓ === (11. RESUM ESTAT DE CONSERVACIÓ; pestanyes Recomanacions ; Valoració)
+Estat de Conservació | Recomanacions | Recomanacions necessàries per a un correcte manteniment i conservació (Enumerar i periodicitat) | text llarg | no |
+Estat de Conservació | Recomanacions | PDF Recomanacions | fitxer | no |
+Estat de Conservació | Valoració | (sense etiqueta pròpia; just després del text informatiu «La inspecció a realitzar és de caràcter visual, i respecte a aquells elements de l'edifici als que s'ha tingut accés. No forma part de la inspecció detectar possibles vicis ocults, ni preveure causes sobrevingudes. Els elements objecte d'inspecció són els que consten en aquest model d'informe. Quan les dades obtingudes en la inspecció visual no siguin prou per a valorar les deficiències detectades, el Tècnic/a encarregat de la inspecció haurà de proposar a la propietat de l'immoble, efectuar una diagnosis de l'element o elements constructius afectats, així com les probes que consideri necessàries.») | opció única | no | Favorable ; Desfavorable
+Estat de Conservació | Valoració | Observacions: | text llarg | no |
+AVÍS | Estat de Conservació | Informe Tècnic desat amb èxit
+(Triar Favorable o Desfavorable no fa aparèixer cap camp nou. No hi ha cap camp de «mesures cautelars» en aquesta secció.)
+=== SOSTENIBILITAT === (10. RECOMANACIONS TÈCNIQUES PER A LA MILLORA DE LA SOSTENIBILITAT I L'ECOEFICIÈNCIA DE L'EDIFICI)
+Sostenibilitat | 10. RECOMANACIONS TÈCNIQUES... | Existència del Certificat d'Eficiència Energètica de l'edifici: | opció única | no | Si ; No
+Sostenibilitat | 10. RECOMANACIONS TÈCNIQUES... | * ID Certificat: | text | sí | | APAREIX AMB: Existència del Certificat d'Eficiència Energètica = Si
+Sostenibilitat | 10. RECOMANACIONS TÈCNIQUES... | Data Validesa: | data | no | (calendari, només de lectura) | APAREIX AMB: Existència del Certificat d'Eficiència Energètica = Si
+Sostenibilitat | Recomanacions tècniques per a la millora de la sostenibilitat i l'ecoeficiència de l'edfici (desglossats per mesures) | (taula: Descripció; paginació « Pàgina anterior / Pàgina següent »; botons «Alta» i «Eliminar») | taula | — |
+Sostenibilitat | finestra «Inspeccions» (botó Alta) | * Mesura recomanada | text llarg | sí | (botons «Desar» i «Cancel·lar»)
+AVÍS | Sostenibilitat | Sostenibilitat i ecoeficiència de l'edifici desat amb èxit
+(Triar «No» al certificat no fa aparèixer cap camp. El títol de la taula diu «edfici» tal com surt al portal.)
+=== ADDENDA ENVOLUPANT DE L'EDIFICI === (camp trobat després, a la pàgina de llista d'Envolupant, en un segon bloc)
+Envolupant de l'edifici | Orientació Façana Principal | Orientació Façana Principal | opció única | no (sense asterisc, però «Validar informe» l'exigeix) | Nord ; Nord Est ; Nord Oest ; Sud ; Sud Est ; Sud Oest ; Est ; Oest
+=== DECLARACIÓ RESPONSABLE === (no demanada, revisada per buscar mesures cautelars)
+Declaració Responsable | Justificació COMUNICAT DE RISC | (sense camps; text: «No aplica per aquest informe tècnic») | — | — |
+=== VALIDAR === (pàgina «Finalitzar informe», botó «Validar informe»; text previ: «Validació informe / Premi el botó 'Validar informe' per verificar que tots els camps obligatoris han estat emplenats correctament / Si tot és correcte, accedirà a la pantalla prèvia al tancament de l'informe, on també podrà generar un esborrany per verificar el resultat final abans de finalitzar-lo. / En cas contrari, apareixerà una pantalla amb totes les mancances llistades. Fins que aquestes no siguin completades, no es podrà finalitzar l'informe.»)
+VALIDAR | No es pot tancar l'informe tècnic, hi ha errors de validació
+VALIDAR | Erros al validar l'informe
+VALIDAR | Manca emplenar les següents dades:
+VALIDAR | Desc. Bàsica Edifici
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Altura sobre rasant (m)
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Any construcció
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Font d'informació superfícies
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > L'edifici ha de tenir 1 habitatge com a mínim
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Núm. plantes sobre rasant
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Núm. plantes sota rasant
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Relació de nombre d'entitats
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Sup. construïda (m2)
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Sup. de la parcel·la (m2)
+VALIDAR | 5. DADES EDIFICI (RELACIÓ DE NOMBRE D'ENTITATS) > Unifamiliar
+VALIDAR | ... 4 Errors més
+VALIDAR | Dades Generals
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Codi Postal és obligatori.
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Municipi és obligatori.
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Nom de via és obligatori.
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Número és obligatori.
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Província és obligatori.
+VALIDAR | 2. IDENTIFICACIÓ DE L'EDIFICI > Referència Cadastral > El camp Tipus via és obligatori.
+VALIDAR | 3. IDENTIFICACIÓ PROPIETAT > Codi postal
+VALIDAR | 3. IDENTIFICACIÓ PROPIETAT > Codi postal
+VALIDAR | 3. IDENTIFICACIÓ PROPIETAT > Identificació
+VALIDAR | ... 12 Errors més
+VALIDAR | Envolupant de l'edifici
+VALIDAR | Orientació Façana Principal
+VALIDAR | Descripció
+VALIDAR | Hi ha d'haver almenys una imatge de croquis
+VALIDAR | Sistemes Constructius
+VALIDAR | ESTRUCTURA > Escala
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Aigua Calenta Sanitària (ACS) > % amb Altres
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Aigua Calenta Sanitària (ACS) > % d'habitatges amb Escalfadors (Gas canalitzat)
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Aigua Calenta Sanitària (ACS) > % d'habitatges amb Escalfadors (Gas embotellat)
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Aigua Calenta Sanitària (ACS) > % habitatges amb Escalfadors elèctrics
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Instal·lació d'ascensor > Amplada
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Instal·lació d'ascensor > Profunditat
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Instal·lació elèctrica > Quadre Comandament i Protecció (QCP) > Fotografia
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Sanejament. Sistema d'evacuació d'aigües residuals
+VALIDAR | INSTAL·LACIONS DE L'EDIFICI > Subministrament d'Aigua
+VALIDAR | ... 3 Errors més
+VALIDAR | Sostenibilitat
+VALIDAR | Recomanacions tècniques per a la millora de la sostenibilitat i l'ecoeficiència de l'edfici (desglossats per mesures)
+(El portal només mostra els primers errors de cada grup i resumeix la resta amb «... N Errors més», que no es pot desplegar.)
+=== FI DE L'INVENTARI ===

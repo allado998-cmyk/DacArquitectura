@@ -1,6 +1,6 @@
 // What a new ITE starts with: the office's technician (David), the owner from
 // the expedient's client and its contacts, and the building's address.
-import { catId, catLabel, findCat, type Cataleg } from "./cataleg";
+import { catId, catLabel, findCat, visibles, type Cataleg } from "./cataleg";
 import { NULL_ID } from "./model";
 import type { IteObj } from "./xml";
 
@@ -68,7 +68,7 @@ export function viaWordFromCatastro(code: string): string {
 export function tipusViaFor(cataleg: Cataleg, word: string): IteObj | undefined {
   if (!word) return undefined;
   const w = fold(word);
-  return (cataleg.tipus_via ?? []).find((o) => fold(catLabel(o)) === w || fold(String(o.codi ?? "")).replace(/ /g, "") === w.replace(/ /g, ""));
+  return visibles(cataleg.tipus_via).find((o) => fold(catLabel(o)) === w || fold(String(o.codi ?? "")).replace(/ /g, "") === w.replace(/ /g, ""));
 }
 
 // "C/ Mallorca, 325" → { word: "carrer", nom: "Mallorca", numero: "325" }
@@ -92,7 +92,10 @@ export function parseAdreca(text: string): { word: string; nom: string; numero: 
 export function municipiFor(cataleg: Cataleg, ciutat: string): IteObj | undefined {
   const f = fold(ciutat);
   if (!f) return undefined;
-  return (cataleg.municipi ?? []).find((m) => fold(String(m.nom ?? "")) === f);
+  // The portal writes the article last: «Hospitalet de Llobregat, l'».
+  const plain = (s: string) => fold(s.replace(/^(.*),\s*(l'|la|el|els|les|es|sa)\s*$/i, "$2 $1"));
+  const list = visibles(cataleg.municipi);
+  return list.find((m) => fold(String(m.nom ?? "")) === f) ?? list.find((m) => plain(String(m.nom ?? "")) === f);
 }
 
 const PROVINCIA_PER_CP: Record<string, string> = { "08": "BARCELONA", "17": "GIRONA", "25": "LLEIDA", "43": "TARRAGONA" };
@@ -164,13 +167,36 @@ export interface ContacteDades {
 
 // Section 3 (owner) from a client of the database. A community of owners
 // ("comunitat de propietaris") is horizontal property, the usual case.
+// "Puig Vila, Maria" or "Maria Puig Vila" → the portal's three boxes. Only a
+// guess for compound names: the form shows it to be checked.
+export function nomICognoms(text: string): { nom: string; cognom1: string; cognom2: string } {
+  const t = text.trim().replace(/\s+/g, " ");
+  const comma = t.indexOf(",");
+  if (comma > 0) {
+    const [c1, ...c2] = t.slice(0, comma).trim().split(" ");
+    return { nom: t.slice(comma + 1).trim(), cognom1: c1 ?? "", cognom2: c2.join(" ") };
+  }
+  const [nom, c1, ...c2] = t.split(" ");
+  return { nom: nom ?? "", cognom1: c1 ?? "", cognom2: c2.join(" ") };
+}
+
 export function propietatFromClient(c: ClientDades, contacte: ContacteDades | null, cataleg: Cataleg): IteObj {
   const p: IteObj = {};
-  if (c.nom?.trim()) p.raoSocialPropietat = c.nom.trim();
   const nif = (c.nif ?? "").replace(/[\s.-]/g, "").toUpperCase();
+  const ti = nif ? tipusIdentificacioFor(cataleg, nif) : undefined;
+  // A company or a community has a company name; a person, name and surnames.
+  if (c.nom?.trim()) {
+    if (ti && ti.codi !== "CIF") {
+      const n = nomICognoms(c.nom);
+      p.nomPropietat = n.nom;
+      if (n.cognom1) p.cognom1Propietat = n.cognom1;
+      if (n.cognom2) p.cognom2Propietat = n.cognom2;
+    } else {
+      p.raoSocialPropietat = c.nom.trim();
+    }
+  }
   if (nif) {
     p.identificacioPropietat = nif;
-    const ti = tipusIdentificacioFor(cataleg, nif);
     if (ti) p.tipusIdentificacioPropietat = structuredClone(ti);
   }
   const regim = (cataleg.regim_juridic ?? []).find((o) => o.codi === "PROP_HORITZONTAL");

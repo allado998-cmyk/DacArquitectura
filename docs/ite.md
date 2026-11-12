@@ -121,33 +121,42 @@ igualment, perquè la numeració sigui la del portal. Descomprimit a, p. ex.,
 
 ### Petició per a Claude (copiar i enganxar)
 
+Al portal, crear un informe nou i deixar-lo obert; canviar «NOM DE
+L'INFORME» pel de l'informe a l'app. Feta amb el que va ensenyar l'inventari
+del formulari (secció següent).
+
 ```
-Tinc obert en aquesta pestanya el formulari d'un informe al Portal generador
-d'informes ITE (ite.agenciahabitatge.cat). Omple'l amb l'informe ITE
-«Llatzeret, 27» de DacArquitectura. Treballa en aquesta pestanya; si no la
-veus, digue-m'ho abans de fer res. No canviïs el nom de l'informe.
+Tinc obert en aquesta pestanya un informe nou al Portal generador d'informes ITE (ite.agenciahabitatge.cat). Omple'l amb l'informe ITE «NOM DE L'INFORME» de DacArquitectura, perquè només em quedi pujar les fotos i signar.
 
-1. Amb el connector DacArquitectura, llista els informes ITE (list_ites) i
-   obre el de Llatzeret, 27 (get_ite). Si n'hi ha més d'un, pregunta'm quin.
-2. Ves secció per secció, en l'ordre del menú del portal: dades generals,
-   descripció de l'edifici, envolupant, sistemes i instal·lacions,
-   deficiències, accessibilitat, conservació, sostenibilitat. Per a cada
-   secció demana-la a get_ite (seccio=...) i omple els camps del formulari
-   que hi coincideixin.
-3. Als desplegables tria l'opció amb el mateix text; a Sí / No / Es desconeix
-   marca el que digui l'informe. Si el portal amaga camps fins que es respon
-   una pregunta Sí/No (calefacció, ACS o refrigeració central), respon-la
-   primer: l'informe la porta. El tècnic redactor i el que l'informe marca
-   com «No cal entrar-ho al portal» ja hi són: salta'ls. Si una dada no té
-   camp al portal o una opció no hi és, no inventis res: apunta-ho i
-   continua.
-4. Desa cada secció abans de passar a la següent.
-5. Les fotos, el croquis i el PDF vénen del zip de fotos: salta aquests
-   camps. No premis «Finalitzar», «Tancar» ni «Signar», i no toquis cap
-   altre informe.
-6. Al final, dona'm la llista del que no has pogut omplir i per què.
+PREPARACIÓ
+1. Treballa només en aquesta pestanya i en aquest informe; no en toquis cap altre del portal.
+2. Amb el connector DacArquitectura, busca l'informe amb list_ites. Si n'hi ha més d'un amb aquest nom, pregunta'm quin.
+3. Ves secció per secció i demana a get_ite només la secció que facis (seccio = dades, descripcio, envolupant, sistemes, deficiencies, accessibilitat, conservacio, sostenibilitat).
 
-Si no estàs segur de quin camp és quin, atura't i pregunta-m'ho.
+COM OMPLIR
+- Copia els valors tal com surten a get_ite. Als desplegables tria el text exacte; si no hi és igual, el més semblant, i apunta-ho.
+- Les preguntes Sí/No que get_ite posa amb «: No» també s'han de respondre. Respon-les abans dels camps que en depenen: el portal els amaga fins llavors.
+- Llegeix les «nota» i el que va després de «—» a cada valor: diuen on és el camp al portal o què s'ha de prémer abans.
+- Salta el tècnic redactor (ja hi és) i el que get_ite posa a «No cal entrar-ho al portal».
+- No inventis res: el que és buit a DacArquitectura es queda buit.
+- Fotos, croquis i PDF: salta'ls, els pujaré jo.
+- Prem «Desar» abans de canviar de secció: el portal perd el que no està desat. Si surt «Si no heu desat abans es perdran els canvis», prem «Cancel·lar» i desa primer.
+
+PER SECCIONS
+- Dades Generals: posa el Nom de l'informe de DacArquitectura. Escriu Finca i Full de plànol, prem «Obtenir dades cadastre» i marca la casella que confirma l'adreça (o, si get_ite ho diu, la de no coincideix, i escriu l'adreça). A la propietat, tria la Província abans del Municipi. El representant, només si get_ite el porta.
+- Desc. Bàsica Edifici: la Data Inspecció es tria amb el calendari. A «Relació de nombre d'entitats», una fila per planta amb «Alta» (Descripció, habitatges, locals, Ordre = index + 1, Té pàrquing); si el portal hi té on marcar les entitats visitades, marca les de «visitades».
+- Envolupant de l'edifici: per a cada element, «Afegir», Tipus i Descripció, i «Desar». L'orientació de la façana principal és al segon bloc de la pàgina de la llista.
+- Sist. Constructius: té quatre pestanyes (Fonamentació, Estructura, Tancaments verticals i cobertes, Instal·lacions de l'edifici) amb apartats plegables: obre'ls tots. Cada pestanya té unes Observacions obligatòries.
+- Deficiències: a les pestanyes Estructures, Envolupant, Instal·lacions i Altres, respon «S'observen deficiències?» a cada element com diu get_ite, i desa. Després, per a cada deficiència, a l'element que diu «element»: «Alta», Descripció, Gravetat, Tipus de deficiència (el text exacte) i Observacions; «Desar» i «Tornar».
+- Accessibilitat: Sí o No; si és No, les caselles i els dos textos.
+- Estat de Conservació: a la pestanya Recomanacions, el text; a Valoració, que coincideixi amb valoracio_final, i les observacions.
+- Sostenibilitat: certificat energètic Sí o No (si és Sí, l'ID i la data amb el calendari) i una fila per mesura amb «Alta».
+
+AL FINAL
+- Ves a «Finalitzar informe» i prem només «Validar informe». No premis «Finalitzar», «Tancar» ni «Signar».
+- Dona'm els errors que surtin (haurien de ser només de fotos) i el que no has pogut omplir i per què.
+
+Si dubtes de quin camp és quin, atura't i pregunta-m'ho.
 ```
 
 ### Primera prova (11/11/2026)
@@ -158,29 +167,107 @@ valors inventats). Claude no va pujar fotos ni tancar res i va dir què no
 havia pogut omplir. D'aquella llista, els ajustos a `get_ite`
 (`schema.ts`: `portal` i `hint` a cada camp; `edit.ts`: `iteAsText`):
 
-- El tècnic redactor, el lloc de signatura i les caselles de confirmació de
-  l'adreça els posa el portal: ara surten com «No cal entrar-ho al portal»
-  (el tècnic, només com a nota). La casella «Altres» de la instal·lació
-  elèctrica no existeix al portal: igual.
-- El portal demana la **província** de la propietat: ara surt, deduïda del
-  codi postal.
+- El tècnic redactor i el lloc de signatura els posa el portal: surten com
+  «No cal entrar-ho al portal» (el tècnic, només com a nota).
+- El portal demana la **província** de la propietat: ara surt, la del
+  municipi triat o la del codi postal.
 - El portal amaga els percentatges de calefacció, ACS i refrigeració fins
   que es respon si hi ha sistema (central): aquestes preguntes ara surten
   sempre, també quan són «No».
-- A deficiències, el portal demana **Sí/No per categoria**: ara surt la
-  llista sencera, calculada de les deficiències de l'informe.
-- Pistes als camps que al portal es diuen d'una altra manera: «Connexió a la
-  xarxa: Directe» i el desplegable d'ascensors (sota «Nuclis de comunicació
-  vertical»). A les plantes, `visitades` són els números d'entitat de la
-  fila de la planta, i ara hi surt el total.
-- Queda per al tècnic: el certificat d'eficiència energètica (el formulari
-  de l'app encara no té aquests camps) i els percentatges que l'informe no
-  porti.
+- A deficiències, el portal demana **«S'observen deficiències?» per
+  element**: ara surt la llista sencera, calculada de les deficiències.
+- A les plantes, `visitades` són els números d'entitat de la fila de la
+  planta, i ara hi surt el total.
+
+L'inventari de l'endemà (secció següent) va aclarir la resta: la casella
+que confirma l'adreça i «Directe» no hi eren perquè surten després de prémer
+«Obtenir dades cadastre» i de marcar «Disposa de connexió a la Xarxa de
+subministrament d'Aigua pública»; la casella «Altres» de l'electricitat surt
+en marcar el QCP; i el certificat energètic ja té els seus camps a l'app.
 
 ## Inventari del formulari del portal
 
-Perquè el formulari de l'app sigui igual que el del portal (mateixos camps,
-totes les opcions dels desplegables, mateixos obligatoris),
+**Fet el 12/11/2026** amb Claude in Chrome sobre un informe en blanc. El
+resultat, tal qual, és a [`docs/ite-portal-formulari.txt`](ite-portal-formulari.txt):
+totes les seccions i pestanyes, 149 camps que apareixen en marcar-ne d'altres,
+totes les opcions dels desplegables i el que demana «Validar informe». D'aquí
+surten:
+
+- **Les llistes** (`src/lib/ite/cataleg-portal.json`, fet amb
+  `node scripts/ite-cataleg-portal.mjs`): 949 municipis per província, 124
+  tipus de via, les 4 gravetats, els 103 tipus de deficiència amb la seva
+  categoria, titulacions, col·legis, orientacions… Els valors que també
+  surten en una exportació real (`cataleg-base.json`) es queden amb el seu id;
+  la resta porten un id nostre (`f…`). Els 18 tipus de deficiència que ja
+  teníem amb id real coincideixen lletra per lletra amb els de l'inventari.
+- **Els camps que faltaven** (`schema.ts`): nom i cognoms de la propietat,
+  representant, escala i bloc, dos o més nuclis, calefacció i ACS centrals
+  amb combustible, torre de refredament, protecció contra incendis i contra el
+  llamp, accessibilitat quan no es compleix, observacions de la valoració,
+  certificat energètic, aïllament de la coberta inclinada. Si el nom surt en
+  una exportació real (Llatzeret 27 en té uns quants), és el del portal; si
+  no, `noExport`.
+- **Els obligatoris** (`validateIte`): els asteriscs del portal i el que diu
+  «Validar informe», també els condicionals (nom i cognoms amb NIF, raó
+  social amb CIF, representant, ascensor, percentatges de calefacció i ACS
+  individuals, escala, sanejament, aigua, almenys una mesura, un element de
+  l'envolupant i un habitatge). Sense errors a la revisió de l'app, al portal
+  només han de quedar les fotos.
+- **Pistes per a Claude** (`portal`, `hint` a `schema.ts`, `get_ite`): el botó
+  «Obtenir dades cadastre», les preguntes Sí/No que obren camps, on és cada
+  camp quan no és a la mateixa secció.
+
+Per repetir-lo (si el portal canvia), dues maneres.
+
+### Amb Claude (recomanat)
+
+En David entra al portal, hi crea un informe nou en blanc (només per a la
+prova) i el deixa obert; obre el panell de Claude a Chrome amb el connector
+DacArquitectura actiu i enganxa la petició de sota. Claude recorre les
+seccions, obre les finestres d'afegir, marca les caselles que obren camps,
+prem «Validar informe» i ho desa tot a la nota de DacArquitectura
+«Inventari portal ITE» (pàgina Notes), una línia per camp. Llegeix com una
+persona: les llistes molt llargues les pot escurçar i no veu els codis
+interns del portal (que ja no calen, perquè Claude tria les opcions pel
+text). Si una llista surt incompleta, es completa amb el botó.
+
+```
+Tinc obert el Portal generador d'informes ITE (ite.agenciahabitatge.cat) en aquesta pestanya, amb un informe nou en blanc. Necessito un inventari complet del formulari d'un informe: tots els camps, totes les opcions dels desplegables, els obligatoris i els avisos. És perquè una altra aplicació tingui exactament el mateix formulari. Treballa només en aquesta pestanya.
+
+1. INFORME
+- L'informe obert en aquesta pestanya és nou i en blanc, només per a aquesta prova: aquí pots marcar caselles i desar. Treballa només en aquest informe i no en toquis cap altre del portal.
+
+2. NOTA A DACARQUITECTURA
+- Amb el connector DacArquitectura, crea una nota anomenada «Inventari portal ITE» (create_note).
+- Després de cada secció, afegeix-hi el que hagis trobat (update_note amb append), com a màxim 20.000 caràcters cada vegada; si una secció és més llarga, afegeix-la en diverses parts.
+- No cal que em demanis confirmació per desar en aquesta nota.
+
+3. CADA SECCIÓ DEL MENÚ
+Per ordre: Dades Generals, Desc. Bàsica Edifici, Envolupant de l'edifici, Sist. Constructius, Deficiències, Accessibilitat, Estat de Conservació i Sostenibilitat.
+Per a cada camp, una línia:
+SECCIÓ | GRUP | ETIQUETA | TIPUS | OBLIGATORI | OPCIONS
+- GRUP: el títol de l'apartat on és el camp.
+- ETIQUETA: el text exacte de la pàgina, amb l'asterisc si en té.
+- TIPUS: text, text llarg, número, data, casella, opció única, desplegable, autocompletar o fitxer.
+- OBLIGATORI: sí o no.
+- OPCIONS: per a desplegables i opcions úniques, TOTES les opcions amb el text exacte, separades per « ; ». No escurcis ni resumeixis cap llista, per llarga que sigui. Si el camp proposa opcions mentre escrius, posa AUTOCOMPLETAR i no les busquis.
+A més, a cada secció:
+a) Obre les finestres o files d'afegir (planta, element de l'envolupant, deficiència, mesura…) i inventaria'n també els camps. Si una llista canvia segons el que triïs en una altra (per exemple, el tipus de deficiència segons la categoria), tria cada opció de la primera i copia la llista que surt per a cada una. Tanca aquestes finestres sense desar.
+b) Marca les caselles i tria les opcions que fan aparèixer camps nous: calefacció i ACS (també col·lectiva o central, i captadors solars), refrigeració (també col·lectiva), protecció contra incendis i contra el llamp, coberta inclinada, representant de la propietat, adreça del cadastre incorrecta, dos o més nuclis de comunicació vertical, accessibilitat que no es compleix, mesures cautelars, certificat d'eficiència energètica i qualsevol altra que trobis. Desa. Per a cada camp nou que aparegui, fes-ne la línia i afegeix-hi al final: | APAREIX AMB: <casella o opció>.
+c) Si en desar surt algun error o avís, copia'l exacte en una línia: AVÍS | <secció> | <text>.
+
+4. VALIDAR
+Prem «Validar informe» i copia cada missatge exacte en una línia: VALIDAR | <text>. Afegeix-ho a la nota.
+
+5. NORMES
+- No pugis fotos i no premis «Finalitzar», «Tancar» ni «Signar».
+- No toquis cap altre informe del portal.
+- No inventis res: si no ho veus a la pàgina, no ho posis.
+- Al final, digues-me quines seccions has fet, quantes línies has desat i què no has pogut fer.
+```
+
+### Amb el botó «Inventari ITE» (més exacte)
+
 `scripts/portal-inventari.js` llegeix la pàgina del portal on s'executa i en
 baixa un JSON: cada camp amb l'etiqueta, el tipus, **totes les opcions** dels
 desplegables (amb el valor intern del portal), si és obligatori, la longitud
@@ -260,19 +347,20 @@ text del PDF es veu quin camp és quin:
   els del portal a Mallorca 325.
 - Les plantes venen en qualsevol ordre: l'ordre és `ordre`. L'app les ordena en importar.
 
-## Què no fem
+## Noms i ids
 
-- **Cap nom de camp inventat.** Si el portal fa servir un lector estricte, un
-  element desconegut faria fallar la importació. El formulari només té camps
-  vistos en una exportació real (`schema.ts`; el test comprova que tots hi
-  són). Les parts del portal que encara no hem vist (protecció contra
-  incendis i llamp, calefacció col·lectiva, accessibilitat quan no es compleix,
-  certificat energètic, representant…) surten a cada secció com a «Encara no es
-  pot omplir aquí» i s'acaben al portal.
-- **Cap id de llista inventat.** Els desplegables només ofereixen valors de
-  `cataleg-base.json` (els de Mallorca 325) i de la taula `ite_cataleg` (els
-  de cada informe importat a l'app). Per tenir totes les gravetats, tipus de
-  deficiència, tipus de via, municipis…, cal importar més informes del portal.
+- **Camps**: el nom de l'element és el del portal quan surt en una exportació
+  real (el test ho comprova amb totes les de `Inspeccio*.zip` i
+  `ite-proves/`); els camps vistos només al formulari porten `noExport` i un
+  nom nostre. Abans no n'hi posàvem cap d'inventat perquè el portal havia
+  d'importar el fitxer; ara que no l'importa, el que compta és el formulari.
+- **Llistes**: id real quan surt en una exportació (`cataleg-base.json`, taula
+  `ite_cataleg`); si no, el de `cataleg-portal.json`. Si un valor arriba més
+  tard amb el seu id real (important un informe), el nostre s'amaga dels
+  desplegables però es manté perquè els informes que ja el fan servir es
+  vegin bé.
+- Falta: la descripció que el portal demana en marcar «Altres» o «Es
+  desconeix/Altres» a sistemes constructius (s'omple al portal).
 - Ni signatura, ni `codiFinal`, `dataFirma`, `dataExport`: l'informe entra com
   a esborrany i es tanca i signa al portal.
 - El bloc `usuari` de l'exportació porta el hash de la contrasenya del portal:
@@ -286,7 +374,8 @@ text del PDF es veu quin camp és quin:
 | Lector/escriptor XML, zip | `src/lib/ite/xml.ts`, `zip.ts` |
 | Camps i etiquetes del portal | `src/lib/ite/schema.ts` |
 | Model: rutes, valors, plantes, fotos, exportació, revisió | `src/lib/ite/model.ts` |
-| Llistes del portal | `src/lib/ite/cataleg.ts`, `cataleg-base.json`, taula `ite_cataleg` |
+| Llistes del portal | `src/lib/ite/cataleg.ts`, `cataleg-base.json`, `cataleg-portal.json` (+ `cataleg-portal.ts`, només servidor), taula `ite_cataleg` |
+| Formulari del portal (inventari) | `docs/ite-portal-formulari.txt` → `scripts/ite-cataleg-portal.mjs` |
 | Valors inicials (David, propietat des del client, adreça) | `src/lib/ite/defaults.ts` |
 | Cadastre (servei públic OVC, sense clau) | `src/lib/ite/cadastre.ts` |
 | Canvis des del plugin | `src/lib/ite/edit.ts`, `src/lib/mcp/tools/ite.ts` |
@@ -330,14 +419,19 @@ text del PDF es veu quin camp és quin:
 Res recurrent: no hi ha cap consulta periòdica. Importar i exportar es fan al
 navegador (cap funció mou el zip); les fotos van directes a Blob (≈5–30 MB per
 informe, menys d'un cèntim al mes). Cada consulta al Cadastre és una funció
-d'un segon.
+d'un segon. L'editor d'un informe porta les llistes senceres del portal (unes
+180 KB sense comprimir, poques desenes comprimides).
 
 ## Proves
 
-- `npm run test:ite`: sense base de dades. Amb una exportació real al directori
-  del projecte (`Inspeccio*.zip`, ignorat per git) també comprova la lectura i
-  escriptura byte a byte, que tots els camps del formulari hi existeixen i que
-  la nostra exportació és el mateix informe.
+- `npm run test:ite`: sense base de dades. Comprova també les llistes del
+  formulari del portal i que un informe complet no dona cap error a la
+  revisió (només les fotos), i cada regla de «Validar informe» per separat.
+  Amb una exportació real al directori del projecte (`Inspeccio*.zip`,
+  ignorat per git) també comprova la lectura i escriptura byte a byte, que
+  tots els camps sense `noExport` existeixen en alguna exportació real (la de
+  l'arrel i les de `ite-proves/`) i que la nostra exportació és el mateix
+  informe.
 - Extrem a extrem fet el 10/11/2026 amb Chromium contra el build de producció,
   com a `demo`: importar Mallorca 325 (17 deficiències, 64 fotos, 29 s), canviar
   un camp i recarregar, exportar (= PROVA-3), crear un informe nou, Cadastre

@@ -379,36 +379,116 @@ export function iteResum(doc: IteObj, cataleg?: Cataleg): IteResum {
 // Checks before exporting ----------------------------------------------------------
 
 export interface IteCheck {
-  errors: string[]; // the portal will refuse or lose data
-  warnings: string[]; // missing data the portal will ask for
+  errors: string[]; // the portal's «Validar informe» will not let the report be closed
+  warnings: string[]; // photos (uploaded at the portal from the photo package) and advice
 }
 
+const PLACE = new Map<string, { s: string; g: string; f: FieldDef }>();
+for (const s of SECTIONS) for (const g of s.groups) for (const f of g.fields) PLACE.set(f.path, { s: s.title, g: g.title, f });
+
+const foldText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// What the portal's «Validar informe» asks for (docs/ite-portal-formulari.txt):
+// with no errors here, once the report is typed into the portal only the
+// photos are left to upload there.
 export function validateIte(doc: IteObj, cataleg: Cataleg): IteCheck {
   const errors: string[] = [];
   const warnings: string[] = [];
-  for (const s of SECTIONS) for (const g of s.groups) for (const f of g.fields) {
-    if (f.required && !fieldValue(doc, f)) warnings.push(`${s.title} · ${g.title}: falta «${f.label}».`);
-  }
+  const on = (path: string) => str(getAt(doc, path)) === "true";
+  const has = (path: string) => {
+    const p = PLACE.get(path);
+    return p ? fieldValue(doc, p.f) !== "" : str(getAt(doc, path)) !== "";
+  };
+  const falta = (path: string) => {
+    const p = PLACE.get(path);
+    if (p && !has(path)) errors.push(`${p.s} · ${p.g}: falta «${p.f.label}».`);
+  };
+
+  for (const [path, p] of PLACE) if (p.f.required) falta(path);
   for (const [p, label] of [["edifici.cadasFinca", "Finca / Parcel·la"], ["edifici.cadasPlanol", "Full de plànol"]] as const) {
     const v = str(getAt(doc, p));
     if (v && !/^[0-9A-Z]{7}$/.test(v)) errors.push(`Referència cadastral: «${label}» ha de tenir 7 caràcters (lletres majúscules i xifres).`);
   }
+
+  // Owner: a company name with a CIF; name and both surnames otherwise.
+  const ti = getAt(doc, "propietat.tipusIdentificacioPropietat");
+  const tiCodi = isObj(ti) ? str(ti.codi) : "";
+  if (tiCodi === "CIF") falta("propietat.raoSocialPropietat");
+  else if (tiCodi) for (const k of ["nomPropietat", "cognom1Propietat", "cognom2Propietat"]) falta(`propietat.${k}`);
+  if (on("mostraRepresentant")) {
+    for (const k of ["tipusIdentificacio", "identificacio", "nom", "cognom1", "cognom2", "tipusVia", "nomVia", "codiPostal", "municipi", "telefon1"]) falta(`propietat.${k}Representant`);
+  }
+  const RC = "edifici.referenciaCadastral";
+  if (!on(`${RC}.adrecaCorrecta`) && !on(`${RC}.adrecaIncorrecta`)) {
+    warnings.push("Dades Generals · 2. Identificació de l'edifici: al portal cal confirmar l'adreça que dona el cadastre, o marcar que no coincideix.");
+  }
+
+  // Vertical circulation: the portal asks for more depending on the choice.
+  const TIP = "edifici.edificiTipologia";
+  const nuclis = getAt(doc, `${TIP}.nuclisComunicacioVertical`);
+  const nf = isObj(nuclis) ? foldText(catLabel(nuclis)) : "";
+  if (nf.startsWith("un sol nucli")) falta(`${TIP}.ascensorsUnNucli`);
+  if (nf.startsWith("dos o mes")) for (const k of ["numTotalEscales", "numTotalAscensors", "numHabitatgesAccesMesUnNucli", "numHabitatgesSenseAscensor"]) falta(`${TIP}.${k}`);
+
+  // «Relació de nombre d'entitats».
+  const plantes = listOf(doc, LIST_PATHS.plantes);
+  if (!plantes.length) errors.push("Desc. Bàsica Edifici · Relació de nombre d'entitats: n'hi ha d'haver almenys una fila.");
+  else if (!plantes.some((p) => Number(str(p.numHabitatges)) > 0)) errors.push("Desc. Bàsica Edifici · Relació de nombre d'entitats: l'edifici ha de tenir 1 habitatge com a mínim.");
+  plantes.forEach((p, i) => {
+    if (!str(p.plantaDescripcio).trim()) errors.push(`Planta ${i + 1}: falta la descripció.`);
+  });
+  if (!isObj(getAt(doc, "edifici.edificiDescripcio.croquis"))) warnings.push("Desc. Bàsica Edifici: falta el croquis (el portal n'exigeix almenys un).");
+
+  const envs = listOf(doc, LIST_PATHS.envolupants);
+  if (!envs.length) errors.push("Envolupant de l'edifici: cal almenys un element (tipus, descripció i foto).");
+  envs.forEach((e, i) => {
+    if (!isObj(e.envolupantTipus)) errors.push(`Envolupant ${i + 1}: falta el tipus (façana, coberta, pati…).`);
+    if (!str(e.envolupantDescripcio).trim()) errors.push(`Envolupant ${i + 1}: falta la descripció.`);
+    if (!listOf(e, "fotos").length) warnings.push(`Envolupant ${i + 1}: sense cap foto (el portal n'exigeix una com a mínim).`);
+  });
+
+  const EST = "edifici.edificiEstructura";
+  const INS = "edifici.edificiInstalacions";
+  const any = (base: string, keys: string[]) => keys.some((k) => on(`${base}.${k}`));
+  if (!any(EST, ["escalaEstructuraFusta", "escalaEstructuraMetal", "escalaEstructuraVoltaCeramica", "escalaEstructuraLlosaArmada", "escalaEstructuraSense", "escalaAltres"])) {
+    errors.push("Sist. Constructius · Estructura d'escala: marca'n una opció (o «Sense estructura d'escala»).");
+  }
+  if (!any(INS, ["seaNoDisposa", "seaDisposaPublic", "seaDisposaPropi"])) {
+    errors.push("Sist. Constructius · Sanejament: marca si evacua a la xarxa pública, amb un sistema propi o si no en té.");
+  }
+  if (!any(INS, ["aaNoDisposa", "aaDisposaPublic", "aaDisposaPropi"])) {
+    errors.push("Sist. Constructius · Subministrament d'aigua: marca si té connexió a la xarxa pública, captació pròpia o si no en té.");
+  }
+  // Individual heating and hot water: the portal wants every percentage (0 when none).
+  if (on(`${INS}.caDisposa`) && !on(`${INS}.caDisposaSistCentral`)) {
+    for (const k of ["caIndividualsPercent", "caCalderaCanalitzatPercent", "caCalderaGasoilPercent", "caCalefaccioElectricaPercent", "caAltresPercent"]) falta(`${INS}.${k}`);
+  }
+  if (on(`${INS}.acsDisposa`) && !on(`${INS}.acsDisposaSistCentral`)) {
+    for (const k of ["acsIndividualsPercent", "acsCanalitzatPercent", "acsEmbassatPercent", "acsEscalfadorElectricPercent", "acsAltresPercent"]) falta(`${INS}.${k}`);
+  }
+  if (on(`${INS}.iaDisposa`)) for (const k of ["iaProfunditat", "iaAmplada"]) falta(`${INS}.${k}`);
+  if (on(`${INS}.ieQcp`) && !isObj(getAt(doc, `${INS}.ieQcpFoto`))) warnings.push("Sist. Constructius · Instal·lació elèctrica: falta la foto del quadre de comandament i protecció (el portal l'exigeix).");
+  if (!isObj(getAt(doc, `${INS}.aaFotoComptadors`))) warnings.push("Sist. Constructius · Subministrament d'aigua: falta la foto dels comptadors (el portal l'exigeix).");
+
   listOf(doc, LIST_PATHS.deficiencies).forEach((d, i) => {
     const n = i + 1;
     if (!isObj(d.tipusDeficiencia)) errors.push(`Deficiència ${n}: falta el tipus.`);
     else if (!categoriaDeTipus(cataleg, d.tipusDeficiencia)) warnings.push(`Deficiència ${n}: el tipus no és de cap categoria coneguda.`);
     if (!isObj(d.gravetat)) errors.push(`Deficiència ${n}: falta la gravetat.`);
-    if (!str(d.deficienciaDescripcio).trim()) warnings.push(`Deficiència ${n}: falta la descripció i localització.`);
+    const desc = str(d.deficienciaDescripcio).trim();
+    if (!desc) errors.push(`Deficiència ${n}: falta la descripció i localització.`);
+    else if (desc.length > 3000) errors.push(`Deficiència ${n}: la descripció passa de 3.000 caràcters, el màxim del portal.`);
+    // Art. 9.2: serious ones carry an indicative deadline in the observations.
+    if (["MG", "G"].includes(gravetatValor(d)) && !str(d.deficienciaObservacions).trim()) {
+      warnings.push(`Deficiència ${n}: és greu o molt greu; a les observacions cal el termini orientatiu per esmenar-la (art. 9.2).`);
+    }
     // The portal refuses to close a report with a deficiency without a photo.
     if (!listOf(d, "fotos").length) warnings.push(`Deficiència ${n}: sense cap foto (el portal n'exigeix una com a mínim per tancar l'informe).`);
   });
-  listOf(doc, LIST_PATHS.envolupants).forEach((e, i) => {
-    if (!isObj(e.envolupantTipus)) errors.push(`Envolupant ${i + 1}: falta el tipus (façana, coberta, pati…).`);
-    if (!str(e.envolupantDescripcio).trim()) warnings.push(`Envolupant ${i + 1}: falta la descripció.`);
-  });
-  listOf(doc, LIST_PATHS.plantes).forEach((p, i) => {
-    if (!str(p.plantaDescripcio).trim()) warnings.push(`Planta ${i + 1}: falta la descripció.`);
-  });
+
+  if (!listOf(doc, LIST_PATHS.mesures).length) errors.push("Sostenibilitat: cal almenys una mesura recomanada.");
+  if (on("edifici.edificiSostenibilitat.existenciaCertificat")) falta("edifici.edificiSostenibilitat.idCertificat");
+
   for (const s of mediaSlots(doc)) {
     const m = getAt(doc, s.path);
     if (isObj(m) && !str(m.path).startsWith("/fitxers/") && !str(m.path).startsWith("data:")) errors.push(`Falta el fitxer d'una foto o PDF (${s.folder || "recomanacions"}).`);

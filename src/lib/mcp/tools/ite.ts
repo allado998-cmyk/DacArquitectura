@@ -6,6 +6,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { consultaCadastreAction, createIteFromDocAction, removeIteFitxersAction, saveIteAction } from "@/app/ite/actions";
 import { applyCadastre } from "@/lib/ite/cadastre";
+import { visibles } from "@/lib/ite/cataleg";
 import { applyIteEdit, iteAsText, iteCamps, removedMedia, type IteEdit } from "@/lib/ite/edit";
 import { fotoPaquet } from "@/lib/ite/fotos";
 import { getAt, setAt, validateIte, valoracioFavorable } from "@/lib/ite/model";
@@ -125,16 +126,17 @@ registerAction({
   description: "Els camps d'un informe ITE que es poden omplir (ruta, etiqueta del portal, tipus i opcions), per seccions.",
   notes: [
     "La ruta (camp) és la clau a camps de create_ite/update_ite.",
-    "Les opcions de les llistes són les que el portal ha fet servir en informes importats; si en falta una, l'usuari ha d'importar un informe del portal que la tingui.",
+    "Les opcions de les llistes són les del formulari del portal; als valors de llista es pot donar el text (p. ex. el nom del municipi).",
+    "obligatori: el portal no deixa tancar l'informe sense aquest camp (get_ite → revisio diu què falta).",
   ],
   schema: z.object({ seccio: z.enum(SECCIONS).optional() }),
   async run(a) {
     const cataleg = await loadCataleg();
     const out: Record<string, unknown> = { seccions: iteCamps(cataleg, a.seccio) };
     if (!a.seccio || a.seccio === "deficiencies" || a.seccio === "envolupant") {
-      out.tipus_deficiencia = (cataleg.tipus_deficiencia ?? []).map((o) => ({ valor: o.codi, text: o.descMultidioma ?? o.descripcio }));
-      out.gravetat = (cataleg.gravetat ?? []).map((o) => ({ valor: o.valor, text: o.descMultidioma }));
-      out.tipus_envolupant = (cataleg.tipus_envolupant ?? []).map((o) => ({ valor: o.codi, text: o.descMultidioma ?? o.descripcio }));
+      out.tipus_deficiencia = visibles(cataleg.tipus_deficiencia).map((o) => ({ valor: o.codi, text: o.descMultidioma ?? o.descripcio }));
+      out.gravetat = visibles(cataleg.gravetat).map((o) => ({ valor: o.valor, text: o.descMultidioma }));
+      out.tipus_envolupant = visibles(cataleg.tipus_envolupant).map((o) => ({ valor: o.codi, text: o.descMultidioma ?? o.descripcio }));
     }
     return out;
   },

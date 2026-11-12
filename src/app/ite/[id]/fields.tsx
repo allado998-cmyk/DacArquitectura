@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { catId, catLabel, categoriaDeTipus, CATALEG_LABELS, type Cataleg } from "@/lib/ite/cataleg";
+import { catId, catLabel, categoriaDeTipus, CATALEG_LABELS, visibles, type Cataleg } from "@/lib/ite/cataleg";
 import { fieldValue, getAt, withField } from "@/lib/ite/model";
 import { TRI_OPTIONS, type FieldDef, type GroupDef } from "@/lib/ite/schema";
 import { isObj, type IteObj } from "@/lib/ite/xml";
@@ -10,16 +10,24 @@ import { useDraft, useIte } from "./ite-context";
 // Options of a code list; the current value is kept even if the list does not
 // have it (a report imported before the list learnt it).
 export function catOptions(cataleg: Cataleg, cat: string, current: IteObj | string | undefined): { value: string; label: string; group?: string }[] {
-  const list = cataleg[cat] ?? [];
-  const opts = list.map((o) => ({ value: catId(o), label: catLabel(o), group: cat === "tipus_deficiencia" ? groupOfTipus(cataleg, o) : undefined }));
+  const opts = visibles(cataleg[cat]).map((o) => ({ value: catId(o), label: catLabel(o), group: groupOf(cataleg, cat, o) }));
   const curId = isObj(current) ? catId(current) : typeof current === "string" ? current : "";
-  if (curId && !opts.some((o) => o.value === curId)) opts.push({ value: curId, label: isObj(current) ? catLabel(current) : `(id ${curId})`, group: undefined });
+  if (curId && !opts.some((o) => o.value === curId)) {
+    const known = (cataleg[cat] ?? []).find((o) => catId(o) === curId);
+    const label = isObj(current) ? catLabel(current) : known ? catLabel(known) : `(id ${curId})`;
+    opts.push({ value: curId, label, group: undefined });
+  }
   return opts;
 }
 
-function groupOfTipus(cataleg: Cataleg, tipus: IteObj): string {
-  const c = categoriaDeTipus(cataleg, tipus);
-  return c ? catLabel(c) : "Altres";
+// Deficiency types by their category, municipalities by province, like the portal.
+function groupOf(cataleg: Cataleg, cat: string, o: IteObj): string | undefined {
+  if (cat === "tipus_deficiencia") {
+    const c = categoriaDeTipus(cataleg, o);
+    return c ? catLabel(c) : "Altres";
+  }
+  if (cat === "municipi") return isObj(o.provincia) && typeof o.provincia.descripcio === "string" ? o.provincia.descripcio : "Altres";
+  return undefined;
 }
 
 export function CatSelect({ cat, value, onChange, className = "input", placeholder = "—" }: { cat: string; value: IteObj | string | undefined; onChange: (id: string) => void; className?: string; placeholder?: string }) {
@@ -151,9 +159,9 @@ export function Pendents({ items }: { items?: string[] }) {
   if (!items?.length) return null;
   return (
     <div className="rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3 text-xs text-[var(--color-muted)]">
-      <p className="font-medium">Encara no es pot omplir aquí (falta veure com ho desa el portal en un informe que ho tingui):</p>
+      <p className="font-medium">Encara no es pot omplir aquí:</p>
       <ul className="mt-1 list-disc pl-5">{items.map((t) => <li key={t}>{t}</li>)}</ul>
-      <p className="mt-1">Es pot completar al portal després d&apos;importar.</p>
+      <p className="mt-1">S&apos;omple directament al portal.</p>
     </div>
   );
 }

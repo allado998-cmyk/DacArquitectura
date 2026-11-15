@@ -11,7 +11,7 @@
     "test:ite": "node scripts/test-ite.mjs",
     "ite:inventari": "node scripts/ite-inventari.mjs",
     "ite:bookmarklet": "node scripts/ite-inventari-bookmarklet.mjs",
-    "test:calculs": "node scripts/test-calculs.mjs && node scripts/test-calculs-biguetes.mjs && node scripts/test-calculs-inercies.mjs",
+    "test:calculs": "node scripts/test-calculs.mjs && node scripts/test-calculs-biguetes.mjs && node scripts/test-calculs-trencallums.mjs && node scripts/test-calculs-reforc-biga.mjs && node scripts/test-calculs-baixada.mjs && node scripts/test-calculs-vidre.mjs && node scripts/test-calculs-vent.mjs && node scripts/test-calculs-inercies.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:migrate:demo": "node --env-file=.env.demo.local scripts/migrate.mjs",
     "db:seed:demo": "node --env-file=.env.demo.local scripts/seed-demo.mjs"

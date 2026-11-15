@@ -37,6 +37,7 @@ export interface Sostre {
   pp: number; // kN/m², pes propi estructural
   cp: number; // paviments i morter
   envans: number;
+  fv?: number; // kN/m², plaques fotovoltaiques (only baixada-carregues.ts reads it)
   gG: number; // γ permanents
   us: number; // sobrecàrrega d'ús
   neu: number;

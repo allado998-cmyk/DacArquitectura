@@ -304,11 +304,13 @@ function reportTexts(t) {
         add(b.title);
         for (const row of b.rows) {
           add(row.label); add(row.formula); add(row.unit); add(row.check?.unit); add(row.alt?.unit);
-          if (typeof row.value === "string" && row.input?.type !== "profile") add(row.value);
+          if (typeof row.value === "string" && row.input?.type !== "profile" && row.input?.type !== "text") add(row.value);
           if (row.input?.type === "select") for (const o of row.input.options) add(o.label);
         }
       }
       for (const w of s.welds ?? []) { add(w.label); add(w.note); }
+      for (const n of s.notes ?? []) add(n);
+      add(s.loads?.totalLabel);
       for (const g of s.loads?.groups ?? []) {
         add(g.title); add(g.total?.label);
         for (const l of g.lines) { add(l.heading); add(l.line?.label); add(l.line?.qUnit); add(l.line?.widthUnit); add(l.param?.label); add(l.param?.unit); }

@@ -7,12 +7,16 @@ import { computePilar, pilarDefaults } from "./pilar";
 import { computeSoldadura, soldaduraDefaults } from "./soldadura";
 import { BIGUETES } from "./biguetes";
 import { INERCIES } from "./inercies";
+import { REFORCOS } from "./reforcos";
+import { ESTRUCTURA_VERTICAL } from "./estructura-vertical";
+import { PAVIMENTS } from "./paviments";
+import { VENT } from "./vent";
 
 export type { CalcTipus } from "./common";
 
-// How the «Càlculs» menu groups the types.
-export type CalcGroup = "Estintolaments" | "Biguetes" | "Inèrcies" | "Soldadures";
-export const CALC_GROUPS: CalcGroup[] = ["Estintolaments", "Biguetes", "Inèrcies", "Soldadures"];
+// How the «Càlculs» menu groups the types, in menu order.
+export type CalcGroup = "Estintolaments" | "Biguetes" | "Reforços" | "Estructura vertical" | "Paviments" | "Vent" | "Inèrcies" | "Soldadures";
+export const CALC_GROUPS: CalcGroup[] = ["Estintolaments", "Biguetes", "Reforços", "Estructura vertical", "Paviments", "Vent", "Inèrcies", "Soldadures"];
 
 export interface CalcType {
   tipus: CalcTipus;
@@ -77,7 +81,7 @@ const BASE_TYPES: CalcType[] = [
 ];
 
 // Every type, in menu order (the first one is the fallback for unknown types).
-export const CALC_TYPES: CalcType[] = [...BASE_TYPES, ...BIGUETES, ...INERCIES].sort(
+export const CALC_TYPES: CalcType[] = [...BASE_TYPES, ...BIGUETES, ...REFORCOS, ...ESTRUCTURA_VERTICAL, ...PAVIMENTS, ...VENT, ...INERCIES].sort(
   (a, b) => CALC_GROUPS.indexOf(a.group) - CALC_GROUPS.indexOf(b.group),
 );
 

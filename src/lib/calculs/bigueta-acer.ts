@@ -35,7 +35,7 @@ import { perfilOptions, perfilProps } from "./perfils";
 import { type CarreguesDades, AJUDA_BIGUETES, carreguesDefaults, estatCarregues } from "./bigueta-carregues";
 import torras from "./biguetes/ala-estreta-torras.json";
 
-interface AcerComu extends CarreguesDades {
+export interface AcerComu extends CarreguesDades {
   ppPerfil: number | null; // kN/ml; null → from the profile's weight
   gPerfil: number;
   L: number; // mm
@@ -94,11 +94,11 @@ export function biguetaAcerAlaDefaults(): BiguetaAcerAlaDades {
 
 // ---- shared rows ----
 
-function perfilLine(pp: number, ppAuto: number | null | undefined, gPerfil: number): LoadLine {
+export function perfilLine(pp: number, ppAuto: number | null | undefined, gPerfil: number): LoadLine {
   return { label: "Pes propi del perfil a calcular", q: pp, qUnit: "kN/ml", qAuto: ppAuto, width: null, unf: pp, gamma: gPerfil, fac: pp * gPerfil, qKey: "ppPerfil", gammaKey: "gPerfil" };
 }
 
-function geometriaRows(L: number, x: number, fAdm: number | null): Row[] {
+export function geometriaRows(L: number, x: number, fAdm: number | null): Row[] {
   return [
     { label: "Llum, distància entre recolzaments", sym: "L", value: L, unit: "mm", decimals: 0, input: { type: "num", key: "L", decimals: 0 }, alt: { value: L / 1000, unit: "m" } },
     { label: "Limitació de deformació (fletxa màxima admissible)", sym: "L /", value: x, decimals: 0, input: { type: "num", key: "limitL", decimals: 0 } },
@@ -106,7 +106,7 @@ function geometriaRows(L: number, x: number, fAdm: number | null): Row[] {
   ];
 }
 
-function acerRows(d: AcerComu, sd: number | null, td: number | null): Row[] {
+export function acerRows(d: Pick<AcerComu, "E" | "sk" | "gk">, sd: number | null, td: number | null): Row[] {
   const E = num(d.E);
   const sk = num(d.sk);
   return [
@@ -122,8 +122,9 @@ function acerRows(d: AcerComu, sd: number | null, td: number | null): Row[] {
 const pct = (a: number | null, b: number) => (a == null || b === 0 ? null : (a / b) * 100);
 
 // «Comprovació perfil existent»: E.L.S., E.L.U. and the safety factors.
-// Ix in mm⁴, Wx in mm³, Aa in mm²; loads in N/mm.
-function comprovacioSection(title: string, p: { L: number; x: number; fAdm: number | null; E: number; sd: number | null; td: number | null; Ix: number | null; Wx: number | null; Aa: number | null; qEls: number; qElu: number }): Section {
+// Ix in mm⁴, Wx in mm³, Aa in mm²; loads in N/mm. Also used by the
+// reinforcement calculations (reforc-*.ts), with their own section key.
+export function comprovacioSection(title: string, p: { L: number; x: number; fAdm: number | null; E: number; sd: number | null; td: number | null; Ix: number | null; Wx: number | null; Aa: number | null; qEls: number; qElu: number }, key = "comprovacio"): Section {
   const { L, x, fAdm, E, sd, td, Ix, Wx, Aa, qEls, qElu } = p;
   const qMaxEls = fAdm != null && Ix != null && L > 0 ? (fAdm * 384 * E * Ix) / (5 * Math.pow(L, 4)) : null;
   const fD = Ix != null && E > 0 && Ix > 0 ? (5 * qEls * Math.pow(L, 4)) / (384 * E * Ix) : null;
@@ -138,7 +139,7 @@ function comprovacioSection(title: string, p: { L: number; x: number; fAdm: numb
   const gMf = div(qMaxMf, qElu);
   const gV = div(qMaxV, qElu);
   return {
-    key: "comprovacio",
+    key,
     title,
     enabled: true,
     blocks: [
@@ -245,25 +246,29 @@ export function biguetaAcerPerfilsValids(raw: Partial<BiguetaAcerDades>): Set<st
 
 export const MANUAL = "manual";
 
-interface AlaPerfil {
+export interface AlaPerfil {
   name: string;
   Ix: number | null; // cm⁴
   Wx: number | null; // cm³
   h1: number | null; // mm
   e: number | null; // mm
   p: number | null; // kg/m
+  // Overall size, for the composite section of the reinforcement (reforc-biga.ts).
+  h: number | null; // mm, height
+  b: number | null; // mm, flange width
+  A: number | null; // cm², section area
 }
 
 // Torras first (the catalogue David pastes in the sheet), then the IPN.
-const ALA_PERFILS: AlaPerfil[] = [
-  ...torras.rows.map((r) => ({ name: r.name, Ix: r.Ix, Wx: r.Wx, h1: r.h1, e: r.d, p: r.p })),
+export const ALA_PERFILS: AlaPerfil[] = [
+  ...torras.rows.map((r) => ({ name: r.name, Ix: r.Ix, Wx: r.Wx, h1: r.h1, e: r.d, p: r.p, h: r.h, b: r.b, A: r.A })),
   ...(perfilOptions(["ipn"])[0]?.names ?? []).map((name) => {
     const p = perfilProps(name);
-    return { name, Ix: p?.Ix ?? null, Wx: p?.Wx ?? null, h1: p?.h1 ?? null, e: p?.tw ?? null, p: p?.p ?? null };
+    return { name, Ix: p?.Ix ?? null, Wx: p?.Wx ?? null, h1: p?.h1 ?? null, e: p?.tw ?? null, p: p?.p ?? null, h: p?.h ?? null, b: p?.b ?? null, A: p?.A ?? null };
   }),
 ];
 
-function alaPerfil(name: string): AlaPerfil | null {
+export function alaPerfil(name: string): AlaPerfil | null {
   return ALA_PERFILS.find((p) => p.name === name) ?? null;
 }
 

@@ -8,6 +8,12 @@
 // checks that every text a calculation can print has a translation.
 
 import type { CalcResult, Row, Section, WeldCombo, WeldPart } from "./common";
+// The texts of the newer calculations, one file each (merged below).
+import { ES_REFORC_TRENCALLUMS, PATTERNS_REFORC_TRENCALLUMS } from "./es-reforc-trencallums";
+import { ES_REFORC_BIGA, PATTERNS_REFORC_BIGA } from "./es-reforc-biga";
+import { ES_BAIXADA_CARREGUES, PATTERNS_BAIXADA_CARREGUES } from "./es-baixada-carregues";
+import { ES_PAVIMENT_VIDRE, PATTERNS_PAVIMENT_VIDRE } from "./es-paviment-vidre";
+import { ES_CARREGA_VENT, PATTERNS_CARREGA_VENT } from "./es-carrega-vent";
 
 export type CalcLang = "ca" | "es";
 
@@ -436,7 +442,14 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^(.+) \+ pletina ([\d,.]+ × [\d,.]+ mm)$/, (m) => `${m[1]} + pletina ${m[2]}`],
   // Biguetes
   [/^([CD]\d+) · (Conífera|Frondosa)$/, (m) => `${m[1]} · ${m[2]}`],
+  // Reforços, Estructura vertical, Paviments, Vent (es-*.ts)
+  ...PATTERNS_REFORC_TRENCALLUMS,
+  ...PATTERNS_REFORC_BIGA,
+  ...PATTERNS_BAIXADA_CARREGUES,
+  ...PATTERNS_PAVIMENT_VIDRE,
+  ...PATTERNS_CARREGA_VENT,
 ];
+Object.assign(ES, ES_REFORC_TRENCALLUMS, ES_REFORC_BIGA, ES_BAIXADA_CARREGUES, ES_PAVIMENT_VIDRE, ES_CARREGA_VENT);
 
 // Made only of symbols, numbers, units and short abbreviations (formulas like
 // «σ = M / Wx» or «Q max ELS = f adm · 384 · E · Ix / (5 · L⁴)»): the same in
@@ -482,7 +495,8 @@ function trRow(r: Row, lang: CalcLang): Row {
     label: tr(r.label, lang),
     formula: tr(r.formula, lang) ?? undefined,
     unit: tr(r.unit, lang) ?? undefined,
-    value: typeof r.value === "string" && r.input?.type !== "profile" ? tr(r.value, lang) : r.value,
+    // Profile names and free text typed by the user stay as they are.
+    value: typeof r.value === "string" && r.input?.type !== "profile" && r.input?.type !== "text" ? tr(r.value, lang) : r.value,
     check: r.check ? { ...r.check, unit: tr(r.check.unit, lang) ?? undefined } : undefined,
     alt: r.alt ? { ...r.alt, unit: tr(r.alt.unit, lang) } : undefined,
   };
@@ -502,8 +516,10 @@ function trSection(s: Section, lang: CalcLang): Section {
     title: tr(s.title, lang),
     blocks: s.blocks.map((b) => ({ ...b, title: tr(b.title, lang) ?? undefined, rows: b.rows.map((r) => trRow(r, lang)) })),
     welds: s.welds?.map((w) => trWeld(w, lang)),
+    notes: s.notes?.map((n) => tr(n, lang)),
     loads: s.loads && {
       ...s.loads,
+      totalLabel: tr(s.loads.totalLabel, lang) ?? undefined,
       groups: s.loads.groups.map((g) => ({
         ...g,
         title: tr(g.title, lang),

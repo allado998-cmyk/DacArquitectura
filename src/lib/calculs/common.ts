@@ -10,6 +10,10 @@ import { AJUDA } from "./ajuda";
 export type CalcTipus =
   | "paret" | "biga" | "pilar" | "soldadura"
   | "bigueta-acer" | "bigueta-acer-ala" | "bigueta-fusta"
+  | "reforc-trencallums" | "reforc-biga-acer" | "reforc-biga-acer-ala"
+  | "baixada-carregues"
+  | "paviment-vidre"
+  | "carrega-vent"
   | "inercies-perfils" | "inercies-pletines" | "inercies-perfil-pletina";
 
 // The spreadsheets convert kg ↔ N with 9,81 (and kg/cm² ↔ N/mm² with 100/9,81).
@@ -18,7 +22,7 @@ export const NMM2_TO_KGCM2 = 100 / G;
 
 export interface Check {
   ok: boolean;
-  op: "<" | ">" | "≤";
+  op: "<" | ">" | "≤" | "≥";
   limit: number | null;
   unit?: string;
   decimals?: number;
@@ -29,7 +33,10 @@ export type InputSpec =
   // allowPlate: also offer "Xapa" (thickness typed in). byType: pick the type
   // (IPE, UPN…) first, then the profile, with the ones that pass marked.
   | { type: "profile"; key: string; allowPlate?: boolean; byType?: boolean }
-  | { type: "select"; key: string; options: { value: string; label: string }[] };
+  | { type: "select"; key: string; options: { value: string; label: string }[] }
+  // Free text typed by the user (e.g. the reinforcement of a slab): printed
+  // as typed, never translated.
+  | { type: "text"; key: string; placeholder?: string };
 
 export interface Row {
   label: string;
@@ -59,6 +66,11 @@ export interface Section {
   loads?: LoadsTable; // paret: "Estat de càrregues ponderat"
   welds?: WeldCombo[]; // soldadura: one entry per pair of welded parts
   figure?: Figure; // a drawing under the section (editor and report)
+  notes?: string[]; // paragraphs under the section (hypotheses, limitations…), editor and report
+  // Its checks are shown (OK! / NO!) but left out of the verdict and the
+  // summary: e.g. the existing profile before a reinforcement, which is
+  // expected to fail.
+  informative?: boolean;
 }
 
 // Soldadura: a part of a piece (ala / ànima of a profile, or a plate) with
@@ -101,8 +113,13 @@ export interface LoadLine {
   q: number | null; // kN/m², kN/ml or kN/m³ (see qUnit)
   qUnit: string;
   qAuto?: number | null; // value used while the input is left empty (null)
+  // Editor only: the note under the label while qAuto is in use, and the link
+  // that clears a typed value. Default: the profile's catalogue weight.
+  qAutoNote?: string;
+  qAutoReset?: string;
   width: number | null; // m or m² (see widthUnit)
   widthUnit?: string;
+  widthAuto?: number | null; // width used while the width input is left empty (null)
   unf: number | null; // kN/ml
   gamma: number | null;
   fac: number | null; // kN/ml
@@ -117,11 +134,13 @@ export interface LoadGroup {
   lines: { heading?: string; line?: LoadLine; param?: { label: string; value: number; unit: string; key: string } }[];
   total?: { label: string; q: number; unf: number; fac: number };
   sostreIndex?: number; // index into dades.sostres
+  aux?: AuxImage[]; // help images beside the group title (editor only)
 }
 export interface LoadsTable {
   groups: LoadGroup[];
   totalUnf: number;
   totalFac: number;
+  totalLabel?: string; // the last row; default «Total estat de càrregues sobre el perfil»
 }
 
 export interface CalcResult {
@@ -131,7 +150,7 @@ export interface CalcResult {
 export function allChecks(r: CalcResult): { section: string; label: string; ok: boolean }[] {
   const out: { section: string; label: string; ok: boolean }[] = [];
   for (const s of r.sections) {
-    if (!s.enabled) continue;
+    if (!s.enabled || s.informative) continue;
     for (const b of s.blocks) for (const row of b.rows) if (row.check) out.push({ section: s.title, label: row.label, ok: row.check.ok });
     for (const w of s.welds ?? []) if (w.included !== false) out.push({ section: s.title, label: w.label, ok: w.ok });
   }
@@ -178,10 +197,10 @@ export function div(a: number | null, b: number | null): number | null {
   return a / b;
 }
 
-export function check(value: number | null, op: "<" | ">" | "≤", limit: number | null, unit?: string, decimals?: number): Check {
+export function check(value: number | null, op: Check["op"], limit: number | null, unit?: string, decimals?: number): Check {
   const ok =
     value != null && limit != null && Number.isFinite(value) && Number.isFinite(limit) &&
-    (op === "<" ? value < limit : op === "≤" ? value <= limit + 1e-9 : value > limit);
+    (op === "<" ? value < limit : op === "≤" ? value <= limit + 1e-9 : op === "≥" ? value >= limit - 1e-9 : value > limit);
   return { ok, op, limit, unit, decimals };
 }
 

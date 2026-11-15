@@ -168,11 +168,15 @@ peces; un test falla si algun text que pot sortir a l'informe no té versió en
 castellà).
 
 El menú agrupa els tipus a l'esquerra (desplegable al mòbil): **Estintolaments**
-(paret, biga, base pilar), **Biguetes**, **Inèrcies**, **Soldadures** i
-**Referència** (Perfils i soldadures), amb el nombre de càlculs de cada tipus.
+(paret, biga, base pilar), **Biguetes**, **Reforços**, **Estructura vertical**,
+**Paviments**, **Vent**, **Inèrcies**, **Soldadures** i **Referència** (Perfils i
+soldadures), amb el nombre de càlculs de cada tipus.
 **Tots els càlculs** els llista tots amb el tipus, per cercar sense saber-lo.
-Cada tipus és un `CalcType` amb el seu grup (`src/lib/calculs/index.ts`); les
-famílies noves es registren a `biguetes.ts` i `inercies.ts`.
+Cada tipus és un `CalcType` amb el seu grup (`src/lib/calculs/index.ts`, ordre
+del menú a `CALC_GROUPS`); les famílies es registren a `biguetes.ts`,
+`reforcos.ts`, `estructura-vertical.ts`, `paviments.ts`, `vent.ts` i
+`inercies.ts`. Els textos en castellà dels càlculs nous van en un fitxer per
+càlcul (`es-*.ts`), que `i18n.ts` incorpora.
 
 - **Estintolament paret de càrrega**: estat de càrregues ponderat, comprovació
   del perfil (E.L.S. i E.L.U.), recolzament als extrems (A connectors, B daus,
@@ -202,6 +206,35 @@ famílies noves es registren a `biguetes.ts` i `inercies.ts`.
   `biguetes/fusta-classes.json`, fletxes per integritat, confort i aparença, i
   foc pel mètode de la secció reduïda). Els errors dels fulls originals estan
   explicats a la capçalera de cada fitxer.
+- **Reforços**:
+  - **Reforç de trencallums** (`reforc-trencallums.ts`): obertura en un sostre
+    de biguetes. Estat de càrregues, trencallums principal perpendicular a les
+    biguetes (càrrega uniforme, comprovat com una bigueta), biga de suport
+    paral·lela a les biguetes (la reacció del trencallums com a càrrega puntual
+    al centre; llum per defecte 2 × amplària de càrrega) i passadors a la paret
+    de càrrega. Cada perfil es tria per tipus amb els que compleixen marcats.
+  - **Reforç biga d'acer estàndard / d'ala estreta amb xapa de compressió**
+    (`reforc-biga.ts`): bigueta existent reforçada amb una capa de formigó
+    armat connectada. Perfil existent (secció *informativa*: es mostra amb
+    OK!/NO! però no compta al resultat, perquè s'espera que falli), secció
+    mixta acer + formigó (formigó passat a acer amb Et = E2 / E1, Steiner),
+    estat de càrregues final (cada línia, per defecte, la inicial; més el pes
+    de la capa), comprovació de la secció mixta, connectors («caliquenyos») per
+    trams i resum. L'amplària de capa que treballa és mín(intereix, L / 4).
+- **Estructura vertical** · **Baixada de càrregues i tensió a la paret**
+  (`baixada-carregues.ts`): els sostres són una llista com a la paret
+  d'estintolament (nom, nombre de plantes, afegir i treure), amb la línia de
+  plaques fotovoltaiques (`fv`); més el pes propi de la paret. Tensió a la base
+  contra fd de la fàbrica (CTE DB SE-F) i percentatge que aporten les plaques.
+- **Paviments** · **Paviment de vidre trepitjable** (`paviment-vidre.ts`):
+  vidre laminat recolzat als 4 costats, coeficients de Roark interpolats com
+  al full, tensions (càrrega uniforme i puntual), fletxes i post-trencament
+  amb la làmina superior trencada (criteris DIN 18008-5). El tipus de vidre
+  omple fk i γM, i el gruix nominal el gruix de càlcul (EN 572-2).
+- **Vent** · **Càrrega de vent** (`carrega-vent.ts`): qe = qb · ce · cp (CTE
+  DB SE-AE 3.3 i annex D). La zona eòlica dona vb, el grau d'aspror k, L i Z, i
+  el cp surt de la taula 3.5 (façanes), de l'EN 1991-1-4 taula 7.9 (murs
+  aïllats) o s'escriu a mà. Sense comprovacions: el resultat és la càrrega.
 - **Inèrcies** (`inercies.ts`, dibuix a `inercies-figura.ts`): suma d'inèrcies
   (Steiner) **entre perfils**, **entre pletines** i **entre perfils i pletina**,
   comparada amb el perfil necessari.
@@ -217,7 +250,10 @@ l'informe. A «Paret de càrrega de suport» (els tres càlculs de paret): annex
 de l'SE-F per a K, taula 4.4 per a fb i fm, taula 4.8 per a γM. A la base del
 pilar, la figura 5.7. A cada sostre de l'estat de càrregues, la taula 3.1 de
 l'SE-AE (sobrecàrregues d'ús) i les seves notes. A l'estat de càrregues, les
-columnes Càrrega i Coef. mostren els valors amb dos decimals.
+columnes Càrrega i Coef. mostren els valors amb dos decimals. Dels fulls de
+novembre de 2026: el pes específic de les fàbriques (SE-AE taula C.1) a la
+baixada de càrregues, l'annex D de l'SE-AE (mapa del vent) a la càrrega de
+vent, i els esquemes de biga amb càrrega uniforme i puntual al trencallums.
 
 La pestanya **Perfils i soldadures** (i el botó «Taules de perfils» de cada
 càlcul) mostra les taules del catàleg: IPE, IPN, HEB, HEA, HEM, UPN, T, L, LD,
@@ -233,7 +269,9 @@ miraven una altra cel·la), la reacció als extrems és Q·L/2 (l'Excel la rebai
 un ~2 %) i el pes propi del perfil surt del catàleg si no s'escriu.
 
 Tests sense base de dades (comparen amb els valors dels fulls de càlcul):
-`npm run test:calculs` (els tres fitxers: `test-calculs`, `-biguetes` i `-inercies`).
+`npm run test:calculs` (`test-calculs`, `-biguetes`, `-trencallums`,
+`-reforc-biga`, `-baixada`, `-vidre`, `-vent` i `-inercies`). Les diferències
+a propòsit amb cada full nou estan a la capçalera del seu fitxer.
 
 ## ITE (informes per al portal de l'Agència de l'Habitatge)
 

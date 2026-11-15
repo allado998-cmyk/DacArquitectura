@@ -127,7 +127,7 @@ function loadsTable(t: LoadsTable, lang: CalcLang): string {
     }
   }
   rows += `<tr>
-    <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;background:#d9d9d9;">${L("TOTAL ESTAT DE CÀRREGUES SOBRE EL PERFIL")}</td>
+    <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;text-transform:uppercase;background:#d9d9d9;">${esc(t.totalLabel ?? L("TOTAL ESTAT DE CÀRREGUES SOBRE EL PERFIL"))}</td>
     <td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td><td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td>
     <td bgcolor="#d9d9d9" style="border:${BD};padding:4px 6px;font-size:9.5px;font-weight:bold;text-align:right;white-space:nowrap;background:#d9d9d9;">${fmt(t.totalUnf)} kN/ml</td>
     <td bgcolor="#d9d9d9" style="border:${BD};background:#d9d9d9;"></td>
@@ -167,6 +167,12 @@ function weldsTable(all: WeldCombo[], lang: CalcLang): string {
   }
   return `<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><colgroup><col style="width:46%"><col style="width:18%"><col style="width:18%"><col style="width:18%"></colgroup>${rows}</table>
     <p style="font-size:8.5px;color:#555;margin:3px 0 0;">${esc(L("La gola màxima de la peça més prima ha d'estar dins del marge de la més gruixuda, i la gola mínima de la més gruixuda dins del marge de la més prima."))}</p>`;
+}
+
+// Paragraphs under a section (hypotheses, limitations…), already translated.
+function notesHtml(s: Section): string {
+  if (!s.notes?.length) return "";
+  return `<div style="margin:4px 0 0;">${s.notes.map((n) => `<p style="font-size:8.5px;color:#444;margin:2px 0;">${esc(n)}</p>`).join("")}</div>`;
 }
 
 function summary(r: CalcResult, lang: CalcLang): string {
@@ -221,7 +227,7 @@ export function buildCalculHtml(c: CalculEstructural, raw: CalcResult, assets: R
 
   const sections = result.sections
     .filter((s) => s.enabled)
-    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads, lang) : "") + (s.welds ? weldsTable(s.welds, lang) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + figureHtml(s, assets))
+    .map((s) => bar(s.title) + (s.loads ? loadsTable(s.loads, lang) : "") + (s.welds ? weldsTable(s.welds, lang) : "") + (s.blocks.length ? rowsTable(s.blocks) : "") + figureHtml(s, assets) + notesHtml(s))
     .join("");
 
   return `

@@ -34,7 +34,8 @@ function fmtData(iso: string | null): string {
 
 const isTab = (t: string | undefined): t is Tab => t === "tots" || t === "perfils" || CALC_TYPES.some((x) => x.tipus === t);
 
-// The menu: every type in its group (Estintolaments, Biguetes, Inèrcies,
+// The menu: every type in its group (CALC_GROUPS order: Estintolaments,
+// Biguetes, Reforços, Estructura vertical, Paviments, Vent, Inèrcies,
 // Soldadures), then the reference tables. A sidebar from laptop width up, a
 // grouped dropdown on a phone.
 const MENU = [

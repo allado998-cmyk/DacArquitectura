@@ -1,6 +1,7 @@
 // Everything the Descàrregues documents list, read in one go (parallel
-// queries, one wake-up of the database per run). The columns and orders are
-// the pages' own, so each PDF matches what the page would print.
+// queries, one wake-up of the database per run). The columns are the pages'
+// own, so each PDF has what the page would print; the order of the rows is
+// set by generar.ts (each list from its lowest number up, as the studio asked).
 import { sql } from "@/lib/db";
 import { loadHonorarisLlista, type HonorariRow } from "@/lib/honoraris-llista";
 import { listOf, LIST_PATHS, valoracioFavorable } from "@/lib/ite/model";

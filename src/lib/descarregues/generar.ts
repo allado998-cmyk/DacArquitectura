@@ -10,7 +10,7 @@ import { fitxersArea } from "@/lib/fitxers";
 import type { PdfDoc } from "@/lib/llistats/doc";
 import { dedicacioStats, dedicacioStatsDoc } from "@/lib/llistats/dedicacio";
 import { anyExpedient, expedientsListDoc, expedientsStats, expedientsStatsDoc } from "@/lib/llistats/expedients";
-import { byNumDesc, facturaYear, facturesListDoc } from "@/lib/llistats/facturacio";
+import { facturaYear, facturesListDoc } from "@/lib/llistats/facturacio";
 import { actesListDoc, byNom, clientsListDoc, contactesListDoc, honorarisListDoc, iteListDoc, propostesListDoc } from "@/lib/llistats/llistes";
 import { runAsActingUser } from "@/lib/acting-user";
 import type { AppUser } from "@/lib/auth";
@@ -28,6 +28,28 @@ export interface Document {
 }
 
 const plural = (n: number, u: string, p: string) => `${n} ${n === 1 ? u : p}`;
+
+// Every list from its lowest number to its highest, as the studio asked:
+// numbers compare as numbers («05-99» before «05-100»); each key breaks the
+// previous one's ties, and a row without the key goes after those with it.
+type Clau<T> = (r: T) => string | number | null | undefined;
+function perNumero<T>(rows: T[], ...claus: Clau<T>[]): T[] {
+  return [...rows].sort((a, b) => {
+    for (const clau of claus) {
+      const x = clau(a);
+      const y = clau(b);
+      const buitX = x == null || x === "";
+      const buitY = y == null || y === "";
+      if (buitX || buitY) {
+        if (buitX !== buitY) return buitX ? 1 : -1;
+        continue;
+      }
+      const c = String(x).localeCompare(String(y), "ca", { numeric: true });
+      if (c) return c;
+    }
+    return 0;
+  });
+}
 
 // The two files of a list kept by year: the current year's (even when empty)
 // and one with every earlier year from 2000, oldest first, each year from a
@@ -69,20 +91,28 @@ export function documents(d: Dades, anyActual: number): Document[] {
   const contactesPerClient = new Map<number, number>();
   for (const k of d.contactes) if (k.client_id != null) contactesPerClient.set(k.client_id, (contactesPerClient.get(k.client_id) ?? 0) + 1);
   const stats = new Map(d.clientStats.map((s) => [s.client_id, s]));
-  const expedientsAny = d.expedients.filter((r) => anyExpedient(r.num_expedient) === Y);
+  // The lists from the lowest number up (an ITE report has none of its own:
+  // its expedient's, then the inspection date).
+  const expedients = perNumero(d.expedients, (r) => r.num_expedient);
+  const actes = perNumero(d.actes, (a) => a.num, (a) => a.data);
+  const ites = perNumero(d.ites, (i) => i.expedient_num, (i) => i.data_inspeccio);
+  const honoraris = perNumero(d.honoraris, (r) => r.num_proposta, (r) => r.data);
+  const propostes = perNumero(d.propostes, (r) => r.num, (r) => r.data);
+  const factures = perNumero(d.factures, (f) => f.num, (f) => f.data);
+  const expedientsAny = expedients.filter((r) => anyExpedient(r.num_expedient) === Y);
 
   return [
-    ...perAnys(d.expedients, (r) => anyExpedient(r.num_expedient), anyActual, (rows, any) => ({ doc: expedientsListDoc(rows, `Any ${any}`, "Cap expedient aquest any."), files: rows.length }), "expedients"),
+    ...perAnys(expedients, (r) => anyExpedient(r.num_expedient), anyActual, (rows, any) => ({ doc: expedientsListDoc(rows, `Any ${any}`, "Cap expedient aquest any."), files: rows.length }), "expedients"),
     { llista: "expedients-estadistica", any: anyActual, doc: expedientsStatsDoc(expedientsStats(expedientsAny, dedicByExp), `Any ${Y}`), files: expedientsAny.length },
     (() => {
       const rows = d.dedicacions.filter((x) => x.data.slice(0, 4) === Y);
       return { llista: "dedicacio-estadistica" as const, any: anyActual, doc: dedicacioStatsDoc(dedicacioStats(rows), `Any ${Y}`), files: rows.length };
     })(),
-    ...perAnys(d.actes, (a) => (a.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: actesListDoc(rows, `Any ${any} · ${plural(rows.length, "acta", "actes")}`), files: rows.length }), "actes"),
-    ...perAnys(d.ites, (i) => i.any, anyActual, (rows, any) => ({ doc: iteListDoc(rows, `Any ${any} · ${plural(rows.length, "informe", "informes")}`, "Cap informe aquest any."), files: rows.length }), "ite"),
-    ...perAnys(d.honoraris, (r) => r.data.slice(0, 4), anyActual, (rows, any) => ({ doc: honorarisListDoc(rows, `Any ${any}`), files: rows.length }), "honoraris"),
-    ...perAnys(d.propostes, (r) => (r.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: propostesListDoc(rows, `Any ${any}`), files: rows.length }), "propostes"),
-    ...perAnys(d.factures, facturaYear, anyActual, (rows, any) => ({ doc: facturesListDoc([...rows].sort(byNumDesc), suplits, `Any ${any}`, "Cap factura aquest any."), files: rows.length }), "facturacio"),
+    ...perAnys(actes, (a) => (a.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: actesListDoc(rows, `Any ${any} · ${plural(rows.length, "acta", "actes")}`), files: rows.length }), "actes"),
+    ...perAnys(ites, (i) => i.any, anyActual, (rows, any) => ({ doc: iteListDoc(rows, `Any ${any} · ${plural(rows.length, "informe", "informes")}`, "Cap informe aquest any."), files: rows.length }), "ite"),
+    ...perAnys(honoraris, (r) => r.data.slice(0, 4), anyActual, (rows, any) => ({ doc: honorarisListDoc(rows, `Any ${any}`), files: rows.length }), "honoraris"),
+    ...perAnys(propostes, (r) => (r.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: propostesListDoc(rows, `Any ${any}`), files: rows.length }), "propostes"),
+    ...perAnys(factures, facturaYear, anyActual, (rows, any) => ({ doc: facturesListDoc(rows, suplits, `Any ${any}`, "Cap factura aquest any."), files: rows.length }), "facturacio"),
     {
       llista: "clients",
       any: null,

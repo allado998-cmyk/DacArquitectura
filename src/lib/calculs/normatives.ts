@@ -45,7 +45,7 @@ export const NORMATIVES: Normativa[] = [
   },
   {
     key: "norm-resum",
-    label: "Resum històric estructural",
+    label: "RESUM HISTÒRIC ESTRUCTURAL", // in capitals, as David asked
     fitxer: "Resum-historic.pdf",
     titol: "Resum històric de la normativa estructural",
     origen: "Escola Sert · Postgrau de Rehabilitació, mòdul 2 (actualitzat el novembre de 2026)",

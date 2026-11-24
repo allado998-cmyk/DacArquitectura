@@ -303,9 +303,9 @@ tubs, rodons, ZF, soldadures i acers. Estan transcrites a
 full). La cerca troba el perfil a qualsevol taula: si no és a l'oberta, salta a
 la que el té.
 
-**Normatives** mostra, per l'ordre que va demanar l'estudi, les normes d'accions
-a l'edificació que s'hi consulten: 1962-MV-101-62, 1988-NBE-AE-88, 2006-CTE DB
-SE-AE i el Resum Històric (si és vigent o derogada surt del mateix resum). Cada
+**Normatives** mostra, per l'ordre que va demanar l'estudi, les normes que s'hi
+consulten: 1962-MV-101-62, 1988-NBE-AE-88, 2006-CTE DB SE-AE, el Resum històric
+estructural (si és vigent o derogada surt del mateix resum) i 2006-CTE DB-SI. Cada
 una és el seu PDF, a `normatives/` (fora de `public/`: el resum és material de
 curs), servit només amb sessió per `/calculs/normatives/<fitxer>` i inclòs a la
 funció per `outputFileTracingIncludes` (`next.config.ts`). Per afegir-ne una:

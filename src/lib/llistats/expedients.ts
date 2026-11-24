@@ -4,7 +4,7 @@
 import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS } from "@/lib/expedients";
 import { formatEur } from "@/lib/format";
 import type { Expedient } from "@/types/db";
-import { dataCa, fmtHores, type PdfBlock, type PdfDoc } from "./doc";
+import { dataCa, fmtHores, type PdfBlock, type PdfDoc, type PdfKpi } from "./doc";
 
 // The year of an expedient is the one in its number: "26-0153" → "2026" ("—" if none).
 export function anyExpedient(num: string): string {
@@ -358,5 +358,107 @@ export function expedientsStatsDoc(s: ExpedientsStats, subtitle: string): PdfDoc
       ...breakdown("Per ciutat", s.byCiutat.map((g) => ({ label: g.key, count: g.count, money: g.money })), s.pressupostTotal),
       ...rankSection,
     ],
+  };
+}
+
+// ============================================================================
+// Fitxa d'un expedient: the «PDF» button of its window prints what the window
+// shows — the data, the figures, the milestones, the hours, the calculations
+// and the attached files — as one document.
+// ============================================================================
+
+export interface FitxaExpedient {
+  expedient: Expedient;
+  clientAdreca: string; // "Passeig Manuel Girona, nº 42, 4º2ª, 08034 Barcelona", or ""
+  dedicacions: readonly { data: string; hores: string; tasca?: string | null; comentari?: string | null }[];
+  fites: readonly { data: string; nom: string }[];
+  calculs: readonly { num: string | null; tipus_label: string; element: string | null; situacio: string | null; versio: string | null; data: string | null }[];
+  fitxers: readonly { nom: string; mida: number; created_at: string }[] | null; // null: the list could not be read
+}
+
+const midaFitxer = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace(".", ",")} MB`);
+
+export function expedientFitxaDoc(f: FitxaExpedient, avui: string): PdfDoc {
+  const e = f.expedient;
+  const hores = f.dedicacions.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
+  const planned = parseFloat(e.planned_hores ?? "0") || 0;
+  const visites = f.dedicacions.filter((d) => (d.tasca ?? "").trim().toLowerCase() === "visita direcció d'obres").length;
+  const kpis: PdfKpi[] = [
+    { label: "Hores fetes", value: fmtHores(hores) },
+    ...(planned > 0
+      ? [
+          { label: "Hores planificades", value: fmtHores(planned) },
+          { label: "% realitzat", value: `${Math.round((hores / planned) * 100)}%`, hint: `${fmtHores(hores)} / ${fmtHores(planned)}` },
+        ]
+      : [{ label: "Dies", value: String(new Set(f.dedicacions.map((d) => d.data)).size) }]),
+    { label: "Pressupost", value: eur(press(e)) },
+    ...(visites > 0 ? [{ label: "Visites d'obra", value: String(visites) }] : []),
+  ];
+  const dades = (
+    [
+      ["Projecte", e.projecte ?? "Sense projecte"],
+      ["Client", e.client_nom ?? "Sense client"],
+      ["Adreça del client", f.clientAdreca],
+      ["Categoria", (e.categoria && CATEGORY_BY_CODE[e.categoria]?.label) || ""],
+      ["Tipologia", e.tipologia_nom ?? ""],
+      ["Tipus", TIPUS[e.tipus].label],
+      ["Estat", ESTAT[e.estat].label + (e.data_tancament ? `, tancat el ${dataCa(e.data_tancament)}` : "")],
+      ["Adreça de l'obra", [e.adreca, e.ciutat].filter(Boolean).join(", ")],
+      ["Data inici", dataCa(e.data_inici)],
+      ["Data final (previsió)", dataCa(e.data_final)],
+      ["Direcció d'obres", e.direccio_obres ? "Sí" : ""],
+      ["Web", e.web ? "Sí" : ""],
+    ] as [string, string][]
+  ).filter(([, v]) => v);
+  const fitxers = f.fitxers;
+  const blocks: PdfBlock[] = [
+    { kind: "kpis", items: kpis },
+    { kind: "table", table: { title: "Dades", columns: [{ label: "Dada", muted: true }, { label: "Valor" }], rows: dades, narrow: true, plain: true } },
+    {
+      kind: "table",
+      table: {
+        title: `Fites${f.fites.length ? ` (${f.fites.length})` : ""}`,
+        columns: [{ label: "Data" }, { label: "Fita" }],
+        rows: f.fites.map((x) => [dataCa(x.data), x.nom]),
+        empty: "Cap fita en aquest expedient.",
+        narrow: true,
+      },
+    },
+    {
+      kind: "table",
+      table: {
+        title: "Dedicació vinculada",
+        columns: [{ label: "Data" }, { label: "Hores", align: "right" }, { label: "Tasca" }, { label: "Comentari", muted: true }],
+        rows: f.dedicacions.map((d) => [dataCa(d.data), fmtHores(parseFloat(d.hores) || 0), d.tasca ?? "—", d.comentari ?? ""]),
+        total: f.dedicacions.length ? ["Total", fmtHores(hores), { text: "", span: 2 }] : undefined,
+        empty: "Encara no hi ha hores registrades en aquest expedient.",
+      },
+    },
+    {
+      kind: "table",
+      table: {
+        title: `Càlculs vinculats${f.calculs.length ? ` (${f.calculs.length})` : ""}`,
+        columns: [{ label: "Núm.", mono: true }, { label: "Tipus" }, { label: "Element" }, { label: "Versió", align: "center" }, { label: "Data" }],
+        rows: f.calculs.map((c) => [c.num ?? "—", c.tipus_label, [c.element, c.situacio].filter(Boolean).join(" — ") || "—", c.versio ?? "", dataCa(c.data)]),
+        empty: "Cap càlcul d'aquest expedient.",
+      },
+    },
+    fitxers
+      ? {
+          kind: "table",
+          table: {
+            title: `Fitxers adjunts${fitxers.length ? ` (${fitxers.length})` : ""}`,
+            columns: [{ label: "Fitxer" }, { label: "Mida", align: "right" }, { label: "Afegit el" }],
+            rows: fitxers.map((x) => [x.nom, midaFitxer(x.mida), dataCa(x.created_at)]),
+            empty: "Cap fitxer adjunt.",
+          },
+        }
+      : { kind: "note", text: "No s'ha pogut llegir la llista de fitxers adjunts." },
+  ];
+  return {
+    title: `Expedient ${e.num_expedient}`,
+    subtitle: [e.projecte ?? "Sense projecte", `Fitxa a ${avui}`].join(" · "),
+    landscape: false,
+    blocks,
   };
 }

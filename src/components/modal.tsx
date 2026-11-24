@@ -9,12 +9,14 @@ export function Modal({
   title,
   children,
   wide,
+  actions,
 }: {
   open: boolean;
   onClose: () => void;
   title?: React.ReactNode;
   children: React.ReactNode;
   wide?: boolean;
+  actions?: React.ReactNode; // buttons next to ✕ (e.g. an expedient's «PDF»)
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -36,14 +38,17 @@ export function Modal({
       <div className={`w-full ${wide ? "max-w-4xl" : "max-w-2xl"} rounded-2xl bg-white shadow-2xl`}>
         <div className="flex items-center justify-between gap-4 border-b border-[var(--color-line)] px-5 py-4">
           <div className="min-w-0">{title}</div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-[var(--color-muted)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
-            aria-label="Tancar"
-          >
-            ✕
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {actions}
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-md px-2 py-1 text-[var(--color-muted)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
+              aria-label="Tancar"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="p-5">{children}</div>
       </div>

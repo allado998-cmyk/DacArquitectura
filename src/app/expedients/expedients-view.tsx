@@ -17,8 +17,9 @@ import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/l
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, StatsViews, TrendChart, YearRange, yearSpan, type TrendSeries } from "@/components/charts";
-import { openPdfDoc, openStatsPdf } from "@/lib/pdf";
-import { anyExpedient as anyOf, expedientsListDoc, expedientsStats, expedientsStatsDoc, type RankedProjecte } from "@/lib/llistats/expedients";
+import { openPdfDoc, openPdfWindow, openStatsPdf } from "@/lib/pdf";
+import { anyExpedient as anyOf, expedientFitxaDoc, expedientsListDoc, expedientsStats, expedientsStatsDoc, type RankedProjecte } from "@/lib/llistats/expedients";
+import { dataCa } from "@/lib/llistats/doc";
 import { googleMapsHref } from "@/lib/geo";
 import dynamic from "next/dynamic";
 import type { MapGroup } from "./expedients-map";
@@ -1011,11 +1012,33 @@ function DedicacioModal({
   onClose: () => void;
 }) {
   const total = dedicacions.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
+  // The attached files as the window lists them (FitxersAdjunts reports them), for the PDF.
+  const [fitxers, setFitxers] = useState<ExpedientFitxer[] | null>(null);
+
+  // «PDF»: the whole window as one document (ticket #33). Without the file list yet,
+  // the PDF's window opens during the click and fills once the list arrives.
+  async function exportFitxa() {
+    if (!expedient) return;
+    const doc = (llista: ExpedientFitxer[] | null) =>
+      expedientFitxaDoc({ expedient, clientAdreca: adrecaClient(client), dedicacions, fites, calculs, fitxers: llista }, dataCa(todayLocal()));
+    if (fitxers) return openPdfDoc(doc(fitxers));
+    const w = openPdfWindow();
+    const llista = await listExpedientFitxersAction(expedient.id).catch(() => null);
+    openPdfDoc(doc(llista), w);
+  }
+
   return (
     <Modal
       open={expedient != null}
       onClose={onClose}
       wide
+      actions={
+        expedient && (
+          <button type="button" className="btn-ghost btn-sm inline-flex items-center gap-1.5" onClick={exportFitxa} title="Genera un PDF d'aquesta fitxa">
+            <PdfIcon /> PDF
+          </button>
+        )
+      }
       title={
         expedient && (
           <div>
@@ -1184,7 +1207,7 @@ function DedicacioModal({
             </div>
           )}
 
-          <FitxersAdjunts key={expedient.id} expedientId={expedient.id} />
+          <FitxersAdjunts key={expedient.id} expedientId={expedient.id} onList={setFitxers} />
         </div>
       )}
     </Modal>
@@ -1193,8 +1216,9 @@ function DedicacioModal({
 
 // «Fitxers adjunts»: any file (plans, contracts, photos…) up to 500 MB, kept in
 // the private file store. The list is fetched when the expedient is opened.
-function FitxersAdjunts({ expedientId }: { expedientId: number }) {
+function FitxersAdjunts({ expedientId, onList }: { expedientId: number; onList?: (l: ExpedientFitxer[] | null) => void }) {
   const [fitxers, setFitxers] = useState<ExpedientFitxer[] | null>(null);
+  useEffect(() => onList?.(fitxers), [fitxers, onList]);
   const [pujant, setPujant] = useState<{ nom: string; pct: number; resten: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);

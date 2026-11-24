@@ -281,18 +281,29 @@ function footers(c: Ctx, generat: string) {
 }
 
 // `generat`: "24/11/2026 a les 06:00", printed at the foot of every page.
-export function renderPdf(doc: PdfDoc, opts: { logo: Logo | null; generat: string }): Uint8Array {
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: doc.landscape ? "landscape" : "portrait", compress: true });
-  pdf.setProperties({ title: winAnsi(doc.title), subject: winAnsi(doc.subtitle), author: "DACARQUITECTURA", creator: "DacArquitectura" });
-  const m = (doc.marginCm ?? 1.3) * 10;
+// Several documents (the years of a «de tots els anys» file) go one after the
+// other in the same file, each from a new page with its own header; the pages
+// are numbered through the whole file. They share the first one's orientation.
+export function renderPdf(docs: PdfDoc | PdfDoc[], opts: { logo: Logo | null; generat: string; title?: string }): Uint8Array {
+  const list = Array.isArray(docs) ? docs : [docs];
+  const first = list[0];
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: first.landscape ? "landscape" : "portrait", compress: true });
+  pdf.setProperties({ title: winAnsi(opts.title ?? first.title), subject: winAnsi(list.length > 1 ? opts.title ?? first.title : first.subtitle), author: "DACARQUITECTURA", creator: "DacArquitectura" });
+  const m = (first.marginCm ?? 1.3) * 10;
   const c: Ctx = { pdf, m, W: pdf.internal.pageSize.getWidth(), H: pdf.internal.pageSize.getHeight(), y: m };
-  header(c, doc, opts.logo);
-  for (const b of doc.blocks) {
-    if (b.kind === "kpis") kpis(c, b.items);
-    else if (b.kind === "heading") heading(c, b.text, 30);
-    else if (b.kind === "note") note(c, b.text);
-    else table(c, b.table);
-  }
+  list.forEach((doc, i) => {
+    if (i > 0) {
+      pdf.addPage();
+      c.y = m;
+    }
+    header(c, doc, opts.logo);
+    for (const b of doc.blocks) {
+      if (b.kind === "kpis") kpis(c, b.items);
+      else if (b.kind === "heading") heading(c, b.text, 30);
+      else if (b.kind === "note") note(c, b.text);
+      else table(c, b.table);
+    }
+  });
   footers(c, opts.generat);
   return new Uint8Array(pdf.output("arraybuffer"));
 }

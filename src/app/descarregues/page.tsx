@@ -1,16 +1,27 @@
+import { headers } from "next/headers";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { AppNav } from "@/components/app-nav";
-import { FILES, ZIP, dataHoraBcn, nomDescarrega, nomFitxer, parseFitxer, type Manifest } from "@/lib/descarregues/cataleg";
+import { DES_DE, FILES, VERSIO, ZIP, dataHoraBcn, nomDescarrega, nomFitxer, parseFitxer, potRegenerar, type Manifest } from "@/lib/descarregues/cataleg";
 import { llegirManifest } from "@/lib/descarregues/magatzem";
 import { fmtMida } from "@/lib/fitxers-shared";
 
 export const dynamic = "force-dynamic";
 
 // The PDFs of every list, made by the cron (src/lib/descarregues). This page
-// only reads the index of the last run from the file store: no database.
+// only reads the index of the last run from the file store: no database —
+// except once after a deploy that changes the files' format, when the first
+// visit has them made again in the background (generar.ts → regenerarSiCal).
 export default async function DescarreguesPage() {
   const user = await requireUser();
   const manifest = await llegirManifest(user === "demo" ? "demo" : "dac");
+  const refent = !!manifest && manifest.versio !== VERSIO && potRegenerar();
+  if (refent) {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const origin = host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : undefined;
+    after(async () => (await import("@/lib/descarregues/generar")).regenerarSiCal(user, origin));
+  }
 
   return (
     <>
@@ -36,6 +47,11 @@ export default async function DescarreguesPage() {
           )}
         </div>
 
+        {refent && (
+          <div className="card mb-4 text-sm" role="status">
+            S&apos;estan preparant els fitxers amb el format nou (tots els anys en un sol PDF). Torna a carregar la pàgina d&apos;aquí un minut.
+          </div>
+        )}
         {manifest ? (
           <Llista manifest={manifest} />
         ) : (
@@ -48,40 +64,56 @@ export default async function DescarreguesPage() {
   );
 }
 
+type Fitxer = Manifest["fitxers"][number];
+
 function Llista({ manifest }: { manifest: Manifest }) {
   const fitxer = new Map(manifest.fitxers.map((f) => [f.nom, f]));
+  const parsed = manifest.fitxers.flatMap((f) => {
+    const p = parseFitxer(f.nom);
+    return p ? [{ f, ...p }] : [];
+  });
   const gravat = dataHoraBcn(manifest.generat);
+  // A run of the previous format (one PDF per year), until the files are made again.
+  const antic = manifest.versio !== VERSIO;
   return (
     <ul className="divide-y divide-[var(--color-line)] rounded-lg border border-[var(--color-line)] bg-white">
       {FILES.map((row) => {
-        // The files of this row: every year's (newest first), the current year's, or the only one.
-        const anys =
-          row.anys === "tots"
-            ? manifest.fitxers
-                .map((f) => parseFitxer(f.nom))
-                .flatMap((p) => (p?.llista === row.llista && p.any != null ? [p.any] : []))
-                .sort((a, b) => b - a)
-            : [row.anys === "actual" ? manifest.anyActual : null];
-        const items = anys
-          .map((any) => ({ any, f: fitxer.get(nomFitxer(row.llista, any)) }))
-          .filter((x): x is { any: number | null; f: Manifest["fitxers"][number] } => !!x.f);
+        // The files of this row and the label of their buttons: for «de tots els anys» the one
+        // PDF of every earlier year (or, from an old run, its years before this one, newest
+        // first); else the current year's or the only one.
+        let items: { f: Fitxer; label: string; nom: string }[];
+        if (row.anys === "anteriors") {
+          items = antic
+            ? parsed
+                .filter((x) => x.llista === row.llista && x.any != null && x.finsA == null && x.any < manifest.anyActual)
+                .sort((a, b) => b.any! - a.any!)
+                .map((x) => ({ f: x.f, label: String(x.any), nom: nomDescarrega(row.llista, x.any) }))
+            : parsed
+                .filter((x) => x.llista === row.llista && x.finsA != null)
+                .map((x) => ({ f: x.f, label: `${x.any}–${x.finsA}`, nom: nomDescarrega(row.llista, x.any, x.finsA) }));
+        } else {
+          const any = row.anys === "actual" ? manifest.anyActual : null;
+          const f = fitxer.get(nomFitxer(row.llista, any));
+          items = f ? [{ f, label: "PDF", nom: nomDescarrega(row.llista, any) }] : [];
+        }
         return (
           <li key={`${row.llista}-${row.anys}`} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)_9rem] sm:items-center sm:gap-4">
             <div className="text-sm font-medium">
               {row.titol}
               {row.anys === "actual" && <span className="font-normal text-[var(--color-muted)]"> ({manifest.anyActual})</span>}
-              {row.anys === "tots" && <div className="text-xs font-normal text-[var(--color-muted)]">Un PDF per any</div>}
+              {row.anys === "anteriors" && (
+                <div className="text-xs font-normal text-[var(--color-muted)]">
+                  {antic ? "Un PDF per any" : `Del ${DES_DE} al ${manifest.anyActual - 1}, en un sol PDF: cada any comença en una pàgina nova`}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-1.5 sm:justify-end">
-              {items.length === 0 && <span className="text-sm text-[var(--color-muted)]">—</span>}
-              {items.map(({ any, f }) => (
-                <a
-                  key={f.nom}
-                  href={`/descarregues/${manifest.carpeta}/${f.nom}`}
-                  className="btn-ghost btn-sm gap-1.5 tabular-nums"
-                  title={`${nomDescarrega(row.llista, any)} · ${fmtMida(f.bytes)}`}
-                >
-                  <PdfIcon /> {row.anys === "tots" ? any : "PDF"}
+              {items.length === 0 && (
+                <span className="text-sm text-[var(--color-muted)]">{row.anys === "anteriors" && !antic ? `Cap d'abans del ${manifest.anyActual}` : "—"}</span>
+              )}
+              {items.map(({ f, label, nom }) => (
+                <a key={f.nom} href={`/descarregues/${manifest.carpeta}/${f.nom}`} className="btn-ghost btn-sm gap-1.5 tabular-nums" title={`${nom} · ${fmtMida(f.bytes)}`}>
+                  <PdfIcon /> {label}
                 </a>
               ))}
             </div>

@@ -12,34 +12,45 @@ import { dedicacioStats, dedicacioStatsDoc } from "@/lib/llistats/dedicacio";
 import { anyExpedient, expedientsListDoc, expedientsStats, expedientsStatsDoc } from "@/lib/llistats/expedients";
 import { byNumDesc, facturaYear, facturesListDoc } from "@/lib/llistats/facturacio";
 import { actesListDoc, byNom, clientsListDoc, contactesListDoc, honorarisListDoc, iteListDoc, propostesListDoc } from "@/lib/llistats/llistes";
-import { LLISTES, ZIP, anyBcn, dataHoraBcn, nomDescarrega, nomFitxer, type Llista, type Manifest } from "./cataleg";
+import { runAsActingUser } from "@/lib/acting-user";
+import type { AppUser } from "@/lib/auth";
+import { DES_DE, LLISTES, VERSIO, ZIP, anyBcn, dataHoraBcn, nomDescarrega, nomFitxer, potRegenerar, type Llista, type Manifest } from "./cataleg";
 import { carregarDades, type Dades } from "./dades";
-import { publicar } from "./magatzem";
+import { agafarBloqueig, deixarBloqueig, llegirManifest, publicar } from "./magatzem";
 import { jpegSize, renderPdf, type Logo } from "./pdf";
 
 export interface Document {
   llista: Llista;
-  any: number | null;
-  doc: PdfDoc;
+  any: number | null; // the year, or the first one of a «de tots els anys» file
+  finsA?: number | null; // the last year of a «de tots els anys» file
+  doc: PdfDoc | PdfDoc[]; // several: one per year, each from a new page
   files: number; // rows listed
 }
 
 const plural = (n: number, u: string, p: string) => `${n} ${n === 1 ? u : p}`;
 
-// One document per year present in the data, plus the current year's even when empty.
-function perAny<T>(rows: T[], anyOf: (r: T) => string, anyActual: number, make: (rows: T[], any: number) => { doc: PdfDoc; files: number }, llista: Llista): Document[] {
-  const anys = new Set<number>([anyActual]);
+// The two files of a list kept by year: the current year's (even when empty)
+// and one with every earlier year from 2000, oldest first, each year from a
+// new page (none when there is no earlier year). Years after the current one
+// (a number typed ahead, say) are in neither.
+function perAnys<T>(rows: T[], anyOf: (r: T) => string, anyActual: number, make: (rows: T[], any: number) => { doc: PdfDoc; files: number }, llista: Llista): Document[] {
+  const anteriors = new Set<number>();
   for (const r of rows) {
     const a = Number(anyOf(r));
-    if (Number.isInteger(a) && a > 1900) anys.add(a);
+    if (Number.isInteger(a) && a > 1900 && a < anyActual) anteriors.add(a);
   }
-  return [...anys]
-    .sort((a, b) => b - a)
-    .map((any) => ({ llista, any, ...make(rows.filter((r) => anyOf(r) === String(any)), any) }));
+  const actual = make(rows.filter((r) => anyOf(r) === String(anyActual)), anyActual);
+  const out: Document[] = [{ llista, any: anyActual, doc: actual.doc, files: actual.files }];
+  if (anteriors.size) {
+    const anys = [...anteriors].sort((a, b) => a - b);
+    const seccions = anys.map((any) => make(rows.filter((r) => anyOf(r) === String(any)), any));
+    out.push({ llista, any: Math.min(DES_DE, anys[0]), finsA: anyActual - 1, doc: seccions.map((s) => s.doc), files: seccions.reduce((n, s) => n + s.files, 0) });
+  }
+  return out;
 }
 
-// What the page offers, from the data: the lists of every year, the current
-// year's statistics, and the clients and contacts.
+// What the page offers, from the data: the lists of the current year and of
+// every earlier one, the current year's statistics, and the clients and contacts.
 export function documents(d: Dades, anyActual: number): Document[] {
   const Y = String(anyActual);
   const dedicByExp = new Map<number, { hores: string }[]>();
@@ -61,17 +72,17 @@ export function documents(d: Dades, anyActual: number): Document[] {
   const expedientsAny = d.expedients.filter((r) => anyExpedient(r.num_expedient) === Y);
 
   return [
-    ...perAny(d.expedients, (r) => anyExpedient(r.num_expedient), anyActual, (rows, any) => ({ doc: expedientsListDoc(rows, `Any ${any}`, "Cap expedient aquest any."), files: rows.length }), "expedients"),
+    ...perAnys(d.expedients, (r) => anyExpedient(r.num_expedient), anyActual, (rows, any) => ({ doc: expedientsListDoc(rows, `Any ${any}`, "Cap expedient aquest any."), files: rows.length }), "expedients"),
     { llista: "expedients-estadistica", any: anyActual, doc: expedientsStatsDoc(expedientsStats(expedientsAny, dedicByExp), `Any ${Y}`), files: expedientsAny.length },
     (() => {
       const rows = d.dedicacions.filter((x) => x.data.slice(0, 4) === Y);
       return { llista: "dedicacio-estadistica" as const, any: anyActual, doc: dedicacioStatsDoc(dedicacioStats(rows), `Any ${Y}`), files: rows.length };
     })(),
-    ...perAny(d.actes, (a) => (a.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: actesListDoc(rows, `Any ${any} · ${plural(rows.length, "acta", "actes")}`), files: rows.length }), "actes"),
-    ...perAny(d.ites, (i) => i.any, anyActual, (rows, any) => ({ doc: iteListDoc(rows, `Any ${any} · ${plural(rows.length, "informe", "informes")}`, "Cap informe aquest any."), files: rows.length }), "ite"),
-    ...perAny(d.honoraris, (r) => r.data.slice(0, 4), anyActual, (rows, any) => ({ doc: honorarisListDoc(rows, `Any ${any}`), files: rows.length }), "honoraris"),
-    ...perAny(d.propostes, (r) => (r.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: propostesListDoc(rows, `Any ${any}`), files: rows.length }), "propostes"),
-    ...perAny(d.factures, facturaYear, anyActual, (rows, any) => ({ doc: facturesListDoc([...rows].sort(byNumDesc), suplits, `Any ${any}`, "Cap factura aquest any."), files: rows.length }), "facturacio"),
+    ...perAnys(d.actes, (a) => (a.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: actesListDoc(rows, `Any ${any} · ${plural(rows.length, "acta", "actes")}`), files: rows.length }), "actes"),
+    ...perAnys(d.ites, (i) => i.any, anyActual, (rows, any) => ({ doc: iteListDoc(rows, `Any ${any} · ${plural(rows.length, "informe", "informes")}`, "Cap informe aquest any."), files: rows.length }), "ite"),
+    ...perAnys(d.honoraris, (r) => r.data.slice(0, 4), anyActual, (rows, any) => ({ doc: honorarisListDoc(rows, `Any ${any}`), files: rows.length }), "honoraris"),
+    ...perAnys(d.propostes, (r) => (r.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: propostesListDoc(rows, `Any ${any}`), files: rows.length }), "propostes"),
+    ...perAnys(d.factures, facturaYear, anyActual, (rows, any) => ({ doc: facturesListDoc([...rows].sort(byNumDesc), suplits, `Any ${any}`, "Cap factura aquest any."), files: rows.length }), "facturacio"),
     {
       llista: "clients",
       any: null,
@@ -131,13 +142,18 @@ export async function generarDescarregues(opts: { ara?: Date; origin?: string } 
   const anyActual = anyBcn(ara);
   const [dades, logo] = await Promise.all([carregarDades(), carregarLogo(opts.origin)]);
   const generat = dataHoraBcn(ara).replace(" ", " a les ");
-  const pdfs = documents(dades, anyActual).map((d) => ({ ...d, nom: nomFitxer(d.llista, d.any), data: renderPdf(d.doc, { logo, generat }) }));
+  const pdfs = documents(dades, anyActual).map((d) => ({
+    ...d,
+    nom: nomFitxer(d.llista, d.any, d.finsA),
+    data: renderPdf(d.doc, { logo, generat, title: d.finsA ? `${LLISTES[d.llista].nom} ${d.any}-${d.finsA}` : undefined }),
+  }));
 
   const entrades: Zippable = {};
-  for (const p of pdfs) entrades[`${LLISTES[p.llista].carpeta}/${nomDescarrega(p.llista, p.any)}`] = [p.data, { level: 0, mtime: ara }];
+  for (const p of pdfs) entrades[`${LLISTES[p.llista].carpeta}/${nomDescarrega(p.llista, p.any, p.finsA)}`] = [p.data, { level: 0, mtime: ara }];
   const zip = zipSync(entrades);
 
   const manifest: Manifest = {
+    versio: VERSIO,
     generat: ara.toISOString(),
     anyActual,
     carpeta: novaCarpeta(ara),
@@ -160,4 +176,21 @@ export async function generarDescarregues(opts: { ara?: Date; origin?: string } 
     esborrats,
     ms: Date.now() - t0,
   };
+}
+
+// The page's background run after a deploy that changes the files' format
+// (cataleg.ts → potRegenerar): one at a time per area, and none if another
+// visit already made them.
+export async function regenerarSiCal(user: AppUser, origin?: string): Promise<void> {
+  const area = user === "demo" ? "demo" : "dac";
+  if (!potRegenerar() || !(await agafarBloqueig(area))) return;
+  try {
+    if ((await llegirManifest(area))?.versio === VERSIO) return; // another visit got there first
+    const r = await runAsActingUser(user, () => generarDescarregues({ origin }));
+    console.log("descarregues: format nou", JSON.stringify(r));
+  } catch (e) {
+    console.error(`descarregues (${user}): regenerar ha fallat`, e);
+  } finally {
+    await deixarBloqueig(area);
+  }
 }

@@ -94,6 +94,10 @@ com més n'hi ha. En clicar una fila s'obre la fitxa, que és on es pot editar o
 eliminar; el comentari només surt a la fitxa. En crear un client nou, s'hi poden
 afegir contactes al mateix formulari i es desen amb el client.
 
+A les actes, el camp **Client** és un desplegable amb cercador d'aquests clients
+(per nom o ciutat; ↑ ↓ i Retorn per triar-ne un). Continua essent text lliure: també
+s'hi pot escriure un client que no sigui a Base de Dades (`client-picker.tsx`).
+
 Un contacte pot tenir diversos telèfons i mails. `telefon` i `mail` són sempre
 els **principals** (els que mostren les taules i llegeixen les actes i el
 plugin); la resta van a `telefons_extra` i `mails_extra` (migració 0044).

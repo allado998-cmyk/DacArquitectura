@@ -26,7 +26,7 @@ export default async function ActaDetailPage({ params }: { params: Promise<{ id:
   if (rows.length === 0) notFound();
   const acta = rows[0];
 
-  const [expedients, contactes] = await Promise.all([
+  const [expedients, contactes, clients] = await Promise.all([
     sql`select id, num_expedient, projecte from public.expedients order by num_expedient desc` as unknown as Promise<
       { id: number; num_expedient: string; projecte: string | null }[]
     >,
@@ -38,13 +38,17 @@ export default async function ActaDetailPage({ params }: { params: Promise<{ id:
       where coalesce(ct.nom, '') <> ''
       order by ct.nom
     ` as unknown as Promise<{ nom: string | null; telefon: string | null; mail: string | null; client_nom: string | null }[]>,
+    // The clients of Base de Dades, for the «Client» dropdown.
+    sql`select id, nom, ciutat from public.clients where coalesce(trim(nom), '') <> '' order by nom` as unknown as Promise<
+      { id: number; nom: string; ciutat: string | null }[]
+    >,
   ]);
 
   return (
     <>
       <AppNav current="actes" />
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
-        <ActaView acta={acta} expedients={expedients} contactes={contactes} />
+        <ActaView acta={acta} expedients={expedients} contactes={contactes} clients={clients} />
       </main>
     </>
   );

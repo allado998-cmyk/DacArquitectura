@@ -146,6 +146,37 @@ l'enllaç (`/fitxers/…?mida=<bytes>`): les actes a les seves llistes
 
 En local cal `BLOB_READ_WRITE_TOKEN` a `.env.local` (`vercel env pull` el porta).
 
+## Descàrregues (PDF de les llistes, tres cops per setmana)
+
+La pàgina **Descàrregues** (al menú, entre Base de Dades i Notes) ofereix en PDF
+les llistes i estadístiques de l'app, sense cap filtre a part de l'any:
+expedients, actes, ITE, càlculs d'honoraris, propostes i facturació (un PDF per
+any i el de l'any en curs), les estadístiques d'expedients i de dedicació de
+l'any en curs, i els llistats de clients i de contactes. A dalt, **Global (ZIP)**
+els porta tots, per carpetes. Cada fila diu quan es va gravar.
+
+- **Quan:** un cron de Vercel (`vercel.json`, `0 5 * * 1,3,5`: dilluns, dimecres
+  i divendres a les 5 UTC, les 6 o les 7 a Barcelona) crida
+  `/api/cron/descarregues` amb `Authorization: Bearer <CRON_SECRET>` (variable de
+  Vercel, només a producció). Es pot llançar a mà amb el mateix capçal (`curl`).
+- **Què fa:** llegeix les dades en una sola tanda de consultes, dibuixa els PDF al
+  servidor amb jsPDF (sense navegador; tot plegat, uns segons), els desa al
+  magatzem privat en una carpeta nova (`<àrea>/descarregues/<carpeta>/…`, amb
+  l'índex a `<àrea>/descarregues/index.json`) i esborra la generació anterior.
+- **Descarregar:** `/descarregues/<carpeta>/<fitxer>` comprova la sessió i només
+  serveix fitxers de l'àrea de l'usuari. La pàgina només llegeix l'índex: obrir-la
+  no toca la base de dades.
+- **Demo:** el mateix cron fa els PDF del compte `demo` a partir de la seva base de
+  dades i els desa a l'àrea `demo`; la demo no veu mai els fitxers reals.
+- **Què hi surt:** el mateix que el botó «PDF» de cada pàgina. Les columnes, les
+  files i els totals de cada llista es defineixen un sol cop a `src/lib/llistats/`:
+  el navegador els imprimeix amb `src/lib/pdf.ts` i el servidor els dibuixa amb
+  `src/lib/descarregues/pdf.ts` (Helvetica: els caràcters fora del joc
+  Windows-1252 es canvien pel més semblant). La llista d'ITE (per any de la
+  inspecció, o de creació si encara no en té) només surt aquí.
+- **Provar-ho en local** sense tocar el magatzem: `node --env-file=.env.local
+  scripts/descarregues.mjs [carpeta] [--demo]` genera els PDF en una carpeta.
+
 ## Mapa d'obres (Expedients → Mapa)
 
 Cada expedient pot tenir una **adreça** i un **enllaç de Google Maps**. En desar,
@@ -339,6 +370,7 @@ número ja existeix o si faria saltar el comptador dels expedients nous.
    - `SESSION_PASSWORD`
    - `DEMO_DATABASE_URL` (la base de dades `demo` del mateix projecte Neon)
    - `DEMO_PASSWORD` (contrasenya del compte de demostració)
+   - `CRON_SECRET` (cadena aleatòria; Vercel l'envia al cron de Descàrregues)
 4. Deploy.
 5. Després del primer deploy, executar `npm run db:migrate` amb la `DATABASE_URL` de producció (la mateixa connexió de Neon funciona des de qualsevol lloc).
 

@@ -42,7 +42,8 @@ import type {
 } from "@/types/db";
 import { formatEur, formatEurPrecise, parseLocaleNumber } from "@/lib/format";
 import { ambDificultat, tarifaBenzina, tarifaHora } from "@/lib/tarifes";
-import { openListPdf } from "@/lib/pdf";
+import { openPdfDoc } from "@/lib/pdf";
+import { byNom, clientsListDoc, contactesListDoc } from "@/lib/llistats/llistes";
 import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
@@ -550,8 +551,6 @@ function IteTarifaField({ label, hint, value, onChange }: { label: string; hint:
 // Case- and accent-insensitive text, so "nuria" finds "Núria" and "collegi" "Col·legi".
 const fold = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[\p{M}·]/gu, "").toLowerCase();
 
-const byNom = (a: { nom: string | null }, b: { nom: string | null }) => (a.nom ?? "￿").localeCompare(b.nom ?? "￿", "ca");
-
 const dash = <span className="text-[var(--color-muted)]">—</span>;
 
 const EXPEDIENTS_OPTIONS: [string, string][] = [["oberts", "Amb oberts"], ["tancats", "Només tancats"], ["cap", "Sense expedients"]];
@@ -768,13 +767,7 @@ function ContactesPanel({
       clientFilterOpts.find((o) => o.id === fClient)?.label,
       fComentari && `${optionLabel(AMB_SENSE, fComentari)} comentari`,
     ].filter(Boolean).join(" · ");
-    openListPdf({
-      title: "Contactes",
-      subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`,
-      landscape: true,
-      columns: [{ label: "Nom" }, { label: "Professió" }, { label: "Telèfon 1" }, { label: "Telèfon 2" }, { label: "Mail" }, { label: "Client" }],
-      rows: filtered.map((c) => [c.nom ?? "—", c.professio ?? "—", c.telefon ?? "—", c.telefons_extra[0] ?? "—", c.mail ?? "—", c.client_nom ?? "—"]),
-    });
+    openPdfDoc(contactesListDoc(filtered, applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} contactes`));
   }
 
   return (
@@ -1332,16 +1325,10 @@ function ClientsPanel({
       fContactes && `${optionLabel(AMB_SENSE, fContactes)} contactes`,
       optionLabel(EXPEDIENTS_OPTIONS, fExpedients),
     ].filter(Boolean).join(" · ");
-    openListPdf({
-      title: "Clients",
-      subtitle: applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} clients`,
-      landscape: false,
-      columns: [{ label: "Nom" }, { label: "NIF/CIF" }, { label: "Ciutat" }, { label: "CP" }, { label: "Contactes", align: "right" }, { label: "Oberts", align: "right" }, { label: "Exp.", align: "right" }],
-      rows: filtered.map((c) => {
-        const s = statsByClient.get(c.id);
-        return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(contactesByClient.get(c.id)?.length ?? 0), String(s?.oberts ?? 0), String(s?.n ?? 0)];
-      }),
-    });
+    const subtitle = applied ? `${applied} · ${filtered.length} de ${rows.length}` : `${rows.length} clients`;
+    openPdfDoc(
+      clientsListDoc(filtered, (id) => ({ contactes: contactesByClient.get(id)?.length ?? 0, oberts: statsByClient.get(id)?.oberts ?? 0, expedients: statsByClient.get(id)?.n ?? 0 }), subtitle),
+    );
   }
 
   return (

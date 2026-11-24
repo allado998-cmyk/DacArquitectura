@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { deletePropostaAction, duplicatePropostaAction } from "./actions";
 import { formatDataCa, formatEur } from "@/lib/format";
-import { openListPdf, openStatsPdf } from "@/lib/pdf";
+import { openPdfDoc, openStatsPdf } from "@/lib/pdf";
+import { honorarisListDoc } from "@/lib/llistats/llistes";
 import { ChartCard, HBarChart, KpiCard, VBarChart } from "@/components/charts";
 
 export interface PropostaListRow {
@@ -111,13 +112,7 @@ function CalculsList({ rows, onCount }: { rows: PropostaListRow[]; onCount: (n: 
 
   const filterSummary = [fAny && `Any ${fAny}`, fTrim && `T${fTrim}`, fClient, q && `"${query.trim()}"`].filter(Boolean).join(" · ") || "Tots els càlculs";
   function exportPdf() {
-    openListPdf({
-      title: "Càlculs d'honoraris",
-      subtitle: filterSummary,
-      columns: [{ label: "Núm." }, { label: "Data" }, { label: "Projecte" }, { label: "Client" }, { label: "Preu", align: "right" }],
-      rows: filtered.map((r) => [`CH-${r.num_proposta ?? r.id}`, formatDataCa(r.data), r.projecte ?? "—", r.client_nom ?? "—", formatEur(r.total)]),
-      totalRow: ["Total", "", "", `${filtered.length}`, formatEur(totalSum)],
-    });
+    openPdfDoc(honorarisListDoc(filtered, filterSummary));
   }
 
   if (rows.length === 0) {

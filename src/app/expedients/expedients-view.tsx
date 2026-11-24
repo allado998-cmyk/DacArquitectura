@@ -17,7 +17,8 @@ import { CATEGORIES, CATEGORY_BY_CODE, ESTAT, TIPUS, tipologiaSwatch } from "@/l
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, StatsViews, TrendChart, YearRange, yearSpan, type TrendSeries } from "@/components/charts";
-import { openStatsPdf } from "@/lib/pdf";
+import { openPdfDoc, openStatsPdf } from "@/lib/pdf";
+import { anyExpedient as anyOf, expedientsListDoc, expedientsStats, expedientsStatsDoc, type RankedProjecte } from "@/lib/llistats/expedients";
 import { googleMapsHref } from "@/lib/geo";
 import dynamic from "next/dynamic";
 import type { MapGroup } from "./expedients-map";
@@ -305,7 +306,7 @@ function ExpedientsList({
   ].filter(Boolean).join(" · ") || "Tots els expedients";
 
   function exportPdf() {
-    exportExpedientsListPdf(filtered, filterSummary);
+    openPdfDoc(expedientsListDoc(filtered, filterSummary));
   }
 
   if (rows.length === 0) {
@@ -1291,22 +1292,6 @@ function FitaShape({ forma, color, size = 13 }: { forma: string; color: string; 
 // Estadístiques
 // ============================================================================
 
-function anyOf(num: string): string {
-  const m = /^(\d{2})-/.exec(num);
-  return m ? `20${m[1]}` : "—";
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.min(hi, Math.max(lo, v));
-}
-
-function medianOf(values: number[]): number {
-  if (values.length === 0) return 0;
-  const s = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-
 type StatsView = "resum" | "evolucio";
 
 function StatsPanel({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipologies: Tipologia[]; dedicByExp: Map<number, Dedicacio[]> }) {
@@ -1450,84 +1435,15 @@ function StatsResum({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
     [rows, fDes, fFins, fEstat, fCategoria, fTipologia, fTipus, fCiutat],
   );
 
-  const total = filtered.length;
-  const oberts = filtered.filter((r) => r.estat === "obert").length;
-  const tancats = total - oberts;
-  const publics = filtered.filter((r) => r.tipus === "public").length;
-  const privats = total - publics;
-  const pressupostTotal = filtered.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  const pressupostPublic = filtered.filter((r) => r.tipus === "public").reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  const pressupostPrivat = pressupostTotal - pressupostPublic;
-  const pressupostObert = filtered.filter((r) => r.estat === "obert").reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  const pressupostMitja = total ? pressupostTotal / total : 0;
-
-  const byCiutat = groupBySum(filtered, (r) => (r.ciutat ?? "").trim() || "(Sense ciutat)");
-  const byTipologia = groupBySum(filtered, (r) => r.tipologia_nom ?? "(Sense tipologia)");
-  // Pressupost split by category — drives the category donut (count + money).
-  const catPressupost = CATEGORIES.map((c) => {
-    const grp = filtered.filter((r) => r.categoria === c.code);
-    return { label: c.label, color: c.color, count: grp.length, value: grp.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0) };
-  }).filter((g) => g.value > 0);
-  const senseCat = filtered.filter((r) => !r.categoria);
-  const senseCatPress = senseCat.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  if (senseCatPress > 0) catPressupost.push({ label: "Sense categoria", color: "#9ca3af", count: senseCat.length, value: senseCatPress });
-
-  // Rànquing de projectes per puntuació (vegeu l'explicació al panell).
-  // Només expedients tancats amb pressupost, hores pressupostades i hores fetes.
-  const ranking = useMemo(() => {
-    const items: RankedProjecte[] = [];
-    for (const r of filtered) {
-      if (r.estat !== "tancat") continue;
-      const pressupost = parseFloat(r.pressupost) || 0;
-      const planned = parseFloat(r.planned_hores ?? "") || 0;
-      const fetes = (dedicByExp.get(r.id) ?? []).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-      if (pressupost <= 0 || planned <= 0 || fetes <= 0) continue;
-      const diff = planned - fetes;
-      items.push({
-        r,
-        pressupost,
-        planned,
-        fetes,
-        rate: pressupost / fetes,
-        pct: Math.round((fetes / planned) * 100),
-        diff,
-        benefici: pressupost * (diff / planned),
-        score: 0,
-        rank: 0,
-      });
-    }
-    const refRate = medianOf(items.map((i) => i.rate));
-    const refPlanned = medianOf(items.map((i) => i.planned));
-    const refDiff = items.reduce((m, i) => Math.max(m, Math.abs(i.diff)), 0);
-    const refBenefici = items.reduce((m, i) => Math.max(m, Math.abs(i.benefici)), 0);
-    for (const it of items) {
-      // Pes del projecte: els ajustos percentuals compten poc en projectes petits
-      // (errar 1 h en un projecte d'1 h és un 100% però no és greu).
-      const wPes = refPlanned > 0 ? clamp(it.planned / refPlanned, 0, 1) : 1;
-      const fDesviacio = clamp((it.planned - it.fetes) / it.planned, -1, 1);
-      const fEstalvi = refDiff > 0 ? clamp(it.diff / refDiff, -1, 1) : 0;
-      const fBenefici = refBenefici > 0 ? clamp(it.benefici / refBenefici, -1, 1) : 0;
-      const fPreu = refRate > 0 ? clamp((it.rate - refRate) / refRate, -1, 1) : 0;
-      it.score = Math.round(clamp(50 + 10 * wPes * fDesviacio + 15 * fEstalvi + 15 * fBenefici + 10 * wPes * fPreu, 1, 100));
-    }
-    items.sort((a, b) => b.score - a.score || b.rate - a.rate);
-    items.forEach((it, i) => { it.rank = i + 1; });
-    return { items, refRate, refDiff, refBenefici, refPlanned };
-  }, [filtered, dedicByExp]);
-
-  const millors = ranking.items.slice(0, 25);
-  const pitjors = ranking.items.length > 25
-    ? ranking.items.slice(Math.max(25, ranking.items.length - 25)).reverse()
-    : [];
-
-  // KPIs del rànquing (sobre tots els expedients inclosos, no només els 25 mostrats)
-  const rankN = ranking.items.length;
-  const rankTotalPlanned = ranking.items.reduce((s, i) => s + i.planned, 0);
-  const rankTotalFetes = ranking.items.reduce((s, i) => s + i.fetes, 0);
-  const rankTotalDiff = rankTotalPlanned - rankTotalFetes;
-  const rankTotalBenefici = ranking.items.reduce((s, i) => s + i.benefici, 0);
-  const rankAvgScore = rankN ? ranking.items.reduce((s, i) => s + i.score, 0) / rankN : 0;
-  const rankAvgDiff = rankN ? rankTotalDiff / rankN : 0;
+  // KPIs, breakdowns and the «Millors projectes» ranking (src/lib/llistats/expedients.ts,
+  // shared with the PDF and the Descàrregues page).
+  const stats = useMemo(() => expedientsStats(filtered, dedicByExp), [filtered, dedicByExp]);
+  const {
+    total, oberts, tancats, publics, privats,
+    pressupostTotal, pressupostPublic, pressupostPrivat, pressupostObert, pressupostMitja,
+    byCiutat, byTipologia, catPressupost, ranking, millors, pitjors,
+    rankN, rankTotalPlanned, rankTotalFetes, rankTotalDiff, rankTotalBenefici, rankAvgScore, rankAvgDiff,
+  } = stats;
 
   const filterSummary = [
     fDes && fDes === fFins ? `Any ${fDes}` : (fDes || fFins) && `${fDes || "…"}–${fFins || "…"}`,
@@ -1539,26 +1455,7 @@ function StatsResum({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
   ].filter(Boolean).join(" · ") || "Tots els expedients";
 
   function exportStatsPdf() {
-    exportExpedientsStatsPdf({
-      filterSummary, total, oberts, tancats, privats, publics,
-      pressupostTotal, pressupostPrivat, pressupostPublic, pressupostObert, pressupostMitja,
-      cat: catPressupost.map((g) => ({ label: g.label, count: g.count, money: g.value })),
-      tipologia: byTipologia.map((g) => ({ label: g.key, count: g.count, money: g.money })),
-      ciutat: byCiutat.map((g) => ({ label: g.key, count: g.count, money: g.money })),
-      refRate: ranking.refRate,
-      refDiff: ranking.refDiff,
-      refBenefici: ranking.refBenefici,
-      refPlanned: ranking.refPlanned,
-      rankN,
-      rankAvgScore,
-      rankAvgDiff,
-      rankTotalDiff,
-      rankTotalPlanned,
-      rankTotalFetes,
-      rankTotalBenefici,
-      millors: millors.map(toRankPdfRow),
-      pitjors: pitjors.map(toRankPdfRow),
-    });
+    openPdfDoc(expedientsStatsDoc(stats, filterSummary));
   }
 
   return (
@@ -1726,19 +1623,6 @@ function StatsResum({ rows, tipologies, dedicByExp }: { rows: Expedient[]; tipol
 // Millors projectes (rànquing per puntuació)
 // ============================================================================
 
-interface RankedProjecte {
-  r: Expedient;
-  pressupost: number;
-  planned: number; // hores pressupostades (del càlcul vinculat)
-  fetes: number;   // suma de dedicacions
-  rate: number;     // pressupost / hores fetes
-  pct: number;      // fetes / pressupostades
-  diff: number;     // pressupostades − fetes (positiu = bé)
-  benefici: number; // pressupost × (diff / pressupostades) — negatiu si s'ha excedit
-  score: number;    // 1–100
-  rank: number;     // posició global al rànquing
-}
-
 function scoreColor(score: number) {
   if (score >= 66) return "#15803d";
   if (score >= 33) return "#b45309";
@@ -1811,24 +1695,6 @@ function RankingTable({ title, items }: { title: string; items: RankedProjecte[]
   );
 }
 
-interface Group {
-  key: string;
-  count: number;
-  money: number;
-}
-
-function groupBySum(rows: Expedient[], keyFn: (r: Expedient) => string): Group[] {
-  const map = new Map<string, Group>();
-  for (const r of rows) {
-    const key = keyFn(r);
-    const g = map.get(key) ?? { key, count: 0, money: 0 };
-    g.count += 1;
-    g.money += parseFloat(r.pressupost) || 0;
-    map.set(key, g);
-  }
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
-}
-
 function FilterSelect({
   label,
   value,
@@ -1854,7 +1720,7 @@ function FilterSelect({
 }
 
 // ============================================================================
-// PDF export (list + stats), respecting the active filters
+// PDF export (src/lib/llistats/expedients.ts), respecting the active filters
 // ============================================================================
 
 function PdfIcon() {
@@ -1863,197 +1729,4 @@ function PdfIcon() {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
     </svg>
   );
-}
-
-function escHtml(s: string | null | undefined) {
-  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function eur(v: number) {
-  return new Intl.NumberFormat("ca-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v || 0);
-}
-function openPdf(title: string, headSub: string, innerHtml: string) {
-  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>${escHtml(title)}</title>
-    <style>
-      @page { size: A4 landscape; margin: 1.2cm; }
-      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: Arial, Helvetica, sans-serif; }
-      body { margin: 0; color: #1a1a1a; }
-      .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-      .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
-      .head .sub { font-size: 12px; color: #666; }
-      .head img { width: 150px; height: auto; }
-      h2 { font-size: 13px; margin: 18px 0 6px; }
-      .kpis { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
-      .kpi { border: 1px solid #e2e2dd; border-radius: 10px; padding: 8px 12px; min-width: 150px; }
-      .kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #777; }
-      .kpi .v { font-size: 16px; font-weight: 700; }
-      table { border-collapse: collapse; width: 100%; font-size: 11px; margin-bottom: 4px; }
-      thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
-      tbody td { padding: 6px 8px; border-bottom: 1px solid #e7e7e3; }
-      tbody tr:nth-child(even) td { background: #f7f7f5; }
-      td.r, th.r { text-align: right; white-space: nowrap; }
-      td.c, th.c { text-align: center; }
-      td.mono { font-family: "Courier New", monospace; }
-      tr.tot td { border-top: 2px solid #1f4d3f; border-bottom: none; font-weight: 700; background: #eef2f0 !important; padding-top: 8px; }
-      .foot { margin-top: 16px; font-size: 10px; color: #999; }
-    </style></head><body>
-      <div class="head"><div><h1>${escHtml(title)}</h1><div class="sub">${escHtml(headSub)}</div></div><img src="${logo}" alt="DAC arquitectura" /></div>
-      ${innerHtml}
-      <div class="foot">Generat el ${new Date().toLocaleDateString("ca-ES")} · DACARQUITECTURA</div>
-    </body></html>`;
-  const w = window.open("", "_blank", "width=1100,height=800");
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
-}
-
-function exportExpedientsListPdf(rows: Expedient[], filterSummary: string) {
-  const body = rows
-    .map((r) => `<tr>
-      <td class="mono">${escHtml(r.num_expedient)}</td>
-      <td>${escHtml(r.projecte ?? "—")}</td>
-      <td>${escHtml(r.client_nom ?? "—")}</td>
-      <td>${escHtml(r.ciutat ?? "—")}</td>
-      <td>${escHtml((r.categoria && CATEGORY_BY_CODE[r.categoria]?.label) || "—")}</td>
-      <td>${escHtml(r.tipologia_nom ?? "—")}</td>
-      <td>${escHtml(TIPUS[r.tipus].label)}</td>
-      <td class="c">${r.web ? "Sí" : "—"}</td>
-      <td class="r">${eur(parseFloat(r.pressupost) || 0)}</td>
-      <td>${escHtml(ESTAT[r.estat].label)}</td>
-      <td>${fmtDate(r.data_tancament) ?? "—"}</td>
-    </tr>`)
-    .join("");
-  const sum = rows.reduce((s, r) => s + (parseFloat(r.pressupost) || 0), 0);
-  const totalRow = `<tr class="tot"><td colspan="8">Total (${rows.length} ${rows.length === 1 ? "expedient" : "expedients"})</td><td class="r">${eur(sum)}</td><td colspan="2"></td></tr>`;
-  const table = `<table><thead><tr>
-      <th>Núm.</th><th>Projecte</th><th>Client</th><th>Ciutat</th><th>Categoria</th><th>Tipologia</th><th>Tipus</th><th class="c">Web</th><th class="r">Pressupost</th><th>Estat</th><th>Tancat el</th>
-    </tr></thead><tbody>${body || `<tr><td colspan="11" style="padding:14px;color:#888;">Cap expedient amb aquests filtres.</td></tr>`}${rows.length ? totalRow : ""}</tbody></table>`;
-  openPdf("Expedients", filterSummary, table);
-}
-
-interface RankPdfRow {
-  rank: number;
-  num: string;
-  any: string;
-  projecte: string | null;
-  client: string | null;
-  planned: number;
-  fetes: number;
-  pct: number;
-  pressupost: number;
-  diff: number;
-  benefici: number;
-  score: number;
-}
-
-function toRankPdfRow(it: RankedProjecte): RankPdfRow {
-  return {
-    rank: it.rank,
-    num: it.r.num_expedient,
-    any: anyOf(it.r.num_expedient),
-    projecte: it.r.projecte,
-    client: it.r.client_nom,
-    planned: it.planned,
-    fetes: it.fetes,
-    pct: it.pct,
-    pressupost: it.pressupost,
-    diff: it.diff,
-    benefici: it.benefici,
-    score: it.score,
-  };
-}
-
-interface StatsPdfData {
-  filterSummary: string;
-  total: number;
-  oberts: number;
-  tancats: number;
-  privats: number;
-  publics: number;
-  pressupostTotal: number;
-  pressupostPrivat: number;
-  pressupostPublic: number;
-  pressupostObert: number;
-  pressupostMitja: number;
-  cat: { label: string; count: number; money: number }[];
-  tipologia: { label: string; count: number; money: number }[];
-  ciutat: { label: string; count: number; money: number }[];
-  refRate: number;
-  refDiff: number;
-  refBenefici: number;
-  refPlanned: number;
-  rankN: number;
-  rankAvgScore: number;
-  rankAvgDiff: number;
-  rankTotalDiff: number;
-  rankTotalPlanned: number;
-  rankTotalFetes: number;
-  rankTotalBenefici: number;
-  millors: RankPdfRow[];
-  pitjors: RankPdfRow[];
-}
-
-function rankingPdfTable(title: string, rowsData: RankPdfRow[]) {
-  if (rowsData.length === 0) return "";
-  const body = rowsData
-    .map((r) => `<tr>
-      <td class="r">${r.rank}</td>
-      <td class="mono">${escHtml(r.num)}</td>
-      <td>${escHtml(r.any)}</td>
-      <td>${escHtml(r.projecte ?? "—")}</td>
-      <td>${escHtml(r.client ?? "—")}</td>
-      <td class="r">${fmtHores(r.planned)}</td>
-      <td class="r">${fmtHores(r.fetes)}</td>
-      <td class="r">${r.pct}%</td>
-      <td class="r">${eur(r.pressupost)}</td>
-      <td class="r" style="color:${r.diff > 0 ? "#15803d" : r.diff < 0 ? "#b91c1c" : "#666"};font-weight:600;">${r.diff > 0 ? "+" : ""}${fmtHores(r.diff)}</td>
-      <td class="r" style="color:${r.benefici > 0 ? "#15803d" : r.benefici < 0 ? "#b91c1c" : "#666"};font-weight:600;">${r.benefici > 0 ? "+" : ""}${eur(r.benefici)}</td>
-      <td class="r" style="font-weight:700;">${r.score}</td>
-    </tr>`)
-    .join("");
-  return `<h2>${escHtml(title)}</h2><table><thead><tr>
-      <th class="r">#</th><th>Núm.</th><th>Any</th><th>Projecte</th><th>Client</th><th class="r">Hores press.</th><th class="r">Hores fetes</th><th class="r">%</th><th class="r">Preu</th><th class="r">Diferència</th><th class="r">Benefici</th><th class="r">Puntuació</th>
-    </tr></thead><tbody>${body}</tbody></table>`;
-}
-
-function breakdownTable(title: string, rowsData: { label: string; count: number; money: number }[], total: number) {
-  if (rowsData.length === 0) return "";
-  const body = rowsData
-    .map((g) => `<tr><td>${escHtml(g.label)}</td><td class="r">${g.count}</td><td class="r">${total ? Math.round((g.money / total) * 100) : 0}%</td><td class="r">${eur(g.money)}</td></tr>`)
-    .join("");
-  return `<h2>${escHtml(title)}</h2><table><thead><tr><th>Concepte</th><th class="r">Expedients</th><th class="r">% pressupost</th><th class="r">Pressupost</th></tr></thead><tbody>${body}</tbody></table>`;
-}
-
-function exportExpedientsStatsPdf(d: StatsPdfData) {
-  const kpis = `<div class="kpis">
-      <div class="kpi"><div class="l">Expedients</div><div class="v">${d.total}</div></div>
-      <div class="kpi"><div class="l">Oberts / Tancats</div><div class="v">${d.oberts} / ${d.tancats}</div></div>
-      <div class="kpi"><div class="l">Privats / Públics</div><div class="v">${d.privats} / ${d.publics}</div></div>
-      <div class="kpi"><div class="l">Pressupost total</div><div class="v">${eur(d.pressupostTotal)}</div></div>
-      <div class="kpi"><div class="l">Pressupost en obert</div><div class="v">${eur(d.pressupostObert)}</div></div>
-      <div class="kpi"><div class="l">Pressupost mitjà</div><div class="v">${eur(d.pressupostMitja)}</div></div>
-    </div>`;
-  const tipus = breakdownTable("Pressupost per tipus", [
-    { label: "Privat", count: d.privats, money: d.pressupostPrivat },
-    { label: "Públic", count: d.publics, money: d.pressupostPublic },
-  ].filter((x) => x.money > 0 || x.count > 0), d.pressupostTotal);
-  const pn = (v: number) => (v > 0 ? "#15803d" : v < 0 ? "#b91c1c" : "#666");
-  const sgn = (v: number) => (v > 0 ? "+" : "");
-  const rankSection = d.millors.length
-    ? `<h2>Millors projectes</h2>
-      <div class="kpis">
-        <div class="kpi"><div class="l">Puntuació mitjana</div><div class="v">${Math.round(d.rankAvgScore)}</div><div class="l">sobre 100 · ${d.rankN} expedients tancats</div></div>
-        <div class="kpi"><div class="l">Diferència mitjana d'hores</div><div class="v" style="color:${pn(d.rankAvgDiff)};">${sgn(d.rankAvgDiff)}${fmtHores(d.rankAvgDiff)}</div><div class="l">pressupostades − fetes, per expedient</div></div>
-        <div class="kpi"><div class="l">Hores estalviades</div><div class="v" style="color:${pn(d.rankTotalDiff)};">${sgn(d.rankTotalDiff)}${fmtHores(d.rankTotalDiff)}</div><div class="l">${fmtHores(d.rankTotalPlanned)} press. · ${fmtHores(d.rankTotalFetes)} fetes</div></div>
-        <div class="kpi"><div class="l">Benefici total</div><div class="v" style="color:${pn(d.rankTotalBenefici)};">${sgn(d.rankTotalBenefici)}${eur(d.rankTotalBenefici)}</div><div class="l">pressupost × % d'hores estalviades</div></div>
-      </div>
-      <p style="font-size:10px;color:#666;margin:6px 0 0;">Puntuació 1–100: base 50 punts; ±10 segons la desviació relativa d'hores (menys hores de les pressupostades suma); ±15 segons les hores estalviades en valor absolut, comparades amb el màxim estalvi o excés del conjunt (${fmtHores(d.refDiff)}); ±15 segons el benefici (pressupost × % d'hores estalviades), comparat amb el màxim del conjunt (${eur(d.refBenefici)}); i ±10 segons el preu per hora feta comparat amb la mediana dels expedients inclosos (${eur(d.refRate)}/h). Els ajustos percentuals (desviació i preu/hora) es ponderen per la mida del projecte (hores pressupostades respecte de la mediana, ${fmtHores(d.refPlanned)}), de manera que desviar-se molt en un projecte petit gairebé no penalitza. Només s'hi inclouen expedients tancats amb pressupost, hores pressupostades i hores fetes.</p>`
-      + rankingPdfTable(`Millors ${d.millors.length}`, d.millors)
-      + rankingPdfTable(`Pitjors ${d.pitjors.length}`, d.pitjors)
-    : "";
-  const inner = kpis + tipus + breakdownTable("Pressupost per categoria", d.cat, d.pressupostTotal) + breakdownTable("Per tipologia", d.tipologia, d.pressupostTotal) + breakdownTable("Per ciutat", d.ciutat, d.pressupostTotal)
-    + rankSection;
-  openPdf("Expedients — Estadístiques", d.filterSummary, inner);
 }

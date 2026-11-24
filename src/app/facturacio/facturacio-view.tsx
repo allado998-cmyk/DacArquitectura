@@ -20,7 +20,8 @@ import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, StatsViews, TrendChart, YearRange, lighten, yearSpan, type TrendSeries } from "@/components/charts";
 import { CATEGORIES, CATEGORY_BY_CODE, TIPUS } from "@/lib/expedients";
-import { openStatsPdf } from "@/lib/pdf";
+import { openPdfDoc, openStatsPdf } from "@/lib/pdf";
+import { DEFAULT_IVA, byNumDesc, facturaYear, facturesListDoc, ivaPctOf, n, rowSup, sumGroup, totals, type GroupSum } from "@/lib/llistats/facturacio";
 import { PROFESSIONAL } from "@/lib/proposta-doc";
 import { facturaFileName } from "@/lib/file-names";
 
@@ -28,7 +29,6 @@ export interface ClientOpt { id: number; nom: string; nif: string | null; carrer
 export interface ExpedientOpt { id: number; num_expedient: string; projecte: string | null; pressupost: string }
 export interface Invoiced { expedient_id: number; total: string }
 
-const DEFAULT_IVA = 21;
 type Tab = "factures" | "estadistiques";
 
 // Dashboard accent palette (kept consistent with the Estadístiques tab).
@@ -36,20 +36,6 @@ const C_TOTAL = "#1f4d3f"; // brand green
 const C_BASE = "#0ea5e9"; // sky
 const C_IVA = "#f59e0b"; // amber
 const C_SUP = "#8b5cf6"; // violet
-
-function n(v: string | number | null | undefined) {
-  const x = typeof v === "string" ? parseFloat(v) : v ?? 0;
-  return Number.isFinite(x) ? (x as number) : 0;
-}
-function totals(preu: number, suplits: number, ivaPct: number = DEFAULT_IVA) {
-  const iva = preu * (ivaPct / 100);
-  const total = preu + iva;
-  return { iva, total, totalFinal: total + suplits };
-}
-function ivaPctOf(f: Factura) {
-  const v = n(f.iva_pct);
-  return Number.isFinite(v) && v >= 0 && f.iva_pct != null ? v : DEFAULT_IVA;
-}
 
 export function FacturacioView({
   factures,
@@ -177,24 +163,6 @@ function PagadaToggle({ id, pagada }: { id: number; pagada: boolean }) {
   );
 }
 
-interface GroupSum { base: number; iva: number; total: number; sup: number; totalFinal: number }
-
-function rowSup(f: Factura, suplitsByFactura: Map<number, FacturaSuplit[]>) {
-  return (suplitsByFactura.get(f.id) ?? []).reduce((s, x) => s + n(x.import), 0);
-}
-function sumGroup(rows: Factura[], suplitsByFactura: Map<number, FacturaSuplit[]>): GroupSum {
-  return rows.reduce<GroupSum>((acc, f) => {
-    const sup = rowSup(f, suplitsByFactura);
-    const t = totals(n(f.preu), sup, ivaPctOf(f));
-    acc.base += n(f.preu);
-    acc.iva += t.iva;
-    acc.total += t.total;
-    acc.sup += sup;
-    acc.totalFinal += t.totalFinal;
-    return acc;
-  }, { base: 0, iva: 0, total: 0, sup: 0, totalFinal: 0 });
-}
-
 function EyeIcon({ off }: { off?: boolean }) {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -289,9 +257,6 @@ function FacturesSummary({
 
 type SortKey = "num" | "base" | "totalFinal" | "data";
 
-function facturaYear(f: Factura) {
-  return f.data ? f.data.slice(0, 4) : "";
-}
 function facturaTrim(f: Factura) {
   if (!f.data) return "";
   const m = parseInt(f.data.slice(5, 7), 10);
@@ -352,7 +317,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
       if (sort === "data") return f.data ? Date.parse(f.data) : 0;
       return 0;
     };
-    if (sort === "num") return [...rows].sort((a, b) => (b.num ?? "").localeCompare(a.num ?? ""));
+    if (sort === "num") return [...rows].sort(byNumDesc);
     return [...rows].sort((a, b) => val(b) - val(a));
   }
 
@@ -378,12 +343,10 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
   useEffect(() => onCount(visibleEmeses.length + visibleProperes.length), [visibleEmeses.length, visibleProperes.length, onCount]);
 
   function exportPdf() {
-    const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
     // When only properes are on screen (Estat = propera, or emeses all hidden),
     // export those instead of an empty emeses table.
     const onlyProperes = visibleEmeses.length === 0 && visibleProperes.length > 0;
     const pdfRows = onlyProperes ? visibleProperes : visibleEmeses;
-    const pdfSum = onlyProperes ? properesSum : emesesSum;
     const filterParts: string[] = [];
     if (fAny) filterParts.push(`Any ${fAny}`);
     if (fTrim) filterParts.push(`Trimestre T${fTrim}`);
@@ -392,84 +355,7 @@ function FacturesList({ factures, suplitsByFactura, onEdit, today, onCount }: { 
     if (q) filterParts.push(`"${query.trim()}"`);
     const filterLine = filterParts.length ? filterParts.join(" · ") : onlyProperes ? "Propera facturació" : "Totes les factures emeses";
 
-    const body = pdfRows.map((f) => {
-      const sup = rowSup(f, suplitsByFactura);
-      const t = totals(n(f.preu), sup, ivaPctOf(f));
-      return `<tr>
-        <td class="mono">${esc(f.num ?? "—")}</td>
-        <td>${f.data ? esc(formatDataCa(f.data)) : "—"}</td>
-        <td>${esc(f.client_nom ?? "—")}</td>
-        <td class="mono">${esc(f.nif ?? "—")}</td>
-        <td>${f.expedient_num ? esc(f.expedient_num) : "—"}</td>
-        <td class="r b">${eur(n(f.preu))}</td>
-        <td class="r muted">${eur(t.iva)}</td>
-        <td class="r">${eur(t.total)}</td>
-        <td class="r">${sup ? eur(sup) : "—"}</td>
-        <td class="r b">${eur(t.totalFinal)}</td>
-        <td class="c">${f.estat === "propera" ? "Propera" : f.pagada ? "Pagada" : "Pendent"}</td>
-      </tr>`;
-    }).join("");
-
-    const totalRow = `<tr class="tot">
-      <td colspan="5">Total (${pdfRows.length} ${pdfRows.length === 1 ? "factura" : "factures"})</td>
-      <td class="r b">${eur(pdfSum.base)}</td>
-      <td class="r muted">${eur(pdfSum.iva)}</td>
-      <td class="r">${eur(pdfSum.total)}</td>
-      <td class="r">${pdfSum.sup ? eur(pdfSum.sup) : "—"}</td>
-      <td class="r b">${eur(pdfSum.totalFinal)}</td>
-      <td></td>
-    </tr>`;
-
-    const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Factures</title>
-      <style>
-        @page { size: A4 landscape; margin: 1.2cm; }
-        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: ${FACTURA_FONT}; }
-        body { margin: 0; color: #1a1a1a; }
-        .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-        .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
-        .head .sub { font-size: 12px; color: #666; }
-        .head img { width: 150px; height: auto; }
-        table { border-collapse: collapse; width: 100%; font-size: 11px; }
-        thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
-        tbody td { padding: 6px 8px; border-bottom: 1px solid #e7e7e3; }
-        tbody tr:nth-child(even) td { background: #f7f7f5; }
-        td.r, th.r { text-align: right; white-space: nowrap; }
-        td.c, th.c { text-align: center; }
-        td.b { font-weight: 700; }
-        td.mono { font-family: "Courier New", monospace; }
-        td.muted { color: #777; }
-        tr.tot td { border-top: 2px solid #1f4d3f; border-bottom: none; font-weight: 700; background: #eef2f0 !important; padding-top: 8px; }
-        .foot { margin-top: 16px; font-size: 10px; color: #999; }
-      </style></head>
-      <body>
-        <div class="head">
-          <div>
-            <h1>Factures</h1>
-            <div class="sub">${esc(filterLine)}</div>
-          </div>
-          <img src="${logo}" alt="DAC arquitectura" />
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Núm.</th><th>Data</th><th>Client</th><th>NIF/CIF</th><th>Expedient</th>
-              <th class="r">Base</th><th class="r">IVA</th><th class="r">Total</th><th class="r">Suplits</th><th class="r">Total final</th><th class="c">Estat</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${body || `<tr><td colspan="11" style="padding:14px;color:#888;">Cap factura amb aquests filtres.</td></tr>`}
-            ${pdfRows.length ? totalRow : ""}
-          </tbody>
-        </table>
-        <div class="foot">Generat el ${esc(formatDataCa(new Date().toISOString().slice(0, 10)))} · DACARQUITECTURA</div>
-      </body></html>`;
-
-    const w = window.open("", "_blank", "width=1100,height=800");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 400);
+    openPdfDoc(facturesListDoc(pdfRows, suplitsByFactura, filterLine));
   }
 
   return (

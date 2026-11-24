@@ -7,6 +7,31 @@ type Area = "dac" | "demo";
 
 const INDEX = "index.json";
 
+// One regeneration at a time per area (generar.ts → regenerarSiCal): a marker
+// taken with a create-only write; one older than 10 minutes (a run that died)
+// is taken over.
+const BLOQUEIG = "regenerant.json";
+
+export async function agafarBloqueig(area: Area): Promise<boolean> {
+  const path = `${areaPrefix(area)}${BLOQUEIG}`;
+  const body = JSON.stringify({ des: new Date().toISOString() });
+  const opts = { access: "private" as const, contentType: "application/json", addRandomSuffix: false };
+  try {
+    await put(path, body, { ...opts, allowOverwrite: false });
+    return true;
+  } catch {
+    const r = await get(path, { access: "private", useCache: false }).catch(() => null);
+    const des = r?.statusCode === 200 && r.stream ? Date.parse(((await new Response(r.stream).json().catch(() => ({}))) as { des?: string }).des ?? "") : NaN;
+    if (Number.isFinite(des) && Date.now() - des < 10 * 60_000) return false;
+    await put(path, body, { ...opts, allowOverwrite: true });
+    return true;
+  }
+}
+
+export async function deixarBloqueig(area: Area): Promise<void> {
+  await del(`${areaPrefix(area)}${BLOQUEIG}`).catch(() => {});
+}
+
 export async function llegirManifest(area: Area): Promise<Manifest | null> {
   const r = await get(`${areaPrefix(area)}${INDEX}`, { access: "private", useCache: false }).catch(() => null);
   if (!r || r.statusCode !== 200 || !r.stream) return null;

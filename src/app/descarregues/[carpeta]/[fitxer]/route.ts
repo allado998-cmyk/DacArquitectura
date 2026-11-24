@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ carp
     return new Response("No trobat.", { status: 404 });
   }
 
-  const name = doc ? nomDescarrega(doc.llista, doc.any) : `DAC Descàrregues ${diaBcn(result.blob.uploadedAt)}.zip`;
+  const name = doc ? nomDescarrega(doc.llista, doc.any, doc.finsA) : `DAC Descàrregues ${diaBcn(result.blob.uploadedAt)}.zip`;
   return new Response(result.stream, {
     headers: {
       "Content-Type": doc ? "application/pdf" : "application/zip",

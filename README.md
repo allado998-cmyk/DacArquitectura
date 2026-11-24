@@ -150,10 +150,12 @@ En local cal `BLOB_READ_WRITE_TOKEN` a `.env.local` (`vercel env pull` el porta)
 
 La pàgina **Descàrregues** (al menú, entre Base de Dades i Notes) ofereix en PDF
 les llistes i estadístiques de l'app, sense cap filtre a part de l'any:
-expedients, actes, ITE, càlculs d'honoraris, propostes i facturació (un PDF per
-any i el de l'any en curs), les estadístiques d'expedients i de dedicació de
-l'any en curs, i els llistats de clients i de contactes. A dalt, **Global (ZIP)**
-els porta tots, per carpetes. Cada fila diu quan es va gravar.
+expedients, actes, ITE, càlculs d'honoraris, propostes i facturació (un sol PDF
+«de tots els anys», del 2000 a l'any anterior, on cada any comença en una pàgina
+nova, i el de l'any en curs; els anys posteriors a l'actual no surten enlloc), les
+estadístiques d'expedients i de dedicació de l'any en curs, i els llistats de
+clients i de contactes. A dalt, **Global (ZIP)** els porta tots, per carpetes.
+Cada fila diu quan es va gravar.
 
 - **Quan:** un cron de Vercel (`vercel.json`, `0 5 * * 1,3,5`: dilluns, dimecres
   i divendres a les 5 UTC, les 6 o les 7 a Barcelona) crida
@@ -166,6 +168,13 @@ els porta tots, per carpetes. Cada fila diu quan es va gravar.
 - **Descarregar:** `/descarregues/<carpeta>/<fitxer>` comprova la sessió i només
   serveix fitxers de l'àrea de l'usuari. La pàgina només llegeix l'índex: obrir-la
   no toca la base de dades.
+- **Canvi de format:** l'índex porta la versió del format (`VERSIO` a
+  `cataleg.ts`). Si després d'un deploy la pàgina troba una generació d'una
+  versió anterior, mostra el que hi ha, avisa que s'estan preparant els fitxers i
+  els torna a generar en segon pla (`regenerarSiCal`, una sola vegada per àrea),
+  sense esperar el cron. Només a producció: una preview o un servidor local
+  comparteixen el magatzem real i no hi han d'escriure (en local,
+  `DESCARREGUES_PROVES=<prefix>` fa llegir i escriure sota `<prefix>/…`).
 - **Demo:** el mateix cron fa els PDF del compte `demo` a partir de la seva base de
   dades i els desa a l'àrea `demo`; la demo no veu mai els fitxers reals.
 - **Què hi surt:** el mateix que el botó «PDF» de cada pàgina. Les columnes, les

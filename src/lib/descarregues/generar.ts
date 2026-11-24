@@ -14,6 +14,7 @@ import { facturaYear, facturacioStats, facturacioStatsDoc, facturesListDoc } fro
 import { actesListDoc, byNom, clientsListDoc, contactesListDoc, honorarisListDoc, iteListDoc, propostesListDoc } from "@/lib/llistats/llistes";
 import { runAsActingUser } from "@/lib/acting-user";
 import type { AppUser } from "@/lib/auth";
+import { enviarAvis } from "./avis";
 import { DES_DE, LLISTES, VERSIO, ZIP, anyBcn, dataHoraBcn, nomDescarrega, nomFitxer, potRegenerar, type Llista, type Manifest } from "./cataleg";
 import { carregarDades, type Dades } from "./dades";
 import { agafarBloqueig, deixarBloqueig, llegirManifest, publicar } from "./magatzem";
@@ -166,10 +167,12 @@ export interface Resultat {
   bytes: number;
   zipBytes: number;
   esborrats: number; // files of earlier runs removed
+  avis?: string; // the e-mail to the studio (avis.ts), when the run asked for it
   ms: number;
 }
 
-export async function generarDescarregues(opts: { ara?: Date; origin?: string } = {}): Promise<Resultat> {
+// `avis`: then e-mail the studio the new zip (only the cron's runs of the studio ask for it).
+export async function generarDescarregues(opts: { ara?: Date; origin?: string; avis?: boolean } = {}): Promise<Resultat> {
   const t0 = Date.now();
   const ara = opts.ara ?? new Date();
   const area = await fitxersArea();
@@ -200,6 +203,7 @@ export async function generarDescarregues(opts: { ara?: Date; origin?: string } 
     ...pdfs.map((p) => ({ nom: p.nom, data: p.data, tipus: "application/pdf" })),
     { nom: ZIP, data: zip, tipus: "application/zip" },
   ]);
+  const avis = opts.avis && area === "dac" && publicat ? await enviarAvis({ manifest, zip, logo, origin: opts.origin }) : undefined;
   return {
     area,
     carpeta: manifest.carpeta,
@@ -208,6 +212,7 @@ export async function generarDescarregues(opts: { ara?: Date; origin?: string } 
     bytes: pdfs.reduce((s, p) => s + p.data.byteLength, 0),
     zipBytes: zip.byteLength,
     esborrats,
+    ...(avis ? { avis } : {}),
     ms: Date.now() - t0,
   };
 }

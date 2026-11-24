@@ -1019,8 +1019,12 @@ function DedicacioModal({
       title={
         expedient && (
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-[var(--color-accent)]">{expedient.num_expedient}</span>
+            {/* As the studio asked: the number stands out (bigger, bold), then the categoria and
+                the tipologia, then privat/públic and the state. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-lg font-bold text-[var(--color-accent)]">{expedient.num_expedient}</span>
+              {expedient.categoria && CATEGORY_BY_CODE[expedient.categoria] && <CategoriaBadge code={expedient.categoria} />}
+              {expedient.tipologia_nom && <TipologiaBadge nom={expedient.tipologia_nom} />}
               <Badge swatch={TIPUS[expedient.tipus]} label={TIPUS[expedient.tipus].label} />
               <Badge swatch={ESTAT[expedient.estat]} label={ESTAT[expedient.estat].label} dot />
             </div>

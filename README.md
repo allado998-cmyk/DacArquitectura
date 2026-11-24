@@ -153,9 +153,15 @@ les llistes i estadístiques de l'app, sense cap filtre a part de l'any:
 expedients, actes, ITE, càlculs d'honoraris, propostes i facturació (un sol PDF
 «de tots els anys», del 2000 a l'any anterior, on cada any comença en una pàgina
 nova, i el de l'any en curs; els anys posteriors a l'actual no surten enlloc), les
-estadístiques d'expedients i de dedicació de l'any en curs, i els llistats de
-clients i de contactes. A dalt, **Global (ZIP)** els porta tots, per carpetes.
-Cada fila diu quan es va gravar.
+estadístiques d'expedients, de dedicació i de facturació de l'any en curs, i els
+llistats de clients i de contactes. A dalt, **Global (ZIP)** els porta tots, per
+carpetes. Cada fila diu quan es va gravar. Dins de cada any, les llistes van del
+número més baix al més alt.
+
+L'**estadística de facturació** (`facturacioStats` a `src/lib/llistats/facturacio.ts`)
+compta les factures emeses de l'any amb els mateixos totals que la llista (base,
+IVA, suplits, total final): cobrat i pendent, per trimestre, per mes i per client,
+i la llista de les pendents de cobrament.
 
 - **Quan:** un cron de Vercel (`vercel.json`, `0 5 * * 1,3,5`: dilluns, dimecres
   i divendres a les 5 UTC, les 6 o les 7 a Barcelona) crida

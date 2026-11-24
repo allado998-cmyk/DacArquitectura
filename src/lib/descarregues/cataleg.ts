@@ -17,6 +17,7 @@ export type Llista =
   | "honoraris"
   | "propostes"
   | "facturacio"
+  | "facturacio-estadistica"
   | "clients"
   | "contactes";
 
@@ -30,6 +31,7 @@ export const LLISTES: Record<Llista, { nom: string; carpeta: string }> = {
   honoraris: { nom: "Càlculs d'honoraris", carpeta: "Honoraris" },
   propostes: { nom: "Propostes d'honoraris", carpeta: "Propostes" },
   facturacio: { nom: "Facturació", carpeta: "Facturació" },
+  "facturacio-estadistica": { nom: "Facturació - estadística", carpeta: "Facturació" },
   clients: { nom: "Clients", carpeta: "Base de Dades" },
   contactes: { nom: "Contactes", carpeta: "Base de Dades" },
 };
@@ -53,6 +55,7 @@ export const FILES: { titol: string; llista: Llista; anys: "anteriors" | "actual
   { titol: "Propostes d'honoraris de l'any en curs", llista: "propostes", anys: "actual" },
   { titol: "Facturació de tots els anys", llista: "facturacio", anys: "anteriors" },
   { titol: "Facturació de l'any en curs", llista: "facturacio", anys: "actual" },
+  { titol: "Estadística de facturació de l'any en curs", llista: "facturacio-estadistica", anys: "actual" },
   { titol: "Llistat de clients", llista: "clients", anys: "cap" },
   { titol: "Llistat de contactes", llista: "contactes", anys: "cap" },
 ];

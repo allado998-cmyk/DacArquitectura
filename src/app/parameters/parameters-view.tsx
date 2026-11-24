@@ -43,7 +43,7 @@ import type {
 import { formatEur, formatEurPrecise, parseLocaleNumber } from "@/lib/format";
 import { ambDificultat, tarifaBenzina, tarifaHora } from "@/lib/tarifes";
 import { openPdfDoc } from "@/lib/pdf";
-import { byNom, clientsListDoc, contactesListDoc } from "@/lib/llistats/llistes";
+import { byNom, clientFitxaDoc, clientsListDoc, contactesListDoc } from "@/lib/llistats/llistes";
 import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
@@ -53,6 +53,9 @@ import { BackToTop, StickyFilters } from "@/components/sticky-filters";
 type Tab = "clients" | "contactes" | "directes" | "altres" | "tipologies" | "tasques" | "benzina" | "hora" | "certificats" | "ite";
 
 const EMPTY_STATS: Omit<ClientStats, "client_id"> = { n: 0, oberts: 0, pressupost_total: "0", pressupost_obert: "0" };
+
+// "24/11/2026": the date a sheet's PDF is made.
+const avuiCa = () => new Intl.DateTimeFormat("ca-ES", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 
 function ParamPdfIcon() {
   return (
@@ -1439,6 +1442,18 @@ function ClientFormModal({
       open={open}
       onClose={onClose}
       wide
+      actions={
+        client && (
+          <button
+            type="button"
+            className="btn-ghost btn-sm inline-flex items-center gap-1.5"
+            title="Genera un PDF d'aquesta fitxa"
+            onClick={() => openPdfDoc(clientFitxaDoc(client, stats ?? EMPTY_STATS, contactes, avuiCa()))}
+          >
+            <ParamPdfIcon /> PDF
+          </button>
+        )
+      }
       title={<h3 className="text-lg font-semibold tracking-tight">{client ? client.nom : "Nou client"}</h3>}
     >
       {open && (

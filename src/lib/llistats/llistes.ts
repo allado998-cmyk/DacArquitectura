@@ -4,7 +4,7 @@
 
 import { actaReasonLabel } from "@/lib/acta-doc";
 import { formatDataCa, formatEur } from "@/lib/format";
-import type { Client, ClientContacte, PropostaDocEstat } from "@/types/db";
+import type { Client, ClientContacte, ClientStats, PropostaDocEstat } from "@/types/db";
 import { dataCa, type PdfDoc } from "./doc";
 
 const num = (v: string | null | undefined) => parseFloat(v ?? "") || 0;
@@ -135,6 +135,52 @@ export function clientsListDoc(rows: Pick<Client, "id" | "nom" | "nif" | "ciutat
             const i = info(c.id);
             return [c.nom, c.nif ?? "—", c.ciutat ?? "—", c.codi_postal ?? "—", String(i.contactes), String(i.oberts), String(i.expedients)];
           }),
+        },
+      },
+    ],
+  };
+}
+
+// A client's sheet, the «PDF» button of its window (ticket #34): the figures,
+// the data and the contacts, as the window shows them.
+export function clientFitxaDoc(
+  c: Pick<Client, "nom" | "nif" | "carrer" | "ciutat" | "codi_postal">,
+  stats: Pick<ClientStats, "n" | "oberts" | "pressupost_total" | "pressupost_obert">,
+  contactes: readonly Pick<ClientContacte, "nom" | "professio" | "telefon" | "telefons_extra" | "mail" | "mails_extra">[],
+  avui: string,
+): PdfDoc {
+  const dades = (
+    [
+      ["Nom", c.nom],
+      ["NIF / CIF", c.nif ?? ""],
+      ["Carrer", c.carrer ?? ""],
+      ["Ciutat", c.ciutat ?? ""],
+      ["Codi postal", c.codi_postal ?? ""],
+    ] as [string, string][]
+  ).filter(([, v]) => v.trim());
+  const tots = (main: string | null, extra: readonly string[]) => [main, ...extra].filter((x): x is string => !!x?.trim()).join(", ") || "—";
+  return {
+    title: c.nom,
+    subtitle: `Fitxa de client · ${avui}`,
+    landscape: false,
+    blocks: [
+      {
+        kind: "kpis",
+        items: [
+          { label: "Expedients", value: String(stats.n) },
+          { label: "Oberts", value: String(stats.oberts) },
+          { label: "Pressupost total", value: formatEur(num(stats.pressupost_total)) },
+          { label: "Pressupost en obert", value: formatEur(num(stats.pressupost_obert)) },
+        ],
+      },
+      { kind: "table", table: { title: "Dades", columns: [{ label: "Dada", muted: true }, { label: "Valor" }], rows: dades, narrow: true, plain: true } },
+      {
+        kind: "table",
+        table: {
+          title: `Contactes${contactes.length ? ` (${contactes.length})` : ""}`,
+          columns: [{ label: "Nom" }, { label: "Professió" }, { label: "Telèfons" }, { label: "Mails" }],
+          rows: contactes.map((x) => [x.nom ?? "—", x.professio ?? "—", tots(x.telefon, x.telefons_extra), tots(x.mail, x.mails_extra)]),
+          empty: "Cap contacte d'aquest client.",
         },
       },
     ],

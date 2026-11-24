@@ -4,17 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { deletePropostaDocAction, duplicatePropostaDocAction } from "./actions";
 import { formatDataCa, formatEur, todayIso } from "@/lib/format";
-import { openListPdf, openStatsPdf } from "@/lib/pdf";
+import { openPdfDoc, openStatsPdf } from "@/lib/pdf";
+import { PROPOSTA_ESTAT_META, propostesListDoc } from "@/lib/llistats/llistes";
 import { ChartCard, GradientDonut, HBarChart, KpiCard, VBarChart } from "@/components/charts";
 import type { PropostaDoc, PropostaDocEstat } from "@/types/db";
 
 type Row = PropostaDoc & { client_nom: string | null; total: string };
 
-const ESTAT_META: Record<PropostaDocEstat, { label: string; bg: string; text: string; color: string }> = {
-  pendent: { label: "Pendent", bg: "#fef9c3", text: "#854d0e", color: "#eab308" },
-  acceptada: { label: "Acceptada", bg: "#dcfce7", text: "#15803d", color: "#16a34a" },
-  rebutjada: { label: "Rebutjada", bg: "#fee2e2", text: "#b91c1c", color: "#dc2626" },
-};
+const ESTAT_META = PROPOSTA_ESTAT_META;
 const ESTATS: PropostaDocEstat[] = ["pendent", "acceptada", "rebutjada"];
 
 type Tab = "propostes" | "estadistiques";
@@ -109,12 +106,7 @@ function PropostesList({ rows, onCount }: { rows: Row[]; onCount: (n: number) =>
 
   const filterSummary = [fAny && `Any ${fAny}`, fTrim && `T${fTrim}`, fClient, fEstat && (ESTAT_META[fEstat as PropostaDocEstat]?.label ?? fEstat), q && `"${query.trim()}"`].filter(Boolean).join(" · ") || "Totes les propostes";
   function exportPdf() {
-    openListPdf({
-      title: "Propostes d'honoraris",
-      subtitle: filterSummary,
-      columns: [{ label: "Núm." }, { label: "Data" }, { label: "Descripció" }, { label: "Client" }, { label: "Import", align: "right" }, { label: "Estat" }],
-      rows: filtered.map((r) => [r.num, formatDataCa(r.data), r.descripcio ?? "—", r.client_nom ?? "—", formatEur(r.total), ESTAT_META[r.estat].label]),
-    });
+    openPdfDoc(propostesListDoc(filtered, filterSummary));
   }
 
   if (rows.length === 0) {

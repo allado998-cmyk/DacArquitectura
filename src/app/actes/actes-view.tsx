@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { createActaAction, duplicateActaAction, deleteActaAction } from "./actions";
 import { ACTA_REASONS, actaReasonLabel } from "@/lib/acta-doc";
-import { openListPdf } from "@/lib/pdf";
+import { openPdfDoc } from "@/lib/pdf";
+import { actesListDoc } from "@/lib/llistats/llistes";
 
 type ActaRow = {
   id: number;
@@ -69,12 +70,7 @@ export function ActesView({ actes, expedients }: { actes: ActaRow[]; expedients:
   }
 
   function pdf() {
-    openListPdf({
-      title: "Actes",
-      subtitle: `${filtered.length} ${filtered.length === 1 ? "acta" : "actes"}`,
-      columns: [{ label: "Núm" }, { label: "Motiu" }, { label: "Acta nº" }, { label: "Expedient" }, { label: "Projecte" }, { label: "Client" }, { label: "Data", align: "right" }],
-      rows: filtered.map((a) => [a.num ?? "", actaReasonLabel(a.tipus), a.acta_num ?? "", a.expedient_num ?? "", a.projecte ?? "", a.client ?? "", fmtData(a.data)]),
-    });
+    openPdfDoc(actesListDoc(filtered, `${filtered.length} ${filtered.length === 1 ? "acta" : "actes"}`));
   }
 
   return (

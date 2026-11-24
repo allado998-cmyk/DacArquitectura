@@ -13,17 +13,13 @@ import { Combobox, type ComboOption } from "@/components/combobox";
 import { Modal } from "@/components/modal";
 import { CATEGORIES } from "@/lib/expedients";
 import { ChartCard, HBarChart, KpiCard, LineChart } from "@/components/charts";
+import { openPdfDoc } from "@/lib/pdf";
+import { MONTHS_CA, dedicacioStats, dedicacioStatsDoc, monthLabel, periodLabel as periodLabelOf } from "@/lib/llistats/dedicacio";
 
 const ACCENT_RGB = "31, 77, 63";
-const MONTHS_CA = [
-  "Gener", "Febrer", "Març", "Abril", "Maig", "Juny",
-  "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre",
-];
 const WEEKDAYS_CA = ["dl", "dt", "dc", "dj", "dv", "ds", "dg"];
-const WEEKDAY_NAMES = ["Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"];
 
 type Tab = "registre" | "estadistiques";
-type Agrupacio = "dia" | "setmana" | "mes";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -55,13 +51,6 @@ function formatDataShort(iso: string) {
 function addDays(iso: string, delta: number) {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d + delta);
-  return dateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
-}
-function weekStart(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  const day = (dt.getDay() + 6) % 7;
-  dt.setDate(dt.getDate() - day);
   return dateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
 export function DedicacioView({
@@ -646,76 +635,12 @@ function StatsTab({
     [dedicacions, fAny, fExpedient, fClient, fCategoria, dStart, dEnd],
   );
 
-  const totalHores = filtered.reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-  const dies = new Set(filtered.map((d) => d.data)).size;
-  const nExpedients = new Set(filtered.map((d) => d.expedient_id).filter(Boolean)).size;
-
-  // Per categoria
-  const catRows = CATEGORIES.map((c) => ({
-    label: c.label,
-    color: c.color,
-    hores: filtered.filter((d) => d.categoria === c.code).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0),
-  })).filter((r) => r.hores > 0);
-  const senseCat = filtered.filter((d) => !d.categoria).reduce((s, d) => s + (parseFloat(d.hores) || 0), 0);
-  if (senseCat > 0) catRows.push({ label: "Sense categoria", color: "#9ca3af", hores: senseCat });
-  catRows.sort((a, b) => b.hores - a.hores);
-
-  // Per client
-  const clientMap = new Map<string, number>();
-  for (const d of filtered) {
-    const k = d.client_nom ?? "(Sense client)";
-    clientMap.set(k, (clientMap.get(k) ?? 0) + (parseFloat(d.hores) || 0));
-  }
-  const clientRows = Array.from(clientMap, ([label, hores]) => ({ label, hores })).sort((a, b) => b.hores - a.hores);
-
-  // Evolució — granularity auto-derived from the active date span.
-  const spanDays = (() => {
-    const dates = filtered.map((d) => d.data).sort();
-    const from = dStart || dates[0];
-    const to = dEnd || dates[dates.length - 1];
-    if (!from || !to) return 0;
-    return Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
-  })();
-  const agrupacio: Agrupacio = spanDays <= 31 ? "dia" : spanDays <= 140 ? "setmana" : "mes";
-  const periodMap = new Map<string, number>();
-  for (const d of filtered) {
-    const key = agrupacio === "dia" ? d.data : agrupacio === "setmana" ? weekStart(d.data) : d.data.slice(0, 7);
-    periodMap.set(key, (periodMap.get(key) ?? 0) + (parseFloat(d.hores) || 0));
-  }
-  const periodRows = Array.from(periodMap, ([key, hores]) => ({ key, hores })).sort((a, b) => a.key.localeCompare(b.key));
-  function periodLabel(key: string) {
-    if (agrupacio === "mes") {
-      const [y, m] = key.split("-").map(Number);
-      return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
-    }
-    return formatDataShort(key).slice(0, 5);
-  }
-
-  // Per dia de la setmana — totals i mitjanes
-  const weekdayAgg = WEEKDAY_NAMES.map((label) => ({ label, total: 0, dates: new Set<string>() }));
-  for (const d of filtered) {
-    const [y, m, da] = d.data.split("-").map(Number);
-    const wd = (new Date(y, m - 1, da).getDay() + 6) % 7;
-    weekdayAgg[wd].total += parseFloat(d.hores) || 0;
-    weekdayAgg[wd].dates.add(d.data);
-  }
-  const weekdayRows = weekdayAgg.map((w) => ({ label: w.label, total: w.total, avg: w.dates.size ? w.total / w.dates.size : 0 }));
+  // KPIs, per categoria / client, «Evolució» and the weekday and monthly means
+  // (src/lib/llistats/dedicacio.ts, shared with the PDF and the Descàrregues page).
+  const stats = useMemo(() => dedicacioStats(filtered, dStart, dEnd), [filtered, dStart, dEnd]);
+  const { totalHores, dies, nExpedients, catRows, agrupacio, periodRows, weekdayRows, monthAvgRows } = stats;
   const weekdayMaxAvg = Math.max(1, ...weekdayRows.map((w) => w.avg));
-
-  // Mitjana d'hores per dia treballat, mes a mes.
-  const monthAggMap = new Map<string, { hores: number; dies: Set<string> }>();
-  for (const d of filtered) {
-    const k = d.data.slice(0, 7);
-    const g = monthAggMap.get(k) ?? { hores: 0, dies: new Set<string>() };
-    g.hores += parseFloat(d.hores) || 0;
-    g.dies.add(d.data);
-    monthAggMap.set(k, g);
-  }
-  function monthLabel(key: string) {
-    const [y, m] = key.split("-").map(Number);
-    return `${MONTHS_CA[m - 1].slice(0, 3)} ${String(y).slice(2)}`;
-  }
-  const monthAvgRows = Array.from(monthAggMap, ([key, g]) => ({ key, avg: g.dies.size ? g.hores / g.dies.size : 0 })).sort((a, b) => a.key.localeCompare(b.key));
+  const periodLabel = (key: string) => periodLabelOf(key, agrupacio);
 
   const filterSummary = [
     fAny && `Any ${fAny}`,
@@ -726,16 +651,7 @@ function StatsTab({
   ].filter(Boolean).join(" · ") || "Tota la dedicació";
 
   function exportStatsPdf() {
-    exportDedicacioStatsPdf({
-      filterSummary,
-      totalHores, dies, nExpedients,
-      mitjanaDia: dies ? totalHores / dies : 0,
-      categoria: catRows.map((r) => ({ label: r.label, hores: r.hores })),
-      client: clientRows.map((r) => ({ label: r.label, hores: r.hores })),
-      mesAvg: monthAvgRows.map((r) => ({ label: monthLabel(r.key), avg: r.avg })),
-      weekday: weekdayRows.map((w) => ({ label: w.label, avg: w.avg, total: w.total })),
-      evolucio: { meta: agrupacio === "dia" ? "per dia" : agrupacio === "setmana" ? "per setmana" : "per mes", rows: periodRows.map((p) => ({ label: periodLabel(p.key), hores: p.hores })) },
-    });
+    openPdfDoc(dedicacioStatsDoc(stats, filterSummary));
   }
 
   return (
@@ -924,7 +840,7 @@ function DayModal({
 }
 
 // ============================================================================
-// PDF export (dedicació stats, respecting filters)
+// PDF export (src/lib/llistats/dedicacio.ts), respecting the filters
 // ============================================================================
 
 function DedPdfIcon() {
@@ -933,74 +849,4 @@ function DedPdfIcon() {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="m9 15 3 3 3-3" />
     </svg>
   );
-}
-function escH(s: string | null | undefined) {
-  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-interface DedStatsPdf {
-  filterSummary: string;
-  totalHores: number;
-  dies: number;
-  nExpedients: number;
-  mitjanaDia: number;
-  categoria: { label: string; hores: number }[];
-  client: { label: string; hores: number }[];
-  mesAvg: { label: string; avg: number }[];
-  weekday: { label: string; avg: number; total: number }[];
-  evolucio: { meta: string; rows: { label: string; hores: number }[] };
-}
-
-function exportDedicacioStatsPdf(d: DedStatsPdf) {
-  const logo = `${typeof window !== "undefined" ? window.location.origin : ""}/logo.jpg`;
-  const twoCol = (title: string, rows: { label: string; v: string }[], head = ["Concepte", "Hores"]) =>
-    rows.length === 0 ? "" : `<h2>${escH(title)}</h2><table><thead><tr><th>${escH(head[0])}</th><th class="r">${escH(head[1])}</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escH(r.label)}</td><td class="r">${escH(r.v)}</td></tr>`).join("")}</tbody></table>`;
-  const weekdayTable = d.weekday.some((w) => w.total > 0)
-    ? `<h2>Per dia de la setmana</h2><table><thead><tr><th>Dia</th><th class="r">Mitjana</th><th class="r">Total</th></tr></thead><tbody>${d.weekday.map((w) => `<tr><td>${escH(w.label)}</td><td class="r">${escH(fmtHores(w.avg))}</td><td class="r">${escH(fmtHores(w.total))}</td></tr>`).join("")}</tbody></table>`
-    : "";
-
-  const kpis = `<div class="kpis">
-      <div class="kpi"><div class="l">Hores totals</div><div class="v">${escH(fmtHores(d.totalHores))}</div></div>
-      <div class="kpi"><div class="l">Dies treballats</div><div class="v">${d.dies}</div></div>
-      <div class="kpi"><div class="l">Expedients</div><div class="v">${d.nExpedients}</div></div>
-      <div class="kpi"><div class="l">Mitjana / dia</div><div class="v">${escH(fmtHores(d.mitjanaDia))}</div></div>
-    </div>`;
-
-  const inner = kpis
-    + twoCol("Hores per categoria", d.categoria.map((r) => ({ label: r.label, v: fmtHores(r.hores) })))
-    + twoCol("Hores per client", d.client.map((r) => ({ label: r.label, v: fmtHores(r.hores) })))
-    + twoCol("Mitjana d'hores per dia treballat (mes a mes)", d.mesAvg.map((r) => ({ label: r.label, v: fmtHores(r.avg) })), ["Mes", "Mitjana/dia"])
-    + twoCol(`Evolució (${d.evolucio.meta})`, d.evolucio.rows.map((r) => ({ label: r.label, v: fmtHores(r.hores) })), ["Període", "Hores"])
-    + weekdayTable;
-
-  const html = `<!DOCTYPE html><html lang="ca"><head><meta charset="utf-8"><title>Dedicació — Estadístiques</title>
-    <style>
-      @page { size: A4; margin: 1.4cm; }
-      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: Arial, Helvetica, sans-serif; }
-      body { margin: 0; color: #1a1a1a; }
-      .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-      .head h1 { font-size: 20px; margin: 0 0 2px; font-weight: 700; }
-      .head .sub { font-size: 12px; color: #666; }
-      .head img { width: 150px; height: auto; }
-      h2 { font-size: 13px; margin: 16px 0 6px; }
-      .kpis { display: flex; flex-wrap: wrap; gap: 10px; }
-      .kpi { border: 1px solid #e2e2dd; border-radius: 10px; padding: 8px 12px; min-width: 130px; }
-      .kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #777; }
-      .kpi .v { font-size: 16px; font-weight: 700; }
-      table { border-collapse: collapse; width: 100%; max-width: 520px; font-size: 11px; }
-      thead th { background: #1f4d3f; color: #fff; font-weight: 600; text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; }
-      tbody td { padding: 5px 8px; border-bottom: 1px solid #e7e7e3; }
-      td.r, th.r { text-align: right; white-space: nowrap; }
-      .foot { margin-top: 16px; font-size: 10px; color: #999; }
-    </style></head><body>
-      <div class="head"><div><h1>Dedicació — Estadístiques</h1><div class="sub">${escH(d.filterSummary)}</div></div><img src="${logo}" alt="DAC arquitectura" /></div>
-      ${inner}
-      <div class="foot">Generat el ${new Date().toLocaleDateString("ca-ES")} · DACARQUITECTURA</div>
-    </body></html>`;
-  const w = window.open("", "_blank", "width=1000,height=900");
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
 }

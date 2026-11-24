@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/login/actions";
 import { getSession } from "@/lib/auth";
 
-export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" | "ite" | "calculs" | "ai" }) {
+export async function AppNav({ current }: { current?: "honoraris" | "parameters" | "expedients" | "dedicacio" | "propostes" | "planificacio" | "facturacio" | "notes" | "actes" | "ite" | "calculs" | "descarregues" | "ai" }) {
   const session = await getSession();
   const isDemo = session.user === "demo";
 
@@ -13,70 +13,77 @@ export async function AppNav({ current }: { current?: "honoraris" | "parameters"
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.jpg" alt="DAC arquitectura" className="h-7 sm:h-8 w-auto" />
         </Link>
+        {/* Twelve sections: px-2 keeps them on one line in the 6xl header (px-3 overflowed). */}
         <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap text-sm [&>a]:shrink-0">
           <Link
             href="/expedients"
-            className={`px-3 py-1.5 rounded-md ${current === "expedients" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "expedients" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Expedients
           </Link>
           <Link
             href="/planificacio"
-            className={`px-3 py-1.5 rounded-md ${current === "planificacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "planificacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Planificació
           </Link>
           <Link
             href="/dedicacio"
-            className={`px-3 py-1.5 rounded-md ${current === "dedicacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "dedicacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Dedicació
           </Link>
           <Link
             href="/actes"
-            className={`px-3 py-1.5 rounded-md ${current === "actes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "actes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Actes
           </Link>
           <Link
             href="/ite"
-            className={`px-3 py-1.5 rounded-md ${current === "ite" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "ite" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             ITE
           </Link>
           <Link
             href="/calculs"
-            className={`px-3 py-1.5 rounded-md ${current === "calculs" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "calculs" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Càlculs
           </Link>
           <Link
             href="/honoraris"
-            className={`px-3 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "honoraris" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Honoraris
           </Link>
           <Link
             href="/propostes"
-            className={`px-3 py-1.5 rounded-md ${current === "propostes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "propostes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Propostes
           </Link>
           <Link
             href="/facturacio"
-            className={`px-3 py-1.5 rounded-md ${current === "facturacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "facturacio" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Facturació
           </Link>
           <Link
             href="/parameters"
-            className={`px-3 py-1.5 rounded-md ${current === "parameters" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "parameters" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Base de Dades
           </Link>
           <Link
+            href="/descarregues"
+            className={`px-2 py-1.5 rounded-md ${current === "descarregues" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+          >
+            Descàrregues
+          </Link>
+          <Link
             href="/notes"
-            className={`px-3 py-1.5 rounded-md ${current === "notes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
+            className={`px-2 py-1.5 rounded-md ${current === "notes" ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "hover:bg-[var(--color-accent-soft)]"}`}
           >
             Notes
           </Link>

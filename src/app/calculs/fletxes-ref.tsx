@@ -1,7 +1,7 @@
 "use client";
 
 // "Límits fletxes": the deformation limits David consults (from his
-// spreadsheet), as a tab of Càlculs › Referència next to "Perfils i
+// spreadsheet), as a tab of Càlculs › Informació estructural next to "Perfils i
 // soldadures": the summary table, a calculator, the limits for usual spans and
 // the standards they come from.
 

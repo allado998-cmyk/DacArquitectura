@@ -47,7 +47,7 @@ const isTab = (t: string | undefined): t is Tab =>
 const MENU = [
   ...CALC_GROUPS.map((g) => ({ title: g, items: CALC_TYPES.filter((t) => t.group === g).map((t) => ({ tab: t.tipus as Tab, label: t.tab })) })),
   {
-    title: "Referència",
+    title: "Informació estructural",
     items: [
       { tab: "perfils" as Tab, label: "Perfils i soldadures" },
       { tab: "fletxes" as Tab, label: "Límits fletxes" },

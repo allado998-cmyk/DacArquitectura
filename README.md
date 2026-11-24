@@ -215,7 +215,7 @@ castellà).
 
 El menú agrupa els tipus a l'esquerra (desplegable al mòbil): **Estintolaments**
 (paret, biga, base pilar), **Biguetes**, **Reforços**, **Estructura vertical**,
-**Paviments**, **Vent**, **Inèrcies**, **Soldadures**, **Referència** (Perfils i
+**Paviments**, **Vent**, **Inèrcies**, **Soldadures**, **Informació estructural** (Perfils i
 soldadures, Límits fletxes) i **Normatives**, amb el nombre de càlculs de cada tipus.
 **Tots els càlculs** els llista tots amb el tipus, per cercar sense saber-lo.
 Cada tipus és un `CalcType` amb el seu grup (`src/lib/calculs/index.ts`, ordre

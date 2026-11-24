@@ -10,6 +10,7 @@ import { actaFileName } from "@/lib/file-names";
 import { refFor } from "@/lib/fitxers-shared";
 import { uploadFitxer } from "@/lib/fitxers-client";
 import { compressImage } from "@/lib/compress-image";
+import { ClientPicker, type ClientOpt } from "./client-picker";
 
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 type Contacte = { nom: string | null; telefon: string | null; mail: string | null; client_nom?: string | null };
@@ -30,7 +31,7 @@ function seedSignatures(a: Acta): ActaSignatura[] {
   return out;
 }
 
-export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedients: ExpedientOpt[]; contactes: Contacte[] }) {
+export function ActaView({ acta, expedients, contactes, clients }: { acta: Acta; expedients: ExpedientOpt[]; contactes: Contacte[]; clients: ClientOpt[] }) {
   const [tipus, setTipus] = useState<string>(acta.tipus);
   const [expedientId, setExpedientId] = useState<number | "">(acta.expedient_id ?? "");
   const [actaNum, setActaNum] = useState(acta.acta_num ?? "");
@@ -309,8 +310,8 @@ export function ActaView({ acta, expedients, contactes }: { acta: Acta; expedien
             <input className="input" value={referencia} onChange={(e) => setReferencia(e.target.value)} onBlur={() => save()} />
           </div>
           <div>
-            <label className="label">Client</label>
-            <input className="input" value={client} onChange={(e) => setClient(e.target.value)} onBlur={() => save()} />
+            <label className="label" htmlFor="acta-client">Client</label>
+            <ClientPicker id="acta-client" value={client} clients={clients} onChange={setClient} onCommit={(v) => save({ client: v })} />
           </div>
           <div className="sm:col-span-2">
             <label className="label">Ubicació</label>

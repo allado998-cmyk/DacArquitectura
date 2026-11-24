@@ -34,6 +34,14 @@ export default async function DescarreguesPage() {
               Les llistes i estadístiques en PDF, com les del botó «PDF» de cada pàgina (sense cap filtre a part de l&apos;any).
               Es generen soles cada dilluns, dimecres i divendres a primera hora del matí, i cada vegada substitueixen les anteriors.
             </p>
+            {/* Once here, not under each «de tots els anys» row, as the studio asked. */}
+            {manifest && (
+              <p className="mt-1 text-sm text-[var(--color-muted)]">
+                {manifest.versio !== VERSIO
+                  ? "Els fitxers «de tots els anys» tenen un PDF per any."
+                  : `Els PDF «de tots els anys» van del ${DES_DE} al ${manifest.anyActual - 1} en un sol fitxer, i cada any comença en una pàgina nova.`}
+              </p>
+            )}
           </div>
           {manifest && (
             <div className="flex flex-col items-start gap-1 sm:items-end">
@@ -101,11 +109,6 @@ function Llista({ manifest }: { manifest: Manifest }) {
             <div className="text-sm font-medium">
               {row.titol}
               {row.anys === "actual" && <span className="font-normal text-[var(--color-muted)]"> ({manifest.anyActual})</span>}
-              {row.anys === "anteriors" && (
-                <div className="text-xs font-normal text-[var(--color-muted)]">
-                  {antic ? "Un PDF per any" : `Del ${DES_DE} al ${manifest.anyActual - 1}, en un sol PDF: cada any comença en una pàgina nova`}
-                </div>
-              )}
             </div>
             <div className="flex flex-wrap gap-1.5 sm:justify-end">
               {items.length === 0 && (

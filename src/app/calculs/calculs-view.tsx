@@ -7,6 +7,8 @@ import { CALC_GROUPS, CALC_TYPES, calcType, type CalcTipus } from "@/lib/calculs
 import { verdict } from "@/lib/calculs/common";
 import { PerfilsRef } from "./perfils-ref";
 import { FletxesRef } from "./fletxes-ref";
+import { NormativaDoc } from "./normatives-ref";
+import { NORMATIVES, isNormativa, type NormativaKey } from "@/lib/calculs/normatives";
 import { BackToTop, StickyFilters } from "@/components/sticky-filters";
 
 export interface CalculRow {
@@ -26,20 +28,22 @@ export interface CalculRow {
 }
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
 // "tots": every calculation, whatever its type; "perfils": the profile and weld
-// tables; "fletxes": the deflection limits.
-type Tab = CalcTipus | "tots" | "perfils" | "fletxes";
+// tables; "fletxes": the deflection limits; "norm-…": a standard of
+// Normatives (src/lib/calculs/normatives.ts).
+type Tab = CalcTipus | "tots" | "perfils" | "fletxes" | NormativaKey;
 
 function fmtData(iso: string | null): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
 
-const isTab = (t: string | undefined): t is Tab => t === "tots" || t === "perfils" || t === "fletxes" || CALC_TYPES.some((x) => x.tipus === t);
+const isTab = (t: string | undefined): t is Tab =>
+  t === "tots" || t === "perfils" || t === "fletxes" || isNormativa(t) || CALC_TYPES.some((x) => x.tipus === t);
 
 // The menu: every type in its group (CALC_GROUPS order: Estintolaments,
 // Biguetes, Reforços, Estructura vertical, Paviments, Vent, Inèrcies,
-// Soldadures), then the reference tables. A sidebar from laptop width up, a
-// grouped dropdown on a phone.
+// Soldadures), then the reference tables and the standards. A sidebar from
+// laptop width up, a grouped dropdown on a phone.
 const MENU = [
   ...CALC_GROUPS.map((g) => ({ title: g, items: CALC_TYPES.filter((t) => t.group === g).map((t) => ({ tab: t.tipus as Tab, label: t.tab })) })),
   {
@@ -49,6 +53,7 @@ const MENU = [
       { tab: "fletxes" as Tab, label: "Límits fletxes" },
     ],
   },
+  { title: "Normatives", items: NORMATIVES.map((n) => ({ tab: n.key as Tab, label: n.label })) },
 ].filter((g) => g.items.length > 0);
 
 export function CalculsView({ calculs, expedients, initialTab }: { calculs: CalculRow[]; expedients: ExpedientOpt[]; initialTab?: string }) {
@@ -63,7 +68,7 @@ export function CalculsView({ calculs, expedients, initialTab }: { calculs: Calc
     for (const c of calculs) m.set(c.tipus, (m.get(c.tipus) ?? 0) + 1);
     return m;
   }, [calculs]);
-  const count = (t: Tab) => (t === "tots" ? calculs.length : t === "perfils" || t === "fletxes" ? null : counts.get(t) ?? 0);
+  const count = (t: Tab) => (t === "tots" ? calculs.length : t === "perfils" || t === "fletxes" || isNormativa(t) ? null : counts.get(t) ?? 0);
 
   return (
     <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -105,6 +110,8 @@ export function CalculsView({ calculs, expedients, initialTab }: { calculs: Calc
           <PerfilsRef />
         ) : tab === "fletxes" ? (
           <FletxesRef />
+        ) : isNormativa(tab) ? (
+          <NormativaDoc k={tab} />
         ) : (
           <CalcList key={tab} tipus={tab} rows={tab === "tots" ? calculs : calculs.filter((c) => c.tipus === tab)} expedients={expedients} />
         )}

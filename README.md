@@ -209,8 +209,8 @@ castellà).
 
 El menú agrupa els tipus a l'esquerra (desplegable al mòbil): **Estintolaments**
 (paret, biga, base pilar), **Biguetes**, **Reforços**, **Estructura vertical**,
-**Paviments**, **Vent**, **Inèrcies**, **Soldadures** i **Referència** (Perfils i
-soldadures), amb el nombre de càlculs de cada tipus.
+**Paviments**, **Vent**, **Inèrcies**, **Soldadures**, **Referència** (Perfils i
+soldadures, Límits fletxes) i **Normatives**, amb el nombre de càlculs de cada tipus.
 **Tots els càlculs** els llista tots amb el tipus, per cercar sense saber-lo.
 Cada tipus és un `CalcType` amb el seu grup (`src/lib/calculs/index.ts`, ordre
 del menú a `CALC_GROUPS`); les famílies es registren a `biguetes.ts`,
@@ -302,6 +302,14 @@ tubs, rodons, ZF, soldadures i acers. Estan transcrites a
 (`public/calculs/perfils/`, una per taula; les d'HEB, HEA i HEM comparteixen
 full). La cerca troba el perfil a qualsevol taula: si no és a l'oberta, salta a
 la que el té.
+
+**Normatives** mostra, per l'ordre que va demanar l'estudi, les normes d'accions
+a l'edificació que s'hi consulten: 1962-MV-101-62, 1988-NBE-AE-88, 2006-CTE DB
+SE-AE i el Resum Històric (si és vigent o derogada surt del mateix resum). Cada
+una és el seu PDF, a `normatives/` (fora de `public/`: el resum és material de
+curs), servit només amb sessió per `/calculs/normatives/<fitxer>` i inclòs a la
+funció per `outputFileTracingIncludes` (`next.config.ts`). Per afegir-ne una:
+el PDF a `normatives/` i una entrada a `src/lib/calculs/normatives.ts`.
 
 Diferències amb els fulls de càlcul, a propòsit (detall a `src/lib/calculs/paret.ts`):
 cada comprovació es fa contra el valor que s'hi mostra (alguns OK!/NO! de l'Excel

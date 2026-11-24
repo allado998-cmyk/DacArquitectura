@@ -115,6 +115,7 @@ export function ExpedientsView({
     label: c.nom,
     sub: c.ciutat ?? undefined,
   }));
+  const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
 
   // Distinct ciutats already in use (from expedients + clients) — used to offer
   // a quick-pick dropdown in the form while still allowing free text.
@@ -170,7 +171,7 @@ export function ExpedientsView({
         )}
       </div>
 
-      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} calculsVinculats={calculsVinculats} onCount={setListCount} />}
+      {tab === "llista" && <ExpedientsList rows={expedients} clientOpts={clientOpts} clientById={clientById} ciutats={ciutats} dedicByExp={dedicByExp} fitesByExp={fitesByExp} tipologies={tipologies} calculs={calculs} propostes={propostes} calculsVinculats={calculsVinculats} onCount={setListCount} />}
       {tab === "estadistiques" && <StatsPanel rows={expedients} tipologies={tipologies} dedicByExp={dedicByExp} />}
       {tab === "mapa" && <MapPanel rows={expedients} clientOpts={clientOpts} ciutats={ciutats} tipologies={tipologies} calculs={calculs} propostes={propostes} />}
     </div>
@@ -239,6 +240,7 @@ function TipologiaBadge({ nom }: { nom: string | null }) {
 function ExpedientsList({
   rows,
   clientOpts,
+  clientById,
   ciutats,
   dedicByExp,
   fitesByExp,
@@ -250,6 +252,7 @@ function ExpedientsList({
 }: {
   rows: Expedient[];
   clientOpts: ComboOption[];
+  clientById: Map<number, Client>;
   ciutats: string[];
   dedicByExp: Map<number, Dedicacio[]>;
   fitesByExp: Map<number, ExpedientFita[]>;
@@ -414,6 +417,7 @@ function ExpedientsList({
 
       <DedicacioModal
         expedient={detail}
+        client={detail?.client_id != null ? clientById.get(detail.client_id) ?? null : null}
         dedicacions={detail ? dedicByExp.get(detail.id) ?? [] : []}
         fites={detail ? fitesByExp.get(detail.id) ?? [] : []}
         calculs={detail ? calculsVinculats.filter((c) => c.expedient_id === detail.id) : []}
@@ -984,14 +988,23 @@ function IconBtn({
   );
 }
 
+// "Passeig Manuel Girona, nº 42, 4º2ª, 08034 Barcelona": the client's street, postal code and city.
+function adrecaClient(c: Client | null): string {
+  if (!c) return "";
+  const lloc = [c.codi_postal, c.ciutat].map((s) => s?.trim()).filter(Boolean).join(" ");
+  return [c.carrer?.trim(), lloc].filter(Boolean).join(", ");
+}
+
 function DedicacioModal({
   expedient,
+  client,
   dedicacions,
   fites,
   calculs,
   onClose,
 }: {
   expedient: Expedient | null;
+  client: Client | null;
   dedicacions: Dedicacio[];
   fites: ExpedientFita[];
   calculs: CalculVinculat[];
@@ -1012,6 +1025,15 @@ function DedicacioModal({
               <Badge swatch={ESTAT[expedient.estat]} label={ESTAT[expedient.estat].label} dot />
             </div>
             <h3 className="text-base font-semibold">{expedient.projecte ?? "Sense projecte"}</h3>
+            {/* Under the project, the client and their address, as the studio asked. */}
+            {expedient.client_nom ? (
+              <div className="mt-0.5 text-sm font-normal">
+                <div>{expedient.client_nom}</div>
+                {adrecaClient(client) && <div className="text-[var(--color-muted)]">{adrecaClient(client)}</div>}
+              </div>
+            ) : (
+              <div className="mt-0.5 text-sm font-normal text-[var(--color-muted)]">Sense client</div>
+            )}
           </div>
         )
       }

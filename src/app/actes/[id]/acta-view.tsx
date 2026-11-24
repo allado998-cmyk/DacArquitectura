@@ -180,6 +180,14 @@ export function ActaView({ acta, expedients, contactes, clients }: { acta: Acta;
   }
   function commitAssistents() { save({ assistents }); }
   function delAssistent(i: number) { setAss(assistents.filter((_, j) => j !== i)); }
+  // ↑ / ↓ on each row: the attendees in the order the studio wants them (the acta prints them in it).
+  function moveAssistent(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= assistents.length) return;
+    const next = [...assistents];
+    [next[i], next[j]] = [next[j], next[i]];
+    setAss(next);
+  }
   function saveNewContact() {
     const nom = ncNom.trim();
     if (!nom && !ncTel.trim() && !ncMail.trim()) { setNewContact(false); return; }
@@ -385,6 +393,7 @@ export function ActaView({ acta, expedients, contactes, clients }: { acta: Acta;
             </div>
           </div>
         )}
+        {assistents.length > 1 && <p className="mb-2 text-xs text-[var(--color-muted)]">Ordena&apos;ls amb les fletxes: l&apos;acta els posa en aquest ordre.</p>}
         <div className="space-y-2">
           {assistents.length === 0 && <p className="text-sm text-[var(--color-muted)]">Cap assistent.</p>}
           {assistents.map((a, i) => (
@@ -394,6 +403,8 @@ export function ActaView({ acta, expedients, contactes, clients }: { acta: Acta;
               </label>
               <input className="input flex-1" placeholder="Nom (inicials)" value={a.nom} onChange={(e) => updAssistent(i, { nom: e.target.value })} onBlur={commitAssistents} />
               <input className="input w-48" placeholder="Empresa / rol" value={a.empresa} onChange={(e) => updAssistent(i, { empresa: e.target.value })} onBlur={commitAssistents} />
+              <button className="btn-ghost" onClick={() => moveAssistent(i, -1)} title="Amunt" aria-label={`Pujar ${a.nom || "l'assistent"}`} disabled={i === 0}>↑</button>
+              <button className="btn-ghost" onClick={() => moveAssistent(i, 1)} title="Avall" aria-label={`Baixar ${a.nom || "l'assistent"}`} disabled={i === assistents.length - 1}>↓</button>
               <button className="btn-ghost" onClick={() => delAssistent(i)} title="Eliminar">✕</button>
             </div>
           ))}

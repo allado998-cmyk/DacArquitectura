@@ -204,6 +204,31 @@ export function contactesListDoc(rows: Pick<ClientContacte, "nom" | "professio" 
   };
 }
 
+// A contact's sheet, the «PDF» button of its window (ticket #35): everything the window shows.
+export function contacteFitxaDoc(
+  c: Pick<ClientContacte, "nom" | "professio" | "telefon" | "telefons_extra" | "mail" | "mails_extra" | "client_nom" | "comentari">,
+  avui: string,
+): PdfDoc {
+  const tots = (main: string | null, extra: readonly string[]) => [main, ...extra].filter((x): x is string => !!x?.trim());
+  const telefons = tots(c.telefon, c.telefons_extra);
+  const mails = tots(c.mail, c.mails_extra);
+  const dades = (
+    [
+      ...telefons.map((t, i) => [telefons.length > 1 ? `Telèfon ${i + 1}` : "Telèfon", t]),
+      ...mails.map((m, i) => [mails.length > 1 ? `Mail ${i + 1}` : "Mail", m]),
+      ["Professió", c.professio ?? ""],
+      ["Client", c.client_nom ?? ""],
+      ["Comentari", c.comentari ?? ""],
+    ] as [string, string][]
+  ).filter(([, v]) => v.trim());
+  return {
+    title: c.nom ?? "Sense nom",
+    subtitle: `Fitxa de contacte · ${avui}`,
+    landscape: false,
+    blocks: [{ kind: "table", table: { title: "Dades", columns: [{ label: "Dada", muted: true }, { label: "Valor" }], rows: dades, narrow: true, plain: true, empty: "Aquest contacte no té cap dada." } }],
+  };
+}
+
 // ============================================================================
 // ITE (informes d'inspecció tècnica)
 // ============================================================================

@@ -43,7 +43,7 @@ import type {
 import { formatEur, formatEurPrecise, parseLocaleNumber } from "@/lib/format";
 import { ambDificultat, tarifaBenzina, tarifaHora } from "@/lib/tarifes";
 import { openPdfDoc } from "@/lib/pdf";
-import { byNom, clientFitxaDoc, clientsListDoc, contactesListDoc } from "@/lib/llistats/llistes";
+import { byNom, clientFitxaDoc, clientsListDoc, contacteFitxaDoc, contactesListDoc } from "@/lib/llistats/llistes";
 import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
 import { Combobox, type ComboOption } from "@/components/combobox";
@@ -853,7 +853,23 @@ function ContacteModal({
   onClose: () => void;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={<h3 className="text-base font-semibold">{contacte ? contacte.nom ?? "Sense nom" : "Nou contacte"}</h3>}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      actions={
+        contacte && (
+          <button
+            type="button"
+            className="btn-ghost btn-sm inline-flex items-center gap-1.5"
+            title="Genera un PDF d'aquesta fitxa"
+            onClick={() => openPdfDoc(contacteFitxaDoc(contacte, avuiCa()))}
+          >
+            <ParamPdfIcon /> PDF
+          </button>
+        )
+      }
+      title={<h3 className="text-base font-semibold">{contacte ? contacte.nom ?? "Sense nom" : "Nou contacte"}</h3>}
+    >
       {open && <ContacteDetail key={contacte?.id ?? "new"} contacte={contacte} presetClientId={presetClientId} clientOpts={clientOpts} onClose={onClose} />}
     </Modal>
   );

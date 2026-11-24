@@ -1209,10 +1209,14 @@ function TasquesPanel({ rows, onCount }: { rows: Tasca[]; onCount: (n: number) =
 function TascaRow({ row }: { row: Tasca }) {
   const [nom, setNom] = useState(row.nom);
   const [, startTransition] = useTransition();
+  // Looks like a Tipologia (the card's line only, no box around the name, as the
+  // studio asked) but the name is still edited in place: a tint while editing.
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[var(--color-line)] bg-white px-2 py-1.5">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-line)] bg-white px-3 py-2">
       <input
-        className="input flex-1 min-w-0"
+        className="flex-1 min-w-0 -mx-1 rounded bg-transparent px-1 text-sm outline-none focus:bg-[var(--color-accent-soft)]"
+        aria-label="Nom de la tasca"
+        title="Clica per canviar el nom"
         value={nom}
         onChange={(e) => setNom(e.target.value)}
         onBlur={() => { if (nom.trim() && nom.trim() !== row.nom) startTransition(() => updateTascaAction(row.id, nom)); }}

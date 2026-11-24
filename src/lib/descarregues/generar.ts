@@ -10,7 +10,7 @@ import { fitxersArea } from "@/lib/fitxers";
 import type { PdfDoc } from "@/lib/llistats/doc";
 import { dedicacioStats, dedicacioStatsDoc } from "@/lib/llistats/dedicacio";
 import { anyExpedient, expedientsListDoc, expedientsStats, expedientsStatsDoc } from "@/lib/llistats/expedients";
-import { facturaYear, facturesListDoc } from "@/lib/llistats/facturacio";
+import { facturaYear, facturacioStats, facturacioStatsDoc, facturesListDoc } from "@/lib/llistats/facturacio";
 import { actesListDoc, byNom, clientsListDoc, contactesListDoc, honorarisListDoc, iteListDoc, propostesListDoc } from "@/lib/llistats/llistes";
 import { runAsActingUser } from "@/lib/acting-user";
 import type { AppUser } from "@/lib/auth";
@@ -113,6 +113,10 @@ export function documents(d: Dades, anyActual: number): Document[] {
     ...perAnys(honoraris, (r) => r.data.slice(0, 4), anyActual, (rows, any) => ({ doc: honorarisListDoc(rows, `Any ${any}`), files: rows.length }), "honoraris"),
     ...perAnys(propostes, (r) => (r.data ?? "").slice(0, 4), anyActual, (rows, any) => ({ doc: propostesListDoc(rows, `Any ${any}`), files: rows.length }), "propostes"),
     ...perAnys(factures, facturaYear, anyActual, (rows, any) => ({ doc: facturesListDoc(rows, suplits, `Any ${any}`, "Cap factura aquest any."), files: rows.length }), "facturacio"),
+    (() => {
+      const rows = factures.filter((f) => facturaYear(f) === Y);
+      return { llista: "facturacio-estadistica" as const, any: anyActual, doc: facturacioStatsDoc(facturacioStats(rows, suplits), `Any ${Y}`), files: rows.length };
+    })(),
     {
       llista: "clients",
       any: null,

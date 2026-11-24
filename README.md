@@ -166,11 +166,19 @@ i la llista de les pendents de cobrament.
 - **Quan:** un cron de Vercel (`vercel.json`, `0 5 * * 1,3,5`: dilluns, dimecres
   i divendres a les 5 UTC, les 6 o les 7 a Barcelona) crida
   `/api/cron/descarregues` amb `Authorization: Bearer <CRON_SECRET>` (variable de
-  Vercel, només a producció). Es pot llançar a mà amb el mateix capçal (`curl`).
+  Vercel, només a producció). Es pot llançar a mà amb el mateix capçal (`curl`),
+  amb `?avis=0` perquè no torni a enviar el correu.
 - **Què fa:** llegeix les dades en una sola tanda de consultes, dibuixa els PDF al
   servidor amb jsPDF (sense navegador; tot plegat, uns segons), els desa al
   magatzem privat en una carpeta nova (`<àrea>/descarregues/<carpeta>/…`, amb
   l'índex a `<àrea>/descarregues/index.json`) i esborra la generació anterior.
+- **Correu:** després de cada generació, l'estudi rep el correu «Actualització
+  dades DAC» amb el Global (ZIP) adjunt (si passés de 15 MB, només l'enllaç) i un
+  botó per obrir Descàrregues (`src/lib/descarregues/avis.ts`). Va a les adreces
+  de `DESCARREGUES_AVIS` (separades per comes) i surt pel Gmail de `SMTP_USER` /
+  `SMTP_PASS` (contrasenya d'aplicació, la mateixa amb què escriu LLM Manager;
+  `src/lib/correu.ts`). Sense aquestes variables no s'envia res; la demo no en
+  rep mai.
 - **Descarregar:** `/descarregues/<carpeta>/<fitxer>` comprova la sessió i només
   serveix fitxers de l'àrea de l'usuari. La pàgina només llegeix l'índex: obrir-la
   no toca la base de dades.
@@ -394,6 +402,8 @@ número ja existeix o si faria saltar el comptador dels expedients nous.
    - `DEMO_DATABASE_URL` (la base de dades `demo` del mateix projecte Neon)
    - `DEMO_PASSWORD` (contrasenya del compte de demostració)
    - `CRON_SECRET` (cadena aleatòria; Vercel l'envia al cron de Descàrregues)
+   - `SMTP_USER`, `SMTP_PASS` (el Gmail i la seva contrasenya d'aplicació) i
+     `DESCARREGUES_AVIS` (a qui va el correu de Descàrregues)
 4. Deploy.
 5. Després del primer deploy, executar `npm run db:migrate` amb la `DATABASE_URL` de producció (la mateixa connexió de Neon funciona des de qualsevol lloc).
 

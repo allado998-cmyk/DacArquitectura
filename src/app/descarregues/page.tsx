@@ -105,10 +105,11 @@ function Llista({ manifest }: { manifest: Manifest }) {
           items = f ? [{ f, label: "PDF", nom: nomDescarrega(row.llista, any) }] : [];
         }
         return (
-          <li key={`${row.llista}-${row.anys}`} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)_9rem] sm:items-center sm:gap-4">
+          <li key={`${row.llista}-${row.anys}`} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(14rem,2fr)_minmax(9rem,1fr)_9rem] sm:items-center sm:gap-4">
             <div className="text-sm font-medium">
               {row.titol}
-              {row.anys === "actual" && <span className="font-normal text-[var(--color-muted)]"> ({manifest.anyActual})</span>}
+              {/* A no-break space: the year always follows «… de l'any en curs» on its line. */}
+              {row.anys === "actual" && <span className="font-normal text-[var(--color-muted)]">&nbsp;({manifest.anyActual})</span>}
             </div>
             <div className="flex flex-wrap gap-1.5 sm:justify-end">
               {items.length === 0 && (

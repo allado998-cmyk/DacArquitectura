@@ -95,17 +95,26 @@ export function docHtml(doc: PdfDoc, origin = typeof window !== "undefined" ? wi
     </body></html>`;
 }
 
-function print(html: string, landscape: boolean) {
-  const w = window.open("", "_blank", landscape ? "width=1100,height=800" : "width=900,height=1000");
-  if (!w) return;
+function print(html: string, landscape: boolean, win?: Window | null) {
+  const w = win ?? window.open("", "_blank", landscape ? "width=1100,height=800" : "width=900,height=1000");
+  if (!w || w.closed) return;
+  w.document.open();
   w.document.write(html);
   w.document.close();
   w.focus();
   setTimeout(() => w.print(), 400);
 }
 
-export function openPdfDoc(doc: PdfDoc) {
-  print(docHtml(doc), doc.landscape);
+// For a PDF that needs data fetched first: open its window during the click
+// (browsers block pop-ups opened after an await) and pass it to openPdfDoc.
+export function openPdfWindow(landscape = false): Window | null {
+  const w = window.open("", "_blank", landscape ? "width=1100,height=800" : "width=900,height=1000");
+  w?.document.write('<p style="font:14px sans-serif;color:#6b6b66;padding:24px">Preparant el PDF…</p>');
+  return w;
+}
+
+export function openPdfDoc(doc: PdfDoc, win?: Window | null) {
+  print(docHtml(doc), doc.landscape, win);
 }
 
 export function openListPdf(opts: {

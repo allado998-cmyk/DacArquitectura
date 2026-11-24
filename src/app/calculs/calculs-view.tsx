@@ -6,6 +6,7 @@ import { createCalculAction, deleteCalculAction, duplicateCalculAction } from ".
 import { CALC_GROUPS, CALC_TYPES, calcType, type CalcTipus } from "@/lib/calculs";
 import { verdict } from "@/lib/calculs/common";
 import { PerfilsRef } from "./perfils-ref";
+import { FletxesRef } from "./fletxes-ref";
 import { BackToTop, StickyFilters } from "@/components/sticky-filters";
 
 export interface CalculRow {
@@ -24,15 +25,16 @@ export interface CalculRow {
   expedient_num: string | null;
 }
 type ExpedientOpt = { id: number; num_expedient: string; projecte: string | null };
-// "tots": every calculation, whatever its type; "perfils": the profile and weld tables.
-type Tab = CalcTipus | "tots" | "perfils";
+// "tots": every calculation, whatever its type; "perfils": the profile and weld
+// tables; "fletxes": the deflection limits.
+type Tab = CalcTipus | "tots" | "perfils" | "fletxes";
 
 function fmtData(iso: string | null): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
 
-const isTab = (t: string | undefined): t is Tab => t === "tots" || t === "perfils" || CALC_TYPES.some((x) => x.tipus === t);
+const isTab = (t: string | undefined): t is Tab => t === "tots" || t === "perfils" || t === "fletxes" || CALC_TYPES.some((x) => x.tipus === t);
 
 // The menu: every type in its group (CALC_GROUPS order: Estintolaments,
 // Biguetes, Reforços, Estructura vertical, Paviments, Vent, Inèrcies,
@@ -40,7 +42,13 @@ const isTab = (t: string | undefined): t is Tab => t === "tots" || t === "perfil
 // grouped dropdown on a phone.
 const MENU = [
   ...CALC_GROUPS.map((g) => ({ title: g, items: CALC_TYPES.filter((t) => t.group === g).map((t) => ({ tab: t.tipus as Tab, label: t.tab })) })),
-  { title: "Referència", items: [{ tab: "perfils" as Tab, label: "Perfils i soldadures" }] },
+  {
+    title: "Referència",
+    items: [
+      { tab: "perfils" as Tab, label: "Perfils i soldadures" },
+      { tab: "fletxes" as Tab, label: "Límits fletxes" },
+    ],
+  },
 ].filter((g) => g.items.length > 0);
 
 export function CalculsView({ calculs, expedients, initialTab }: { calculs: CalculRow[]; expedients: ExpedientOpt[]; initialTab?: string }) {
@@ -55,7 +63,7 @@ export function CalculsView({ calculs, expedients, initialTab }: { calculs: Calc
     for (const c of calculs) m.set(c.tipus, (m.get(c.tipus) ?? 0) + 1);
     return m;
   }, [calculs]);
-  const count = (t: Tab) => (t === "tots" ? calculs.length : t === "perfils" ? null : counts.get(t) ?? 0);
+  const count = (t: Tab) => (t === "tots" ? calculs.length : t === "perfils" || t === "fletxes" ? null : counts.get(t) ?? 0);
 
   return (
     <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -95,6 +103,8 @@ export function CalculsView({ calculs, expedients, initialTab }: { calculs: Calc
       <div className="min-w-0">
         {tab === "perfils" ? (
           <PerfilsRef />
+        ) : tab === "fletxes" ? (
+          <FletxesRef />
         ) : (
           <CalcList key={tab} tipus={tab} rows={tab === "tots" ? calculs : calculs.filter((c) => c.tipus === tab)} expedients={expedients} />
         )}

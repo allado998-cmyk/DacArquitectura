@@ -996,6 +996,15 @@ function adrecaClient(c: Client | null): string {
   return [c.carrer?.trim(), lloc].filter(Boolean).join(", ");
 }
 
+// "Carrer d'Aragó, nº 435, Barcelona": where the works are (the expedient's address and
+// city; the city alone when there is no address, not repeated when the address has it).
+function adrecaProjecte(e: Pick<Expedient, "adreca" | "ciutat">): string {
+  const adreca = e.adreca?.trim() ?? "";
+  const ciutat = e.ciutat?.trim() ?? "";
+  if (ciutat && adreca.toLowerCase().includes(ciutat.toLowerCase())) return adreca;
+  return [adreca, ciutat].filter(Boolean).join(", ");
+}
+
 function DedicacioModal({
   expedient,
   client,
@@ -1052,14 +1061,16 @@ function DedicacioModal({
               <Badge swatch={ESTAT[expedient.estat]} label={ESTAT[expedient.estat].label} dot />
             </div>
             <h3 className="text-base font-semibold">{expedient.projecte ?? "Sense projecte"}</h3>
-            {/* Under the project, the client and their address, as the studio asked. */}
+            {/* Under the project, its address (the works'), then the client and their address,
+                both addresses alike, as the studio asked. */}
+            {adrecaProjecte(expedient) && <div className="text-sm font-normal text-[var(--color-muted)]">{adrecaProjecte(expedient)}</div>}
             {expedient.client_nom ? (
-              <div className="mt-0.5 text-sm font-normal">
+              <div className="mt-1 text-sm font-normal">
                 <div>{expedient.client_nom}</div>
                 {adrecaClient(client) && <div className="text-[var(--color-muted)]">{adrecaClient(client)}</div>}
               </div>
             ) : (
-              <div className="mt-0.5 text-sm font-normal text-[var(--color-muted)]">Sense client</div>
+              <div className="mt-1 text-sm font-normal text-[var(--color-muted)]">Sense client</div>
             )}
           </div>
         )

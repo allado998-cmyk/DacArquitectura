@@ -46,6 +46,7 @@ import { openPdfDoc } from "@/lib/pdf";
 import { byNom, clientFitxaDoc, clientsListDoc, contacteFitxaDoc, contactesListDoc } from "@/lib/llistats/llistes";
 import { confirmaTelefons, telefonAvis, telefonsAmbAvis } from "@/lib/telefon";
 import { Modal } from "@/components/modal";
+import { ShareMenu } from "@/components/share-menu";
 import { Combobox, type ComboOption } from "@/components/combobox";
 import { KpiCard } from "@/components/charts";
 import { BackToTop, StickyFilters } from "@/components/sticky-filters";
@@ -858,14 +859,18 @@ function ContacteModal({
       onClose={onClose}
       actions={
         contacte && (
-          <button
-            type="button"
-            className="btn-ghost btn-sm inline-flex items-center gap-1.5"
-            title="Genera un PDF d'aquesta fitxa"
-            onClick={() => openPdfDoc(contacteFitxaDoc(contacte, avuiCa()))}
-          >
-            <ParamPdfIcon /> PDF
-          </button>
+          <>
+            {/* The same sheet as the PDF, by e-mail, WhatsApp… (ticket #42). */}
+            <ShareMenu doc={() => contacteFitxaDoc(contacte, avuiCa())} subject={`Fitxa de contacte: ${contacte.nom ?? "Sense nom"}`} />
+            <button
+              type="button"
+              className="btn-ghost btn-sm inline-flex items-center gap-1.5"
+              title="Genera un PDF d'aquesta fitxa"
+              onClick={() => openPdfDoc(contacteFitxaDoc(contacte, avuiCa()))}
+            >
+              <ParamPdfIcon /> PDF
+            </button>
+          </>
         )
       }
       title={<h3 className="text-base font-semibold">{contacte ? contacte.nom ?? "Sense nom" : "Nou contacte"}</h3>}
@@ -1460,14 +1465,18 @@ function ClientFormModal({
       wide
       actions={
         client && (
-          <button
-            type="button"
-            className="btn-ghost btn-sm inline-flex items-center gap-1.5"
-            title="Genera un PDF d'aquesta fitxa"
-            onClick={() => openPdfDoc(clientFitxaDoc(client, stats ?? EMPTY_STATS, contactes, avuiCa()))}
-          >
-            <ParamPdfIcon /> PDF
-          </button>
+          <>
+            {/* The same sheet as the PDF, by e-mail, WhatsApp… (ticket #41). */}
+            <ShareMenu doc={() => clientFitxaDoc(client, stats ?? EMPTY_STATS, contactes, avuiCa())} subject={`Fitxa de client: ${client.nom}`} />
+            <button
+              type="button"
+              className="btn-ghost btn-sm inline-flex items-center gap-1.5"
+              title="Genera un PDF d'aquesta fitxa"
+              onClick={() => openPdfDoc(clientFitxaDoc(client, stats ?? EMPTY_STATS, contactes, avuiCa()))}
+            >
+              <ParamPdfIcon /> PDF
+            </button>
+          </>
         )
       }
       title={<h3 className="text-lg font-semibold tracking-tight">{client ? client.nom : "Nou client"}</h3>}

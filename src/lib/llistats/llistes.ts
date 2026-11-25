@@ -141,11 +141,13 @@ export function clientsListDoc(rows: Pick<Client, "id" | "nom" | "nif" | "ciutat
   };
 }
 
-// A client's sheet, the «PDF» button of its window (ticket #34): the figures,
-// the data and the contacts, as the window shows them.
+// A client's sheet, the «PDF» button of its window (ticket #34): the number of
+// expedients, the data and the contacts, as the window shows them. The window's
+// other figures (open expedients, total and open budget) stay out of the PDF, as
+// the studio asked (tickets #38–#40).
 export function clientFitxaDoc(
   c: Pick<Client, "nom" | "nif" | "carrer" | "ciutat" | "codi_postal">,
-  stats: Pick<ClientStats, "n" | "oberts" | "pressupost_total" | "pressupost_obert">,
+  stats: Pick<ClientStats, "n">,
   contactes: readonly Pick<ClientContacte, "nom" | "professio" | "telefon" | "telefons_extra" | "mail" | "mails_extra">[],
   avui: string,
 ): PdfDoc {
@@ -164,15 +166,7 @@ export function clientFitxaDoc(
     subtitle: `Fitxa de client · ${avui}`,
     landscape: false,
     blocks: [
-      {
-        kind: "kpis",
-        items: [
-          { label: "Expedients", value: String(stats.n) },
-          { label: "Oberts", value: String(stats.oberts) },
-          { label: "Pressupost total", value: formatEur(num(stats.pressupost_total)) },
-          { label: "Pressupost en obert", value: formatEur(num(stats.pressupost_obert)) },
-        ],
-      },
+      { kind: "kpis", items: [{ label: "Expedients", value: String(stats.n) }] },
       { kind: "table", table: { title: "Dades", columns: [{ label: "Dada", muted: true }, { label: "Valor" }], rows: dades, narrow: true, plain: true } },
       {
         kind: "table",

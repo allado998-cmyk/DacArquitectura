@@ -123,7 +123,7 @@ export async function geocodeAddress(text: string): Promise<LatLng | null> {
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
         signal: ctrl.signal,
-        headers: { "user-agent": "DacArquitectura/1.0 (https://dac-arquitectura.vercel.app)", "accept-language": "ca,es" },
+        headers: { "user-agent": "DacArquitectura/1.0 (https://dac.adriallm.com)", "accept-language": "ca,es" },
       });
       if (!res.ok) continue;
       const rows = (await res.json()) as { lat: string; lon: string }[];

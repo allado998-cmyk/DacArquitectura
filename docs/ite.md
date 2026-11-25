@@ -53,9 +53,10 @@ certificat no surt mai del seu navegador.
    permisos. Funciona amb tots els models públics, sigui quin sigui el pla.
 3. **Connector DacArquitectura**: a claude.ai → Configuració → Connectors →
    *Afegir connector personalitzat* → URL
-   `https://dac-arquitectura.vercel.app/api/mcp` (sense client ID ni secret) →
+   `https://dac.adriallm.com/api/mcp` (sense client ID ni secret) →
    Connecta → entrar amb l'usuari `adri` → **Autoritzar**. La guia és la pàgina
-   `/ai` de l'app (cal haver entrat a l'app).
+   `/ai` de l'app (cal haver entrat a l'app). Els connectors creats abans amb
+   `https://dac-arquitectura.vercel.app/api/mcp` continuen funcionant.
 
 ### On escriure la petició
 
